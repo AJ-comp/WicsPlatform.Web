@@ -1,0 +1,127 @@
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.OData;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OData.ModelBuilder;
+using Mythosia.Azure;
+using Radzen;
+using WicsPlatform.Server.Components;
+using WicsPlatform.Server.Data;
+using WicsPlatform.Server.Middleware;
+using WicsPlatform.Server.Models;
+using WicsPlatform.Server.Services;
+
+static async Task RegisterDBContextWithKeyVaultAsync(WebApplicationBuilder builder)
+{
+    // Key Vault에서 접속 문자열 가져오기
+    SecretFetcher secretFatcher = new SecretFetcher("https://database-login.vault.azure.net", "WicsConnectionString");
+    var connectionString = await secretFatcher.GetKeyValueAsync();
+    // DbContext를 종속성 주입을 통해 등록
+    builder.Services.AddDbContext<wicsContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    builder.Services.AddDbContext<wicsContext>(options =>
+    {
+        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    });
+    builder.Services.AddDbContext<ApplicationIdentityDbContext>(options =>
+    {
+        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    });
+    builder.Services.AddIdentity<ApplicationUser, ApplicationRole>().AddEntityFrameworkStores<ApplicationIdentityDbContext>().AddDefaultTokenProviders();
+    builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
+    {
+        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    });
+    builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastWebSocketService>();
+}
+
+var builder = WebApplication.CreateBuilder(args);
+// Add services to the container.
+builder.Services.AddRazorComponents().AddInteractiveWebAssemblyComponents();
+builder.Services.AddControllers();
+builder.Services.AddRadzenComponents();
+builder.Services.AddRadzenCookieThemeService(options =>
+{
+    options.Name = "WicsPlatformTheme";
+    options.Duration = TimeSpan.FromDays(365);
+});
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<WicsPlatform.Server.wicsService>();
+builder.Services.AddSingleton<IUdpBroadcastService, UdpBroadcastService>();
+await RegisterDBContextWithKeyVaultAsync(builder);
+builder.Services.AddControllers().AddOData(opt =>
+{
+    var oDataBuilderwics = new ODataConventionModelBuilder();
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Broadcast>("Broadcasts");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Channel>("Channels");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Group>("Groups");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelMedium>("MapChannelMedia");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelTt>("MapChannelTts");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapMediaGroup>("MapMediaGroups");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapSpeakerGroup>("MapSpeakerGroups");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Medium>("Media");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Mic>("Mics");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Speaker>("Speakers");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Tt>("Tts");
+    opt.AddRouteComponents("odata/wics", oDataBuilderwics.GetEdmModel()).Count().Filter().OrderBy().Expand().Select().SetMaxTop(null).TimeZone = TimeZoneInfo.Utc;
+});
+builder.Services.AddScoped<WicsPlatform.Client.wicsService>();
+builder.Services.AddHttpClient("WicsPlatform.Server").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseCookies = false }).AddHeaderPropagation(o => o.Headers.Add("Cookie"));
+builder.Services.AddHeaderPropagation(o => o.Headers.Add("Cookie"));
+builder.Services.AddAuthentication();
+builder.Services.AddAuthorization();
+builder.Services.AddScoped<WicsPlatform.Client.SecurityService>();
+builder.Services.AddControllers().AddOData(o =>
+{
+    var oDataBuilder = new ODataConventionModelBuilder();
+    oDataBuilder.EntitySet<ApplicationUser>("ApplicationUsers");
+    var usersType = oDataBuilder.StructuralTypes.First(x => x.ClrType == typeof(ApplicationUser));
+    usersType.AddProperty(typeof(ApplicationUser).GetProperty(nameof(ApplicationUser.Password)));
+    usersType.AddProperty(typeof(ApplicationUser).GetProperty(nameof(ApplicationUser.ConfirmPassword)));
+    oDataBuilder.EntitySet<ApplicationRole>("ApplicationRoles");
+    o.AddRouteComponents("odata/Identity", oDataBuilder.GetEdmModel()).Count().Filter().OrderBy().Expand().Select().SetMaxTop(null).TimeZone = TimeZoneInfo.Utc;
+});
+builder.Services.AddScoped<AuthenticationStateProvider, WicsPlatform.Client.ApplicationAuthenticationStateProvider>();
+// Add CORS policy to allow the client to access the server API from browser
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyMethod().AllowAnyHeader().SetIsOriginAllowed(_ => true) // 또는 .WithOrigins("https://localhost:50553")
+        .AllowCredentials(); // 이 부분이 중요!
+    });
+});
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.SameSite = SameSiteMode.Lax; // None -> Lax 변경
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Always -> SameAsRequest 변경
+});
+builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
+{
+    options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
+});
+var app = builder.Build();
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseWebAssemblyDebugging();
+}
+else
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+// app.UseHsts();  // 주석 처리
+}
+
+// app.UseHttpsRedirection();  // 주석 처리
+app.UseStaticFiles(); // 추가
+app.UseCors("AllowAll"); // Apply CORS policy
+app.MapControllers();
+app.UseHeaderPropagation();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseWebSockets();
+app.UseMiddleware<WicsPlatform.Server.Middleware.WebSocketMiddleware>();
+app.UseAntiforgery();
+app.MapRazorComponents<App>().AddInteractiveWebAssemblyRenderMode().AddAdditionalAssemblies(typeof(WicsPlatform.Client._Imports).Assembly);
+app.Services.CreateScope().ServiceProvider.GetRequiredService<ApplicationIdentityDbContext>().Database.Migrate();
+app.Run();

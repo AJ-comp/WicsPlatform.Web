@@ -1,0 +1,127 @@
+@attribute [Authorize]
+
+<div class="add-tts-to-channel-dialog">
+    <div class="dialog-header">
+        <RadzenIcon Icon="record_voice_over" Style="font-size: 32px; margin-right: 12px;" />
+        <RadzenText TextStyle="TextStyle.H5" class="mb-0">채널에 TTS 추가</RadzenText>
+    </div>
+
+    <div class="dialog-description">
+        <RadzenText TextStyle="TextStyle.Body2">
+            선택한 TTS를 채널에 추가합니다. 추가할 채널을 선택해주세요.
+        </RadzenText>
+    </div>
+
+    <RadzenAlert Shade="Shade.Lighter" Variant="Variant.Flat" Size="AlertSize.Small"
+                 AlertStyle="AlertStyle.Danger" Visible="@errorVisible">
+        <RadzenIcon Icon="error_outline" class="me-2" />
+        @error
+    </RadzenAlert>
+
+    <div class="selected-count mb-4">
+        <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true" Text="@($"{selectedTts.Count()} 개 TTS 선택됨")" />
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 50%; height: 8px; margin: 0 auto;" />
+            <RadzenText TextStyle="TextStyle.Body1" class="mt-3 mb-0">채널 목록을 불러오는 중입니다...</RadzenText>
+        </div>
+    }
+    else if (channels == null || !channels.Any())
+    {
+        <div class="text-center py-5">
+            <RadzenIcon Icon="speaker_group" Style="font-size: 48px; opacity: 0.5;" class="mb-3" />
+            <RadzenText TextStyle="TextStyle.H5" class="mb-2">채널이 없습니다</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="mb-3">먼저 채널을 생성해주세요.</RadzenText>
+        </div>
+    }
+    else
+    {
+        <div class="form-section">
+            <RadzenRow style="margin-bottom: 1.5rem">
+                <RadzenColumn SizeMD="3">
+                    <RadzenLabel Text="채널" Component="ChannelId" style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn SizeMD="9">
+                    <div class="custom-input-container">
+                        <RadzenIcon Icon="speaker_group" />
+                        <RadzenDropDown @bind-Value="selectedChannelId"
+                                        Data="@channels"
+                                        TextProperty="Name"
+                                        ValueProperty="Id"
+                                        AllowClear="false"
+                                        AllowFiltering="true"
+                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                        Placeholder="채널 선택..."
+                                        style="display: block; width: 100%; padding-left: 35px;"
+                                        Name="ChannelId" />
+                    </div>
+                </RadzenColumn>
+            </RadzenRow>
+        </div>
+    }
+
+    <div class="form-actions">
+        <RadzenButton ButtonStyle="ButtonStyle.Light" Text="취소" Click="@CancelClick" Variant="Variant.Flat" class="me-2" Disabled="@isProcessing" />
+        @if (isProcessing)
+        {
+            <RadzenButton ButtonType="ButtonType.Button" Text="처리 중..." Icon="sync" IconSpin="true"
+                          Disabled="true" Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" />
+        }
+        else
+        {
+            <RadzenButton ButtonType="ButtonType.Button" Icon="record_voice_over" Text="추가"
+                          Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary"
+                          Click="@AddToChannel"
+                          Disabled="@(channels == null || !channels.Any() || selectedChannelId == 0 || isLoading || selectedTts == null || !selectedTts.Any())" />
+        }
+    </div>
+</div>
+
+<style>
+    .add-tts-to-channel-dialog {
+        padding: 0;
+    }
+
+    .dialog-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .dialog-description {
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--rz-border-light);
+    }
+
+    .form-section {
+        margin-bottom: 20px;
+    }
+
+    .custom-input-container {
+        position: relative;
+    }
+
+        .custom-input-container .rz-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 16px;
+        margin-top: 16px;
+        border-top: 1px solid var(--rz-border-light);
+    }
+
+    .selected-count {
+        margin-top: 10px;
+    }
+</style>

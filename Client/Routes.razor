@@ -1,0 +1,61 @@
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(Program).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData">
+                <NotAuthorized>
+                    @{
+                        var path = routeData.PageType.Name;
+                        var isPublicPage = path == "Login" || path == "AdminSetup";
+                    }
+                    @if (isPublicPage)
+                    {
+                        @childContent(routeData)
+                    }
+                    else
+                    {
+                        <RedirectToLogin IsAuthenticated="@context.User.Identity.IsAuthenticated" />
+                    }
+                </NotAuthorized>
+                <Authorizing>
+                    <div style="text-align: center; padding: 50px;">
+                        <p>인증 확인 중...</p>
+                    </div>
+                </Authorizing>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <RadzenRow>
+                    <RadzenColumn Size="12" style="margin-top: 5rem; margin-bottom: 5rem">
+                        <RadzenText Text="Page not found" TextStyle="TextStyle.DisplayH1" style="margin: 0; margin-bottom: 2rem" TextAlign="TextAlign.Center" />
+                        <RadzenText Text="Sorry, but there's nothing here!" TextStyle="TextStyle.H6" style="margin: 0" TextAlign="TextAlign.Center" TagName="TagName.P" />
+                    </RadzenColumn>
+                </RadzenRow>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+@code {
+    [Inject] IJSRuntime JSRuntime { get; set; }
+
+    private RenderFragment childContent(RouteData routeData) => builder =>
+    {
+        builder.OpenComponent(0, routeData.PageType);
+        foreach (var kvp in routeData.RouteValues)
+        {
+            builder.AddAttribute(1, kvp.Key, kvp.Value);
+        }
+        builder.CloseComponent();
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Routes가 렌더링되면 로딩 화면 제거
+            await JSRuntime.InvokeVoidAsync("removeLoadingScreen");
+        }
+    }
+}

@@ -1,0 +1,58 @@
+@layout LoginLayout
+@page "/admin-setup"
+
+<PageTitle>관리자 계정 설정</PageTitle>
+<RadzenText Text="관리자 계정 생성" TextStyle="Radzen.Blazor.TextStyle.H5" class="mb-4" TagName="Radzen.Blazor.TagName.H2" />
+<RadzenRow>
+    <RadzenColumn SizeMD="12">
+        <RadzenTemplateForm TItem="AdminSetupModel" Data="@model" Submit="@HandleSetup">
+            <RadzenAlert Shade="Radzen.Shade.Lighter" Variant="Radzen.Variant.Flat" Size="Radzen.AlertSize.Small" AlertStyle="Radzen.AlertStyle.Danger" Visible="@errorVisible">@error</RadzenAlert>
+            <RadzenAlert Shade="Radzen.Shade.Lighter" Variant="Radzen.Variant.Flat" Size="Radzen.AlertSize.Small" AlertStyle="Radzen.AlertStyle.Info" Visible="@infoVisible">@info</RadzenAlert>
+
+            @if (isLoading)
+            {
+                <div class="d-flex justify-content-center my-3">
+                    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 100%; height: 8px;" />
+                </div>
+            }
+            else
+            {
+                <RadzenRow style="margin-bottom: 1rem">
+                    <RadzenColumn SizeMD="3">
+                        <RadzenLabel Text="이메일" Component="Email" />
+                    </RadzenColumn>
+                    <RadzenColumn SizeMD="9">
+                        <RadzenTextBox Name="Email" @bind-Value="@model.Email" Style="display: block; width: 100%;" />
+                        <RadzenRequiredValidator Text="이메일을 입력해주세요" Component="Email" />
+                        <RadzenEmailValidator Text="올바른 이메일 형식을 입력해주세요" Component="Email" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow style="margin-bottom: 1rem">
+                    <RadzenColumn SizeMD="3">
+                        <RadzenLabel Text="비밀번호" Component="Password" />
+                    </RadzenColumn>
+                    <RadzenColumn SizeMD="9">
+                        <RadzenPassword Name="Password" @bind-Value="@model.Password" Style="display: block; width: 100%;" />
+                        <RadzenRequiredValidator Text="비밀번호를 입력해주세요" Component="Password" />
+                        <RadzenLengthValidator Min="6" Text="비밀번호는 최소 6자 이상이어야 합니다" Component="Password" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow style="margin-bottom: 1rem">
+                    <RadzenColumn SizeMD="3">
+                        <RadzenLabel Text="비밀번호 확인" Component="ConfirmPassword" />
+                    </RadzenColumn>
+                    <RadzenColumn SizeMD="9">
+                        <RadzenPassword Name="ConfirmPassword" @bind-Value="@model.ConfirmPassword" Style="display: block; width: 100%;" />
+                        <RadzenRequiredValidator Text="비밀번호 확인을 입력해주세요" Component="ConfirmPassword" />
+                        <RadzenCompareValidator Text="비밀번호가 일치하지 않습니다" Component="ConfirmPassword" Value="@model.Password" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn Size="12" Class="d-flex justify-content-end">
+                        <RadzenButton ButtonType="ButtonType.Submit" Text="관리자 계정 생성" ButtonStyle="ButtonStyle.Primary" />
+                    </RadzenColumn>
+                </RadzenRow>
+            }
+        </RadzenTemplateForm>
+    </RadzenColumn>
+</RadzenRow>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="_content/Radzen.Blazor/css/material-base.css">
+    <link rel="stylesheet" href="WicsPlatform.Client.styles.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet @rendermode="InteractiveWebAssembly" />
+    <style>
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.3s ease-out;
+        }
+
+        [data-theme="dark"] #loading-screen {
+            background-color: #1a1a1a;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        [data-theme="dark"] .loading-spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #3498db;
+        }
+
+        @@keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            position: absolute;
+            margin-top: 80px;
+            color: #333;
+            font-family: Arial, sans-serif;
+        }
+
+        [data-theme="dark"] .loading-text {
+            color: #ccc;
+        }
+
+        .fade-out {
+            opacity: 0 !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading-screen">
+        <div>
+            <div class="loading-spinner"></div>
+            <div class="loading-text">로딩중...</div>
+        </div>
+    </div>
+
+    <Routes @rendermode="InteractiveWebAssembly" />
+    <script src="_framework/blazor.web.js"></script>
+    <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
+    <script>
+        // Blazor가 준비되면 로딩 화면 제거
+        window.removeLoadingScreen = function() {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 300);
+            }
+        };
+
+        // TTS 재생 함수들
+        window.playTTS = function(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ko-KR';
+                window.speechSynthesis.speak(utterance);
+            }
+        };
+
+        window.stopTTS = function() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+        };
+    </script>
+
+
+    <script>
+        // Base64 데이터를 파일로 다운로드하는 함수
+        window.downloadBase64File = function(base64Data, fileName, mimeType) {
+            // Base64를 Blob으로 변환
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: mimeType });
+
+            // 다운로드 링크 생성
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // 메모리 정리
+            URL.revokeObjectURL(link.href);
+        };
+    </script>
+</body>
+
+</html>

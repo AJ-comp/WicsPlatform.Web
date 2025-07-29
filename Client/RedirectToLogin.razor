@@ -1,0 +1,33 @@
+@inject NavigationManager NavigationManager
+
+@code {
+    [Parameter]
+    public bool IsAuthenticated { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check current route - if it's one of the public pages, don't redirect
+        var currentPath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).ToLower();
+        if (currentPath.StartsWith("admin-setup") || currentPath.StartsWith("login"))
+        {
+            return;
+        }
+
+        if (!IsAuthenticated)
+        {
+            var redirectUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            if (!string.IsNullOrEmpty(redirectUrl))
+            {
+                NavigationManager.NavigateTo($"Login?redirectUrl={Uri.EscapeDataString(redirectUrl)}", true);
+            }
+            else
+            {
+                NavigationManager.NavigateTo("Login", true);
+            }
+        }
+        else
+        {
+            NavigationManager.NavigateTo("Unauthorized");
+        }
+    }
+}

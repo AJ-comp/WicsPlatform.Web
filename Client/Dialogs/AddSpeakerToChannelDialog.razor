@@ -1,0 +1,134 @@
+@attribute [Authorize]
+
+<div class="add-speaker-dialog">
+    <div class="dialog-header">
+        <RadzenIcon Icon="speaker_group" Style="font-size: 32px; margin-right: 12px;" />
+        <RadzenText TextStyle="TextStyle.H5" class="mb-0">채널에 스피커 추가</RadzenText>
+    </div>
+
+    <div class="dialog-description">
+        <RadzenText TextStyle="TextStyle.Body2">
+            '<strong>@ChannelName</strong>' 채널에 연결할 스피커를 선택해주세요.
+            선택한 스피커는 이 채널에 연결되어 통합 제어됩니다.
+        </RadzenText>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 50%; height: 8px; margin: 0 auto;" />
+            <RadzenText TextStyle="TextStyle.Body1" class="mt-3 mb-0">스피커 목록을 불러오는 중입니다...</RadzenText>
+        </div>
+    }
+    else if (unassignedSpeakers == null || !unassignedSpeakers.Any())
+    {
+        <div class="text-center py-5">
+            <RadzenIcon Icon="speaker_notes_off" Style="font-size: 48px; opacity: 0.5;" class="mb-3" />
+            <RadzenText TextStyle="TextStyle.H5" class="mb-2">연결 가능한 스피커가 없습니다</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="mb-3">현재 모든 스피커가 채널에 할당되어 있거나, 등록된 스피커가 없습니다.</RadzenText>
+        </div>
+    }
+    else
+    {
+        <RadzenAlert Shade="Shade.Lighter" Variant="Variant.Flat" Size="AlertSize.Small"
+                     AlertStyle="AlertStyle.Danger" Visible="@errorVisible">
+            <RadzenIcon Icon="error_outline" class="me-2" />
+            @error
+        </RadzenAlert>
+
+        <RadzenDataGrid @ref="speakersGrid"
+                        Data="@unassignedSpeakers"
+                        AllowPaging="true"
+                        PageSize="5"
+                        AllowSorting="true"
+                        SelectionMode="DataGridSelectionMode.Multiple"
+                        @bind-Value="@selectedSpeakers"
+                        EmptyText="연결 가능한 스피커가 없습니다"
+                        Class="speaker-selection-grid">
+            <Columns>
+                <RadzenDataGridColumn TItem="SpeakerModel" Width="40px" Sortable="false" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <RadzenCheckBox TriState="false" TValue="bool" @bind-Value="@selectAllChecked"
+                                        Change="@SelectAllSpeakersChanged" />
+                    </HeaderTemplate>
+                    <Template Context="speaker">
+                        <RadzenCheckBox TriState="false" TValue="bool" Value="@(IsSpeakerSelected(speaker))"
+                                        Change="@(args => SpeakerSelectionChanged(args, speaker))" />
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="SpeakerModel" Title="단말기명" Width="120px">
+                    <Template Context="speaker">
+                        <div class="d-flex align-items-center">
+                            <RadzenIcon Icon="router" Class="me-2" />
+                            <div class="fw-bold">@speaker.Name</div>
+                        </div>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="SpeakerModel" Property="Ip" Title="IP 주소" Width="140px" />
+                <RadzenDataGridColumn TItem="SpeakerModel" Property="Location" Title="설치 위치" Width="140px" />
+                <RadzenDataGridColumn TItem="SpeakerModel" Property="Status" Title="상태" Width="80px" TextAlign="TextAlign.Center">
+                    <Template Context="speaker">
+                        <RadzenBadge BadgeStyle="@GetDeviceStatusBadgeStyle(speaker.Status)" IsPill="true" Text="@speaker.Status" />
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+
+        <div class="selected-count mt-3 mb-2">
+            <RadzenText TextStyle="TextStyle.Body2">
+                @selectedSpeakers.Count() 개 스피커 선택됨
+            </RadzenText>
+        </div>
+    }
+
+    <div class="form-actions">
+        <RadzenButton ButtonStyle="ButtonStyle.Light" Text="취소" Click="@CancelClick" Variant="Variant.Flat" class="me-2" Disabled="@isProcessing" />
+        @if (isProcessing)
+        {
+            <RadzenButton ButtonType="ButtonType.Button" Text="처리 중..." Icon="sync" IconSpin="true"
+                          Disabled="true" Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" />
+        }
+        else
+        {
+            <RadzenButton ButtonType="ButtonType.Button" Icon="link" Text="스피커 연결"
+                          Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary"
+                          Click="@AssignSpeakers"
+                          Disabled="@(selectedSpeakers == null || !selectedSpeakers.Any() || isLoading)" />
+        }
+    </div>
+</div>
+
+<style>
+    .add-speaker-dialog {
+        padding: 0;
+    }
+
+    .dialog-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .dialog-description {
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--rz-border-light);
+    }
+
+    .speaker-selection-grid {
+        margin-bottom: 20px;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 16px;
+        margin-top: 16px;
+        border-top: 1px solid var(--rz-border-light);
+    }
+
+    .selected-count {
+        text-align: right;
+        color: var(--rz-text-secondary-color);
+    }
+</style>

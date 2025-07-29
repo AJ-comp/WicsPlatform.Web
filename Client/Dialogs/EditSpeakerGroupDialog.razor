@@ -1,0 +1,144 @@
+@attribute [Authorize]
+
+<div class="edit-speaker-group-dialog">
+    <div class="dialog-header">
+        <RadzenIcon Icon="edit" Style="font-size: 32px; margin-right: 12px;" />
+        <RadzenText TextStyle="TextStyle.H5" class="mb-0">스피커 그룹 수정</RadzenText>
+    </div>
+
+    <div class="dialog-description">
+        <RadzenText TextStyle="TextStyle.Body2">
+            스피커 그룹의 정보를 수정합니다. 그룹명과 설명을 변경할 수 있습니다.
+        </RadzenText>
+    </div>
+
+    <RadzenTemplateForm TItem="SpeakerGroupFormModel" Data="@model" Submit="@FormSubmit">
+        <RadzenAlert Shade="Shade.Lighter" Variant="Variant.Flat" Size="AlertSize.Small"
+                     AlertStyle="AlertStyle.Danger" Visible="@errorVisible">
+            <RadzenIcon Icon="error_outline" class="me-2" />
+            @error
+        </RadzenAlert>
+
+        <div class="form-section">
+            <div class="form-section-header">
+                <RadzenText TextStyle="TextStyle.Subtitle2" Class="mb-2">그룹 정보</RadzenText>
+                <div class="section-divider"></div>
+            </div>
+
+            <RadzenRow style="margin-bottom: 1.5rem">
+                <RadzenColumn SizeMD="3">
+                    <RadzenLabel Text="그룹명" Component="GroupName" style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn SizeMD="9">
+                    <div class="custom-input-container">
+                        <RadzenIcon Icon="group" />
+                        <RadzenTextBox style="display: block; width: 100%; padding-left: 35px;"
+                                       Placeholder="그룹 이름 입력..."
+                                       @bind-Value="@(model.GroupName)" Name="GroupName" />
+                    </div>
+                    <RadzenRequiredValidator Component="GroupName" Text="그룹명은 필수입니다" Style="position: absolute" />
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow style="margin-bottom: 1.5rem">
+                <RadzenColumn SizeMD="3">
+                    <RadzenLabel Text="설명" Component="Description" style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn SizeMD="9">
+                    <div class="custom-input-container">
+                        <RadzenIcon Icon="description" Style="align-self: flex-start; margin-top: 8px;" />
+                        <RadzenTextArea Rows="4" style="display: block; width: 100%; padding-left: 35px;"
+                                        Placeholder="그룹 설명 입력 (선택사항)..."
+                                        @bind-Value="@(model.Description)" Name="Description" />
+                    </div>
+                </RadzenColumn>
+            </RadzenRow>
+        </div>
+
+        <div class="form-actions">
+            <RadzenButton ButtonStyle="ButtonStyle.Light" Text="취소" Click="@CancelClick" Variant="Variant.Flat" class="me-2" Disabled="@isProcessing" />
+            @if (isProcessing)
+            {
+                <RadzenButton ButtonType="ButtonType.Submit" Text="처리 중..." Icon="sync" IconSpin="true"
+                              Disabled="true" Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" />
+            }
+            else
+            {
+                <RadzenButton ButtonType="ButtonType.Submit" Icon="save" Text="저장"
+                              Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" />
+            }
+        </div>
+    </RadzenTemplateForm>
+</div>
+
+<style>
+    .edit-speaker-group-dialog {
+        padding: 0;
+    }
+
+    .dialog-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .dialog-description {
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--rz-border-light);
+    }
+
+    .form-section {
+        margin-bottom: 20px;
+    }
+
+    .form-section-header {
+        margin-bottom: 16px;
+    }
+
+    .section-divider {
+        height: 2px;
+        background: var(--rz-border-light);
+        width: 100%;
+        margin-top: 4px;
+    }
+
+    .custom-input-container {
+        position: relative;
+    }
+
+        .custom-input-container .rz-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 16px;
+        margin-top: 16px;
+        border-top: 1px solid var(--rz-border-light);
+    }
+
+    /* 스크롤바 스타일 수정 - 테마와 일치하도록 */
+    ::deep .rz-textarea::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    ::deep .rz-textarea::-webkit-scrollbar-track {
+        background: var(--rz-base-background-color);
+        border-radius: 4px;
+    }
+
+    ::deep .rz-textarea::-webkit-scrollbar-thumb {
+        background: var(--rz-secondary-lighter);
+        border-radius: 4px;
+    }
+
+        ::deep .rz-textarea::-webkit-scrollbar-thumb:hover {
+            background: var(--rz-secondary-light);
+        }
+</style>

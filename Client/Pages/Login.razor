@@ -1,0 +1,49 @@
+@layout LoginLayout
+@page "/login"
+
+<PageTitle>Login</PageTitle>
+<RadzenText Text="Login" TextStyle="Radzen.Blazor.TextStyle.H5" class="mb-4" TagName="Radzen.Blazor.TagName.H2" />
+<RadzenRow>
+    <RadzenColumn SizeMD="12">
+        <form action="Account/Login" method="post">
+            <RadzenAlert Shade="Radzen.Shade.Lighter" Variant="Radzen.Variant.Flat" Size="Radzen.AlertSize.Small" AlertStyle="Radzen.AlertStyle.Danger" Visible="@errorVisible">@error</RadzenAlert>
+            <RadzenAlert Shade="Radzen.Shade.Lighter" Variant="Radzen.Variant.Flat" Size="Radzen.AlertSize.Small" AlertStyle="Radzen.AlertStyle.Info" Visible="@infoVisible">@info</RadzenAlert>
+
+            @if (isLoading)
+            {
+                <div class="d-flex justify-content-center my-3">
+                    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 100%; height: 8px;" />
+                </div>
+            }
+            else
+            {
+                <RadzenRow style="margin-bottom: 1rem">
+                    <RadzenColumn SizeMD="3">
+                        <RadzenLabel Text="Email" Component="Email" />
+                    </RadzenColumn>
+                    <RadzenColumn SizeMD="9">
+                        <RadzenTextBox Name="userName" @bind-Value="@loginModel.UserName" Style="display: block; width: 100%;" />
+                        <RadzenRequiredValidator Text="Email is required" Component="Email" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow style="margin-bottom: 1rem">
+                    <RadzenColumn SizeMD="3">
+                        <RadzenLabel Text="Password" Component="Password" />
+                    </RadzenColumn>
+                    <RadzenColumn SizeMD="9">
+                        <RadzenPassword Name="password" @bind-Value="@loginModel.Password" Style="display: block; width: 100%;" />
+                        <RadzenRequiredValidator Text="Password is required" Component="Password" />
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <input type="hidden" name="redirectUrl" value="@loginModel.redirectUrl" />
+
+                <RadzenRow>
+                    <RadzenColumn Size="12" Class="d-flex justify-content-end">
+                        <RadzenButton ButtonType="ButtonType.Submit" Text="Login" ButtonStyle="ButtonStyle.Primary" />
+                    </RadzenColumn>
+                </RadzenRow>
+            }
+        </form>
+    </RadzenColumn>
+</RadzenRow>

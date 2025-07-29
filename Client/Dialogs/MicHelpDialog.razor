@@ -1,0 +1,36 @@
+@namespace WicsPlatform.Client.Dialogs
+@using Radzen
+
+@inject DialogService DialogService
+
+<div class="p-4" style="line-height:1.65">
+    <h3>브라우저별 마이크 권한 해제 방법</h3>
+
+    <h4 class="mt-3">Chrome / Edge (PC)</h4>
+    <ol>
+        <li>주소창 왼쪽 <strong>🔒 자물쇠</strong> 클릭</li>
+        <li><strong>“사이트 설정”</strong> 선택</li>
+        <li><strong>마이크</strong>를 <em>허용</em> 또는 <em>기본값</em>으로 변경</li>
+        <li>페이지 새로고침 후 <strong>방송 시작</strong> 재시도</li>
+    </ol>
+
+    <h4 class="mt-3">Firefox</h4>
+    <ol>
+        <li>주소창 왼쪽 <strong>ⓘ 정보</strong> 아이콘 클릭</li>
+        <li><strong>권한</strong> 섹션에서 <em>마이크</em> 체크 해제</li>
+        <li>새로고침 후 재시도</li>
+    </ol>
+
+    <h4 class="mt-3">Safari (macOS)</h4>
+    <ol>
+        <li>Safari → <strong>설정</strong> → <strong>웹 사이트</strong> → <strong>마이크</strong></li>
+        <li>도메인을 <em>허용</em> 또는 <em>묻기</em>로 설정</li>
+        <li>새로고침 후 재시도</li>
+    </ol>
+
+    <div class="text-end mt-4">
+        <RadzenButton Text="닫기"
+                      ButtonStyle="ButtonStyle.Primary"
+                      Click="@(() => DialogService.Close(null))" />
+    </div>
+</div>

@@ -1,0 +1,230 @@
+@attribute [Authorize]
+
+<div class="add-speaker-dialog">
+    <div class="dialog-header">
+        <RadzenIcon Icon="speaker" Style="font-size: 32px; margin-right: 12px;" />
+        <RadzenText TextStyle="TextStyle.H5" class="mb-0">새 스피커 추가</RadzenText>
+    </div>
+
+    <div class="dialog-description">
+        <RadzenText TextStyle="TextStyle.Body2">
+            새 스피커 장치를 등록합니다. 스피커 이름, IP 주소, 위치 등 필요한 정보를 입력해주세요.
+        </RadzenText>
+    </div>
+
+    <RadzenTemplateForm TItem="SpeakerFormModel" Data="@model" Submit="@FormSubmit">
+        <RadzenAlert Shade="Shade.Lighter" Variant="Variant.Flat" Size="AlertSize.Small"
+                     AlertStyle="AlertStyle.Danger" Visible="@errorVisible">
+            <RadzenIcon Icon="error_outline" class="me-2" />
+            @error
+        </RadzenAlert>
+
+        <div class="form-section">
+            <div class="form-section-header">
+                <RadzenText TextStyle="TextStyle.Subtitle2" Class="mb-2">기본 정보</RadzenText>
+                <div class="section-divider"></div>
+            </div>
+
+            <RadzenRow style="margin-bottom: 1.5rem">
+                <RadzenColumn SizeMD="3">
+                    <RadzenLabel Text="스피커명" Component="Name" style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn SizeMD="9">
+                    <div class="custom-input-container">
+                        <RadzenIcon Icon="speaker_phone" />
+                        <RadzenTextBox style="display: block; width: 100%; padding-left: 35px;"
+                                       Placeholder="스피커 이름 입력..."
+                                       @bind-Value="@(model.Name)" Name="Name" />
+                    </div>
+                    <RadzenRequiredValidator Component="Name" Text="스피커명은 필수입니다" Style="position: absolute" />
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow style="margin-bottom: 1.5rem">
+                <RadzenColumn SizeMD="3">
+                    <RadzenLabel Text="IP 주소" Component="Ip" style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn SizeMD="9">
+                    <div class="custom-input-container">
+                        <RadzenIcon Icon="router" />
+                        <RadzenTextBox style="display: block; width: 100%; padding-left: 35px;"
+                                       Placeholder="IP 주소 입력 (예: 192.168.0.1)..."
+                                       @bind-Value="@(model.Ip)" Name="Ip" />
+                    </div>
+                    <RadzenRequiredValidator Component="Ip" Text="IP 주소는 필수입니다" Style="position: absolute" />
+                    <RadzenRegexValidator Component="Ip" Text="올바른 IP 주소 형식이 아닙니다"
+                                          Pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+                                          Style="position: absolute" />
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow style="margin-bottom: 1.5rem">
+                <RadzenColumn SizeMD="3">
+                    <RadzenLabel Text="모델명" Component="Model" style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn SizeMD="9">
+                    <div class="custom-input-container">
+                        <RadzenIcon Icon="devices" />
+                        <RadzenTextBox style="display: block; width: 100%; padding-left: 35px;"
+                                       Placeholder="모델명 입력..."
+                                       @bind-Value="@(model.Model)" Name="Model" />
+                    </div>
+                    <RadzenRequiredValidator Component="Model" Text="모델명은 필수입니다" Style="position: absolute" />
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow style="margin-bottom: 1.5rem">
+                <RadzenColumn SizeMD="3">
+                    <RadzenLabel Text="비밀번호" Component="Password" style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn SizeMD="9">
+                    <div class="custom-input-container">
+                        <RadzenIcon Icon="vpn_key" />
+                        <RadzenPassword style="display: block; width: 100%; padding-left: 35px;"
+                                        Placeholder="비밀번호 입력..."
+                                        @bind-Value="@(model.Password)" Name="Password" />
+                    </div>
+                    <RadzenRequiredValidator Component="Password" Text="비밀번호는 필수입니다" Style="position: absolute" />
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow style="margin-bottom: 1.5rem">
+                <RadzenColumn SizeMD="3">
+                    <RadzenLabel Text="설치 위치" Component="Location" style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn SizeMD="9">
+                    <div class="custom-input-container">
+                        <RadzenIcon Icon="place" />
+                        <RadzenTextBox style="display: block; width: 100%; padding-left: 35px;"
+                                       Placeholder="설치 위치 입력..."
+                                       @bind-Value="@(model.Location)" Name="Location" />
+                    </div>
+                    <RadzenRequiredValidator Component="Location" Text="설치 위치는 필수입니다" Style="position: absolute" />
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow style="margin-bottom: 1.5rem">
+                <RadzenColumn SizeMD="3">
+                    <RadzenLabel Text="채널" Component="ChannelId" style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn SizeMD="9">
+                    <div class="custom-input-container">
+                        <RadzenIcon Icon="settings_input_antenna" />
+                        <RadzenDropDown AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                        style="display: block; width: 100%; padding-left: 35px;"
+                                        @bind-Value="@(model.ChannelId)"
+                                        Data="@channels" TextProperty="Name" ValueProperty="Id"
+                                        Placeholder="채널 선택(선택사항)..."
+                                        Name="ChannelId" />
+                    </div>
+                </RadzenColumn>
+            </RadzenRow>
+        </div>
+
+        <div class="form-actions">
+            <RadzenButton ButtonStyle="ButtonStyle.Light" Text="취소" Click="@CancelClick" Variant="Variant.Flat" class="me-2" Disabled="@isProcessing" />
+            @if (isProcessing)
+            {
+                <RadzenButton ButtonType="ButtonType.Submit" Text="처리 중..." Icon="sync" IconSpin="true"
+                              Disabled="true" Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" />
+            }
+            else
+            {
+                <RadzenButton ButtonType="ButtonType.Submit" Icon="save" Text="스피커 추가"
+                              Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" />
+            }
+        </div>
+    </RadzenTemplateForm>
+</div>
+
+<style>
+    .add-speaker-dialog {
+        padding: 0;
+    }
+
+    .dialog-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .dialog-description {
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--rz-border-light);
+    }
+
+    .form-section {
+        margin-bottom: 20px;
+    }
+
+    .form-section-header {
+        margin-bottom: 16px;
+    }
+
+    .section-divider {
+        height: 2px;
+        background: var(--rz-border-light);
+        width: 100%;
+        margin-top: 4px;
+    }
+
+    .custom-input-container {
+        position: relative;
+    }
+
+        .custom-input-container .rz-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 16px;
+        margin-top: 16px;
+        border-top: 1px solid var(--rz-border-light);
+    }
+
+    /* 스크롤바 스타일 수정 - 테마와 일치하도록 */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--rz-base-200);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--rz-secondary-dark);
+        border-radius: 4px;
+    }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--rz-secondary-darker);
+        }
+
+    .rz-dialog-content::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    .rz-dialog-content::-webkit-scrollbar-track {
+        background: var(--rz-base-200);
+        border-radius: 4px;
+    }
+
+    .rz-dialog-content::-webkit-scrollbar-thumb {
+        background: var(--rz-secondary-dark);
+        border-radius: 4px;
+    }
+
+        .rz-dialog-content::-webkit-scrollbar-thumb:hover {
+            background: var(--rz-secondary-darker);
+        }
+</style>

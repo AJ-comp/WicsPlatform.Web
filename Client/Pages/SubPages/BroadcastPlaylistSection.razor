@@ -1,0 +1,269 @@
+@using WicsPlatform.Server.Models.wics
+
+<RadzenCard class="mt-3 collapsible-panel-container">
+    <!-- 클릭 가능한 커스텀 헤더 -->
+    <div @onclick="TogglePanel"
+         style="background-color: var(--rz-sidebar-background-color); padding: 0.75rem 1rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                <RadzenIcon Icon="playlist_play" Style="font-size: 1.25rem; color: var(--rz-primary);" />
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-size: 0.95rem;">
+                    @(Channel?.Name ?? "채널") - 플레이리스트 관리
+                </RadzenText>
+            </RadzenStack>
+            <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")"
+                        Style="font-size: 1.25rem; transition: transform 0.3s ease;"
+                        class="@(IsCollapsed ? "rotate-icon" : "")" />
+        </RadzenStack>
+    </div>
+
+    <!-- 패널 내용 -->
+    @if (!IsCollapsed)
+    {
+        <div class="panel-content" Style="padding: 1rem;">
+            <RadzenStack Gap="1rem">
+                <!-- 플레이리스트 목록 -->
+                <RadzenRow Gap="0.75rem">
+                    <RadzenColumn Size="12" SizeMD="5">
+                        <RadzenCard class="playlist-section" Style="padding: 0.75rem;">
+                            <RadzenText TextStyle="TextStyle.Body2" class="mb-2" Style="font-weight: 600;">
+                                <RadzenIcon Icon="queue_music" class="me-1" Style="font-size: 0.875rem;" />
+                                플레이리스트 목록
+                            </RadzenText>
+
+                            @if (isLoadingPlaylists)
+                            {
+                                <div class="text-center py-2">
+                                    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
+                                                       Style="width: 60%; height: 4px; margin: 0 auto;" />
+                                    <RadzenText Text="플레이리스트를 불러오는 중..." TextStyle="TextStyle.Caption" class="mt-1" />
+                                </div>
+                            }
+                            else if (playlists.Any())
+                            {
+                                <div style="height: 320px; overflow-y: auto; border: 1px solid var(--rz-border); border-radius: var(--rz-border-radius); background-color: var(--rz-base-background-color);">
+                                    @foreach (var playlist in playlists)
+                                    {
+                                        <div style="position: relative;">
+                                            <RadzenCard class="@($"playlist-item {(selectedPlaylist?.Id == playlist.Id ? "selected" : "")}")"
+                                                        Style="margin: 3px; cursor: pointer; padding: 0.5rem;"
+                                                        @onclick="@(() => OnPlaylistCardClicked(playlist))">
+                                                <RadzenStack Gap="0.25rem">
+                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                                            <span @onclick:stopPropagation="true">
+                                                                <RadzenCheckBox Value="@IsPlaylistSelected(playlist.Id)"
+                                                                                Change="@((bool value) => OnPlaylistCheckChanged(playlist.Id, value))"
+                                                                                Style="width: 14px; height: 14px;" />
+                                                            </span>
+                                                            <RadzenIcon Icon="album" Style="color: var(--rz-secondary); font-size: 0.875rem;" />
+                                                            <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.8rem;">
+                                                                @playlist.Name
+                                                            </RadzenText>
+                                                        </RadzenStack>
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true"
+                                                                     Text="@GetPlaylistMediaCount(playlist.Id)"
+                                                                     Style="font-size: 0.65rem; padding: 1px 6px;" />
+                                                    </RadzenStack>
+                                                    @if (!string.IsNullOrEmpty(playlist.Description))
+                                                    {
+                                                        <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="margin-left: 1.5rem; font-size: 0.7rem;">
+                                                            @playlist.Description
+                                                        </RadzenText>
+                                                    }
+                                                </RadzenStack>
+                                            </RadzenCard>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-center py-3">
+                                    <RadzenIcon Icon="playlist_remove" Style="font-size: 2.5rem; color: var(--rz-text-disabled-color);" />
+                                    <RadzenText TextStyle="TextStyle.Body2" class="mt-2 mb-0">
+                                        플레이리스트가 없습니다
+                                    </RadzenText>
+                                </div>
+                            }
+                        </RadzenCard>
+                    </RadzenColumn>
+
+                    <RadzenColumn Size="12" SizeMD="7">
+                        <RadzenCard class="playlist-section" Style="padding: 0.75rem;">
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="mb-2">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                    <RadzenIcon Icon="audio_file" Style="font-size: 0.875rem;" />
+                                    <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600;">
+                                        미디어 파일 목록
+                                        @if (selectedPlaylist != null)
+                                        {
+                                            <span class="text-muted ms-1" style="font-size: 0.75rem;">(@selectedPlaylist.Name)</span>
+                                        }
+                                    </RadzenText>
+                                </RadzenStack>
+                                @if (playlistMedia.Any())
+                                {
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                        <RadzenCheckBox Value="@selectAllMedia"
+                                                        Change="@((bool value) => OnSelectAllMediaChanged(value))"
+                                                        Style="width: 14px; height: 14px;" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.75rem;">전체 선택</RadzenText>
+                                    </RadzenStack>
+                                }
+                            </RadzenStack>
+
+                            @if (selectedPlaylist == null)
+                            {
+                                <div class="text-center py-3">
+                                    <RadzenIcon Icon="touch_app" Style="font-size: 2.5rem; color: var(--rz-text-disabled-color);" />
+                                    <RadzenText TextStyle="TextStyle.Body2" class="mt-2 mb-0">
+                                        플레이리스트를 선택하세요
+                                    </RadzenText>
+                                </div>
+                            }
+                            else if (isLoadingMedia)
+                            {
+                                <div class="text-center py-2">
+                                    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
+                                                       Style="width: 60%; height: 4px; margin: 0 auto;" />
+                                    <RadzenText Text="미디어 파일을 불러오는 중..." TextStyle="TextStyle.Caption" class="mt-1" />
+                                </div>
+                            }
+                            else if (playlistMedia.Any())
+                            {
+                                <RadzenDataGrid Data="@playlistMedia"
+                                                TItem="Medium"
+                                                AllowAlternatingRows="false"
+                                                AllowPaging="true"
+                                                PageSize="7"
+                                                Style="height: 280px; font-size: 0.8rem;">
+                                    <Columns>
+                                        <RadzenDataGridColumn TItem="Medium" Width="35px" TextAlign="TextAlign.Center">
+                                            <Template Context="media">
+                                                <RadzenCheckBox Value="@IsMediaSelected(media.Id)"
+                                                                Change="@((bool value) => OnMediaCheckChanged(media.Id, value))"
+                                                                Style="width: 14px; height: 14px;" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="Medium" Width="30px" TextAlign="TextAlign.Center">
+                                            <Template Context="media">
+                                                <RadzenIcon Icon="audiotrack" Style="color: var(--rz-secondary); font-size: 0.75rem;" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="Medium" Property="FileName" Title="파일명">
+                                            <Template Context="media">
+                                                <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.75rem;">@media.FileName</RadzenText>
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="Medium" Property="CreatedAt" Title="등록일"
+                                                              Width="90px" FormatString="{0:yyyy-MM-dd}">
+                                            <Template Context="media">
+                                                <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.7rem;">@media.CreatedAt.ToString("yyyy-MM-dd")</RadzenText>
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                    </Columns>
+                                </RadzenDataGrid>
+                            }
+                            else
+                            {
+                                <div class="text-center py-3">
+                                    <RadzenIcon Icon="library_music" Style="font-size: 2.5rem; color: var(--rz-text-disabled-color);" />
+                                    <RadzenText TextStyle="TextStyle.Body2" class="mt-2 mb-0">
+                                        이 플레이리스트에 미디어 파일이 없습니다
+                                    </RadzenText>
+                                </div>
+                            }
+                        </RadzenCard>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+        </div>
+    }
+</RadzenCard>
+
+<style>
+    .collapsible-panel-container {
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .panel-content {
+        animation: slideDown 0.3s ease-out;
+        background-color: var(--rz-base-background-color);
+        border-radius: 0 0 var(--rz-border-radius) var(--rz-border-radius);
+        border: 1px solid var(--rz-border-color);
+        border-top: none;
+    }
+
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rotate-icon {
+        transform: rotate(-90deg);
+    }
+
+    .playlist-section {
+        height: 100%;
+        min-height: 350px;
+    }
+
+    .playlist-item {
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+
+        .playlist-item:hover {
+            background-color: var(--rz-base-200);
+            transform: translateX(1px);
+        }
+
+        .playlist-item.selected {
+            border-color: var(--rz-primary);
+            background-color: var(--rz-primary-lighter);
+        }
+
+    /* 데이터그리드 컴팩트 스타일 */
+    .rz-datatable-data td {
+        padding: 0.25rem 0.375rem !important;
+        font-size: 0.75rem !important;
+    }
+
+    .rz-datatable-thead th {
+        padding: 0.375rem 0.5rem !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+    }
+
+    .rz-paginator {
+        font-size: 0.7rem !important;
+        padding: 0.25rem !important;
+    }
+
+        .rz-paginator .rz-button {
+            height: 24px !important;
+            min-width: 24px !important;
+        }
+
+    /* 다크 테마 지원 */
+    :root[data-theme='dark'] .playlist-item:hover {
+        background-color: var(--rz-base-300);
+    }
+
+    :root[data-theme='dark'] .playlist-item.selected {
+        background-color: rgba(var(--rz-primary-rgb), 0.2);
+    }
+
+    :root[data-theme='dark'] .text-muted {
+        color: var(--rz-text-secondary-color) !important;
+    }
+</style>

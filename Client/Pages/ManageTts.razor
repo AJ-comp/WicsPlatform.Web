@@ -1,0 +1,143 @@
+@page "/manage-tts"
+@attribute [Authorize]
+
+<PageTitle>TTS 관리</PageTitle>
+
+<RadzenStack>
+    <RadzenRow AlignItems="AlignItems.Center" Class="mb-4">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" style="margin: 0">TTS 관리</RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6" Class="text-md-end">
+            <RadzenButton Text="새 TTS 추가" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@OpenAddTtsDialog" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow Class="mb-3">
+        <RadzenColumn SizeMD="12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="text-secondary">
+                    <small>선택된 항목: <span class="font-weight-bold">@(selectedTts.Count())</span></small>
+                </div>
+                <RadzenButton Text="채널에 추가"
+                              Icon="library_add"
+                              ButtonStyle="ButtonStyle.Light"
+                              Variant="Variant.Flat"
+                              Size="ButtonSize.Medium"
+                              Click="@OpenAddTtsToChannelDialog"
+                              Disabled="@(selectedTts.Count() == 0)"
+                              Class="rz-border-primary rz-text-primary" />
+            </div>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow>
+        <RadzenColumn SizeMD="12">
+            <RadzenCard class="mb-4">
+                <RadzenText TextStyle="TextStyle.Subtitle2" TagName="TagName.H3" Class="mb-3">검색 필터</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="4" Class="mb-3">
+                        <RadzenFormField Text="TTS 제목" Style="width: 100%">
+                            <RadzenTextBox @bind-Value="@searchFilter" Change="@ApplyFilters" Placeholder="검색..." Style="width: 100%" />
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4" Class="mb-3">
+                        <RadzenFormField Text="생성일" Style="width: 100%">
+                            <RadzenDatePicker @bind-Value="@dateFilter" DateFormat="yyyy-MM-dd" Change="@ApplyFilters" Style="width: 100%" />
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4" Class="mb-3">
+                        <RadzenStack AlignItems="AlignItems.End" Style="width: 100%; height: 100%">
+                            <RadzenButton Text="필터 초기화" Click="@ResetFilters" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" />
+                        </RadzenStack>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow>
+        <RadzenColumn SizeMD="12">
+            @if (isLoading)
+            {
+                <div class="d-flex justify-content-center my-5">
+                    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 40%; height: 8px;" />
+                </div>
+            }
+            else
+            {
+                <RadzenDataGrid @ref="ttsGrid"
+                                Data="@ttsList"
+                                TItem="WicsPlatform.Server.Models.wics.Tt"
+                                AllowFiltering="false"
+                                AllowColumnResize="true"
+                                AllowAlternatingRows="true"
+                                AllowSorting="true"
+                                PageSize="10"
+                                AllowPaging="true"
+                                PagerHorizontalAlign="HorizontalAlign.Right"
+                                ShowPagingSummary="true"
+                                RowSelect="@ViewTtsDetails"
+                                IsLoading="@isLoading"
+                                SelectionMode="DataGridSelectionMode.Multiple"
+                                @bind-Value="@selectedTts">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Tt" Width="40px" Sortable="false" Filterable="false" TextAlign="TextAlign.Center">
+                            <HeaderTemplate>
+                                <RadzenCheckBox TValue="bool" TriState="false" @bind-Value="@selectAllChecked" Change="@SelectAllTtsChanged" />
+                            </HeaderTemplate>
+                            <Template Context="data">
+                                <RadzenCheckBox TValue="bool" Value="@IsTtsSelected(data)" Change="@(args => TtsSelectionChanged(args, data))" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Tt" Property="Name" Title="제목" Width="200px">
+                            <Template Context="data">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                    <RadzenIcon Icon="record_voice_over" />
+                                    <span>@data.Name</span>
+                                </RadzenStack>
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Tt" Property="Content" Title="내용" Width="400px">
+                            <Template Context="data">
+                                <div class="text-truncate" style="max-width: 350px;" title="@data.Content">
+                                    @data.Content
+                                </div>
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Tt" Property="CreatedAt" Title="생성일" Width="150px" FormatString="{0:yyyy-MM-dd HH:mm}" />
+                        <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Tt" Title="재생" Width="100px" TextAlign="TextAlign.Center">
+                            <Template Context="data">
+                                <RadzenButton Icon="play_arrow" ButtonStyle="ButtonStyle.Info" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                                              Click="@(() => PlayTts(data))" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Tt" Width="120px" TextAlign="TextAlign.Center" Filterable="false" Sortable="false">
+                            <Template Context="data">
+                                <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium"
+                                              Click="@(() => OpenEditTtsDialog(data))" />
+                                <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Size="ButtonSize.Medium"
+                                              Click="@(() => OpenDeleteTtsDialog(data))" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                    <EmptyTemplate>
+                        <div class="rz-p-5 text-center">
+                            <RadzenIcon Icon="mic_off" Style="width: 48px; height: 48px; font-size: 48px; color: var(--rz-text-disabled-color)" />
+                            <RadzenText Text="등록된 TTS가 없습니다." TextStyle="TextStyle.Body1" Style="margin: 1rem 0 0.5rem 0; opacity: 0.5" />
+                            <RadzenText Text="새 TTS 추가 버튼을 클릭하여 새 TTS를 만드세요." TextStyle="TextStyle.Body2" Style="opacity: 0.5" />
+                        </div>
+                    </EmptyTemplate>
+                </RadzenDataGrid>
+            }
+        </RadzenColumn>
+    </RadzenRow>
+</RadzenStack>
+
+<style>
+    .text-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+</style>

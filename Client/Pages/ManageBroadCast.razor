@@ -1,0 +1,705 @@
+@page "/manage-broad-cast"
+@attribute [Authorize]
+@using WicsPlatform.Client.Pages.SubPages
+
+<PageTitle>방송 관리</PageTitle>
+
+<RadzenStack>
+    <!-- 상단 채널 생성 영역 -->
+    <RadzenCard class="mb-3" Style="padding: 1rem;">
+        <RadzenRow AlignItems="AlignItems.Center" Gap="0.75rem">
+            <RadzenColumn Size="12" SizeMD="8">
+                <RadzenFormField Text="채널명" Style="width: 100%">
+                    <RadzenTextBox @bind-Value="@newChannelName"
+                                   Placeholder="새 채널명을 입력하세요"
+                                   Style="width: 100%; height: 36px;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenButton Text="채널 만들기"
+                              Icon="add_circle"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Medium"
+                              Style="width: 100%; height: 36px;"
+                              Click="@CreateChannel" />
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    <!-- 채널 리스트 영역 - 가로 스크롤 -->
+    <RadzenCard class="mb-3" Style="padding: 1rem;">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-2">
+            <RadzenIcon Icon="settings_input_antenna" class="me-1" Style="font-size: 1.125rem;" />
+            채널 목록
+        </RadzenText>
+
+        <div class="channel-list-container">
+            @if (channels != null && channels.Any())
+            {
+                <div class="channel-list-scroll">
+                    @foreach (var channel in channels)
+                    {
+                        <div class="channel-card-wrapper">
+                            <RadzenCard class="@($"channel-card {(selectedChannel?.Id == channel.Id ? "selected" : "")}")"
+                                        Style="padding: 0.875rem;"
+                                        @onclick="@(() => SelectChannel(channel))">
+                                <RadzenStack Gap="0.375rem">
+                                    <!-- 채널 아이콘과 이름 -->
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                                        <RadzenIcon Icon="@GetChannelIcon(channel.Type)"
+                                                    Style="font-size: 1.5rem; color: var(--rz-primary);" />
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-size: 0.95rem;">
+                                            @channel.Name
+                                        </RadzenText>
+                                    </RadzenStack>
+
+                                    <!-- 채널 상태 -->
+                                    <RadzenBadge BadgeStyle="@GetChannelBadgeStyle(channel.State)"
+                                                 IsPill="true"
+                                                 Text="@GetChannelStateText(channel.State)"
+                                                 Style="font-size: 0.7rem; padding: 2px 8px;" />
+
+                                    <!-- 채널 설명 -->
+                                    @if (!string.IsNullOrEmpty(channel.Description))
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Body2" class="text-muted mb-0" Style="font-size: 0.75rem; line-height: 1.3;">
+                                            @channel.Description
+                                        </RadzenText>
+                                    }
+
+                                    <!-- 추가 정보 -->
+                                    <RadzenText TextStyle="TextStyle.Caption" class="mb-0 text-muted" Style="font-size: 0.7rem;">
+                                        <RadzenIcon Icon="access_time" Style="font-size: 0.75rem;" />
+                                        @channel.CreatedAt.ToString("yyyy-MM-dd")
+                                    </RadzenText>
+
+                                    <RadzenButton Text="@(isChannelBroadcasting.ContainsKey(channel.Id) && isChannelBroadcasting[channel.Id] ? "방송 중지" : "방송 시작")"
+                                                  Icon="@(isChannelBroadcasting.ContainsKey(channel.Id) && isChannelBroadcasting[channel.Id] ? "stop" : "play_circle")"
+                                                  ButtonStyle="ButtonStyle.Primary"
+                                                  Size="ButtonSize.Small"
+                                                  Style="width: 100%; height: 28px; font-size: 0.75rem;"
+                                                  @onclick:stopPropagation="true"
+                                                  Click="@(() => ToggleBroadcast(channel.Id))" />
+                                </RadzenStack>
+                            </RadzenCard>
+                        </div>
+                    }
+                </div>
+            }
+            else if (isLoading)
+            {
+                <div class="text-center py-4">
+                    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
+                                       Style="width: 40%; height: 6px; margin: 0 auto;" />
+                    <RadzenText Text="채널 목록을 불러오는 중입니다..." TextStyle="TextStyle.Body2" class="mt-2" />
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-4">
+                    <RadzenIcon Icon="tv_off" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="mt-2 mb-1">
+                        생성된 채널이 없습니다
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted">
+                        상단의 '채널 만들기' 버튼을 클릭하여 첫 번째 채널을 생성해보세요
+                    </RadzenText>
+                </div>
+            }
+        </div>
+    </RadzenCard>
+
+    <!-- 선택된 채널이 없을 때 메뉴얼 표시 -->
+    @if (selectedChannel == null && channels != null && channels.Any())
+    {
+        <RadzenCard class="manual-card" Style="padding: 1.25rem;">
+            <RadzenStack Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-1">
+                    <RadzenIcon Icon="help_outline" class="me-1" Style="color: var(--rz-info); font-size: 1.125rem;" />
+                    방송 관리 가이드
+                </RadzenText>
+
+                <RadzenRow Gap="0.75rem">
+                    <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                        <RadzenCard class="guide-step" Style="padding: 0.875rem;">
+                            <RadzenStack Gap="0.375rem">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                                    <div class="step-number">1</div>
+                                    <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">채널 선택</RadzenText>
+                                </RadzenStack>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted" Style="font-size: 0.75rem; line-height: 1.4;">
+                                    위의 채널 목록에서 방송하고자 하는 채널을 클릭하여 선택하세요.
+                                </RadzenText>
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenColumn>
+
+                    <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                        <RadzenCard class="guide-step" Style="padding: 0.875rem;">
+                            <RadzenStack Gap="0.375rem">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                                    <div class="step-number">2</div>
+                                    <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">스피커 그룹 설정</RadzenText>
+                                </RadzenStack>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted" Style="font-size: 0.75rem; line-height: 1.4;">
+                                    채널 선택 후 방송할 스피커 그룹을 선택하고 체크하세요.
+                                </RadzenText>
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenColumn>
+
+                    <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                        <RadzenCard class="guide-step" Style="padding: 0.875rem;">
+                            <RadzenStack Gap="0.375rem">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                                    <div class="step-number">3</div>
+                                    <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">방송 설정</RadzenText>
+                                </RadzenStack>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted" Style="font-size: 0.75rem; line-height: 1.4;">
+                                    볼륨, TTS, 플레이리스트 등 방송에 필요한 세부 설정을 구성하세요.
+                                </RadzenText>
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenColumn>
+
+                    <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
+                        <RadzenCard class="guide-step" Style="padding: 0.875rem;">
+                            <RadzenStack Gap="0.375rem">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                                    <div class="step-number">4</div>
+                                    <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">방송 시작</RadzenText>
+                                </RadzenStack>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted" Style="font-size: 0.75rem; line-height: 1.4;">
+                                    모든 설정이 완료되면 '방송 시작' 버튼을 클릭하여 실시간 방송을 시작하세요.
+                                </RadzenText>
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <RadzenCard class="tip-card" Style="padding: 0.75rem;">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.75rem">
+                        <RadzenIcon Icon="lightbulb" Style="font-size: 1.25rem; color: var(--rz-warning);" />
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.8rem;">
+                                Tip: 가로 스크롤
+                            </RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.7rem; line-height: 1.4;">
+                                채널이 많은 경우 마우스 휠이나 스크롤바를 이용하여 좌우로 이동할 수 있습니다.
+                                Shift + 마우스 휠로도 가로 스크롤이 가능합니다.
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenStack>
+        </RadzenCard>
+    }
+
+    <!-- 선택된 채널의 섹션들 -->
+    @if (selectedChannel != null)
+    {
+        <!-- ★ 방송 시작 버튼 ------------------------------------------------ -->
+        <RadzenCard class="mt-3" Style="padding: 1rem;">
+            <RadzenStack Gap="0.75rem">
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn Size="6">
+                        <RadzenButton Text="@(!isBroadcasting ? "방송 시작" : "방송 중...")"
+                                      Icon="@(!isBroadcasting ? "play_circle" : "graphic_eq")"
+                                      ButtonStyle="ButtonStyle.Primary"
+                                      Size="ButtonSize.Large"
+                                      Disabled="@isBroadcasting"
+                                      Style="width: 100%"
+                                      Click="@StartBroadcast" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="6">
+                        <RadzenButton Text="@(!isTestBroadcasting ? "방송 테스트" : "테스트 중...")"
+                                      Icon="@(!isTestBroadcasting ? "science" : "stop_circle")"
+                                      ButtonStyle="@(!isTestBroadcasting ? ButtonStyle.Secondary : ButtonStyle.Warning)"
+                                      Size="ButtonSize.Large"
+                                      Style="width: 100%"
+                                      Click="@ToggleTestBroadcast" />
+                    </RadzenColumn>
+                </RadzenRow>
+
+                @if (isBroadcasting)
+                {
+                    <!-- 녹음 제어 버튼들 -->
+                    <RadzenRow Gap="0.75rem">
+                        <RadzenColumn Size="6">
+                            @if (!isRecording)
+                            {
+                                <RadzenButton Text="녹음 시작"
+                                              Icon="fiber_manual_record"
+                                              ButtonStyle="ButtonStyle.Danger"
+                                              Size="ButtonSize.Small"
+                                              Style="width: 100%; height: 32px; font-size: 0.875rem;"
+                                              Click="@StartRecording" />
+                            }
+                            else
+                            {
+                                <RadzenButton Text="녹음 중지"
+                                              Icon="stop"
+                                              ButtonStyle="ButtonStyle.Warning"
+                                              Size="ButtonSize.Small"
+                                              Style="width: 100%; height: 32px; font-size: 0.875rem;"
+                                              Click="@StopRecording" />
+                            }
+                        </RadzenColumn>
+                        <RadzenColumn Size="6">
+                            @if (isRecording)
+                            {
+                                <RadzenCard Style="background-color: var(--rz-danger-lighter); padding: 0.375rem;">
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="0.375rem">
+                                        <RadzenIcon Icon="fiber_manual_record" Style="color: var(--rz-danger); animation: blink 1s infinite; font-size: 0.875rem;" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.75rem;">
+                                            <strong>녹음 중</strong> @recordingDuration
+                                        </RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="mb-0 text-muted" Style="font-size: 0.7rem;">
+                                            (@recordingDataSize.ToString("F2") MB)
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            }
+                        </RadzenColumn>
+                    </RadzenRow>
+                }
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- 마이크데이터 패널 (방송 중일 때만 표시) -->
+        @if (isBroadcasting)
+        {
+            <BroadcastMicDataSection Channel="@selectedChannel"
+                                     @bind-IsCollapsed="@micDataPanelCollapsed"
+                                     JSModule="@_jsModule"
+                                     OnBroadcastStatusChanged="@OnBroadcastStatusChanged"
+                                     OnBroadcastStopped="@OnBroadcastStopped"
+                                     @ref="micDataSection" />
+        }
+
+        <!-- 스피커 그룹 관리 패널 -->
+        <RadzenCard class="mt-3 collapsible-panel-container">
+            <!-- 클릭 가능한 커스텀 헤더 -->
+            <div @onclick="@(() => TogglePanel("speakerGroup"))"
+                 style="background-color: var(--rz-sidebar-background-color); padding: 0.75rem 1rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                        <RadzenIcon Icon="@GetChannelIcon(selectedChannel.Type)" Style="font-size: 1.25rem; color: var(--rz-primary);" />
+                        <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-size: 0.95rem;">
+                            @selectedChannel.Name - 스피커 그룹 관리
+                        </RadzenText>
+                    </RadzenStack>
+                    <RadzenIcon Icon="@(speakerGroupPanelCollapsed ? "expand_more" : "expand_less")"
+                                Style="font-size: 1.25rem; transition: transform 0.3s ease;"
+                                class="@(speakerGroupPanelCollapsed ? "rotate-icon" : "")" />
+                </RadzenStack>
+            </div>
+
+            <!-- 패널 내용 -->
+            @if (!speakerGroupPanelCollapsed)
+            {
+                <div class="panel-content" Style="padding: 1rem;">
+                    <RadzenStack Gap="0.75rem">
+                        <!-- 스피커 그룹 리스트 -->
+                        <RadzenText TextStyle="TextStyle.Body2" class="mb-1" Style="font-weight: 600;">스피커 그룹 선택</RadzenText>
+                        @if (isLoadingGroups)
+                        {
+                            <div class="text-center py-2">
+                                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
+                                                   Style="width: 40%; height: 4px; margin: 0 auto;" />
+                                <RadzenText Text="스피커 그룹을 불러오는 중..." TextStyle="TextStyle.Caption" class="mt-1" />
+                            </div>
+                        }
+                        else
+                        {
+                            <RadzenRow Gap="0.75rem">
+                                @foreach (var group in speakerGroups)
+                                {
+                                    <RadzenColumn Size="12" SizeSM="6" SizeMD="4" SizeLG="3">
+                                        <RadzenCard class="@($"speaker-group-card {(selectedGroups.Contains(group.Id) ? "selected" : "")}")"
+                                                    Style="cursor: pointer; transition: all 0.3s ease; padding: 0.75rem;"
+                                                    @onclick="@(() => ToggleGroupSelection(group.Id))">
+                                            <RadzenStack Gap="0.375rem">
+                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                                                    <RadzenIcon Icon="group" Style="font-size: 1.25rem; color: var(--rz-secondary);" />
+                                                    <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">
+                                                        @group.Name
+                                                    </RadzenText>
+                                                </RadzenStack>
+                                                @if (!string.IsNullOrEmpty(group.Description))
+                                                {
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.7rem;">
+                                                        @group.Description
+                                                    </RadzenText>
+                                                }
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true"
+                                                             Text="@($"스피커 {GetSpeakerCountInGroup(group.Id)}개")"
+                                                             Style="font-size: 0.7rem; padding: 2px 8px;" />
+                                            </RadzenStack>
+                                        </RadzenCard>
+                                    </RadzenColumn>
+                                }
+                            </RadzenRow>
+                        }
+
+                        <!-- 전체 스피커 리스트 -->
+                        <RadzenText TextStyle="TextStyle.Body2" class="mt-3 mb-1" Style="font-weight: 600;">
+                            전체 스피커 목록
+                            @if (selectedGroups.Any())
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true"
+                                             Text="@($"선택된 스피커 {GetSelectedSpeakersCount()}개")" Class="ms-2"
+                                             Style="font-size: 0.7rem; padding: 2px 8px;" />
+                            }
+                        </RadzenText>
+
+                        @if (isLoadingSpeakers)
+                        {
+                            <div class="text-center py-2">
+                                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
+                                                   Style="width: 40%; height: 4px; margin: 0 auto;" />
+                                <RadzenText Text="스피커 목록을 불러오는 중..." TextStyle="TextStyle.Caption" class="mt-1" />
+                            </div>
+                        }
+                        else if (allSpeakers.Any())
+                        {
+                            <RadzenDataGrid Data="@allSpeakers"
+                                            TItem="WicsPlatform.Server.Models.wics.Speaker"
+                                            AllowAlternatingRows="false"
+                                            AllowFiltering="true"
+                                            AllowPaging="true"
+                                            PageSize="10"
+                                            AllowSorting="true"
+                                            ColumnWidth="180px"
+                                            Style="font-size: 0.8rem;">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Speaker" Width="30px" TextAlign="TextAlign.Center">
+                                        <Template Context="speaker">
+                                            <RadzenCheckBox TriState="false" TValue="bool"
+                                                            Value="@IsSpeakerInSelectedGroups(speaker.Id)"
+                                                            Disabled="true"
+                                                            Style="width: 16px; height: 16px;" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Speaker" Property="Name" Title="스피커명" Width="160px">
+                                        <Template Context="speaker">
+                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                                <RadzenIcon Icon="speaker" Style="font-size: 0.875rem;" />
+                                                <span style="font-size: 0.8rem;">@speaker.Name</span>
+                                            </RadzenStack>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Speaker" Property="Ip" Title="IP 주소" Width="120px" />
+                                    <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Speaker" Property="Model" Title="모델" Width="100px" />
+                                    <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Speaker" Property="Location" Title="설치 위치" />
+                                    <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Speaker" Title="그룹" Width="180px">
+                                        <Template Context="speaker">
+                                            @{
+                                                var groups = GetSpeakerGroups(speaker.Id);
+                                                if (groups.Any())
+                                                {
+                                                    foreach (var groupName in groups)
+                                                    {
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Secondary" IsPill="true" Text="@groupName" Class="me-1"
+                                                                     Style="font-size: 0.65rem; padding: 1px 6px;" />
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted" style="font-size: 0.75rem;">미지정</span>
+                                                }
+                                            }
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="WicsPlatform.Server.Models.wics.Speaker" Title="상태" Width="80px" TextAlign="TextAlign.Center">
+                                        <Template Context="speaker">
+                                            <RadzenBadge BadgeStyle="@GetSpeakerStatusBadgeStyle(speaker.State)"
+                                                         IsPill="true"
+                                                         Text="@GetSpeakerStatusText(speaker.State)"
+                                                         Style="font-size: 0.65rem; padding: 1px 6px;" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                        else
+                        {
+                            <RadzenCard class="text-center py-3" Style="background-color: var(--rz-base-100);">
+                                <RadzenIcon Icon="speaker_notes_off" Style="font-size: 2.5rem; color: var(--rz-text-disabled-color);" />
+                                <RadzenText TextStyle="TextStyle.Body2" class="mt-2 mb-0">
+                                    등록된 스피커가 없습니다
+                                </RadzenText>
+                            </RadzenCard>
+                        }
+                    </RadzenStack>
+                </div>
+            }
+        </RadzenCard>
+
+        <!-- 볼륨 설정 패널 -->
+        <BroadcastVolumeSection Channel="@selectedChannel"
+                                @bind-IsCollapsed="@volumePanelCollapsed"
+                                OnVolumeSaved="@OnVolumeSaved" />
+
+        <!-- TTS 설정 패널 -->
+        <BroadcastTtsSection Channel="@selectedChannel"
+                             @bind-IsCollapsed="@ttsPanelCollapsed" />
+
+        <!-- 플레이리스트 설정 패널 -->
+        <BroadcastPlaylistSection Channel="@selectedChannel"
+                                  @bind-IsCollapsed="@playlistPanelCollapsed" />
+
+    }
+</RadzenStack>
+
+<style>
+    /* 채널 리스트 가로 스크롤 스타일 */
+    .channel-list-container {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .channel-list-scroll {
+        display: flex;
+        gap: 0.75rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 0.75rem 0;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+    }
+
+        /* 스크롤바 스타일 */
+        .channel-list-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .channel-list-scroll::-webkit-scrollbar-track {
+            background: var(--rz-base-200);
+            border-radius: 4px;
+        }
+
+        .channel-list-scroll::-webkit-scrollbar-thumb {
+            background: var(--rz-text-disabled-color);
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+            .channel-list-scroll::-webkit-scrollbar-thumb:hover {
+                background: var(--rz-text-secondary-color);
+            }
+
+    .channel-card-wrapper {
+        flex: 0 0 auto;
+        width: 220px;
+        min-width: 220px;
+    }
+
+    .channel-card {
+        height: 100%;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 1.5px solid transparent;
+    }
+
+        .channel-card:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .channel-card.selected {
+            border: 1.5px solid var(--rz-primary);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+    /* 메뉴얼 카드 스타일 */
+    .manual-card {
+        background: linear-gradient(135deg, var(--rz-base-100) 0%, var(--rz-base-200) 100%);
+        border: 1px solid var(--rz-border-light);
+    }
+
+    .guide-step {
+        background-color: var(--rz-base-background-color);
+        border: 1px solid var(--rz-border-lighter);
+        height: 100%;
+        transition: all 0.3s ease;
+    }
+
+        .guide-step:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        }
+
+    .step-number {
+        width: 24px;
+        height: 24px;
+        background-color: var(--rz-primary);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.75rem;
+    }
+
+    .tip-card {
+        background-color: var(--rz-warning-lighter);
+        border: 1px solid var(--rz-warning-light);
+    }
+
+    /* 스피커 그룹 카드 스타일 */
+    .speaker-group-card {
+        transition: all 0.3s ease;
+        border: 1.5px solid transparent;
+    }
+
+        .speaker-group-card:hover {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .speaker-group-card.selected {
+            border: 1.5px solid var(--rz-secondary);
+            background-color: var(--rz-secondary-lighter);
+        }
+
+    /* 패널 관련 스타일 */
+    .collapsible-panel-container {
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .panel-content {
+        animation: slideDown 0.3s ease-out;
+        background-color: var(--rz-base-background-color);
+        border-radius: 0 0 var(--rz-border-radius) var(--rz-border-radius);
+        border: 1px solid var(--rz-border-color);
+        border-top: none;
+    }
+
+    @@keyframes slideDown {
+        from
+
+    {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    }
+
+    .rotate-icon {
+        transform: rotate(-90deg);
+    }
+
+    /* 데이터그리드 컴팩트 스타일 */
+    .rz-datatable-data td {
+        padding: 0.375rem 0.5rem !important;
+        font-size: 0.8rem !important;
+    }
+
+    .rz-datatable-thead th {
+        padding: 0.5rem !important;
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+    }
+
+    .rz-paginator {
+        font-size: 0.75rem !important;
+    }
+
+        .rz-paginator .rz-button {
+            height: 28px !important;
+            min-width: 28px !important;
+        }
+
+    /* 다크 테마 지원 */
+    :root[data-theme='dark'] .channel-card:hover {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    :root[data-theme='dark'] .channel-card.selected {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    :root[data-theme='dark'] .manual-card {
+        background: linear-gradient(135deg, var(--rz-base-200) 0%, var(--rz-base-300) 100%);
+    }
+
+    :root[data-theme='dark'] .guide-step {
+        background-color: var(--rz-base-200);
+        border-color: var(--rz-border);
+    }
+
+    :root[data-theme='dark'] .tip-card {
+        background-color: rgba(var(--rz-warning-rgb), 0.1);
+        border-color: rgba(var(--rz-warning-rgb), 0.3);
+    }
+
+    :root[data-theme='dark'] .speaker-group-card:hover {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    :root[data-theme='dark'] .speaker-group-card.selected {
+        background-color: rgba(var(--rz-secondary-rgb), 0.2);
+    }
+
+    /* 녹음 중 깜빡임 애니메이션 */
+    @@keyframes blink {
+        0%, 100%
+
+    {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+
+    }
+
+    /* 녹음 관련 스타일 */
+    .recording-indicator {
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%
+
+    {
+        box-shadow: 0 0 0 0 rgba(var(--rz-danger-rgb), 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(var(--rz-danger-rgb), 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(var(--rz-danger-rgb), 0);
+    }
+
+    }
+
+    /* 반응형 대응 */
+    @@media (max-width: 768px) {
+        .channel-card-wrapper
+
+    {
+        width: 180px;
+        min-width: 180px;
+    }
+
+    .step-number {
+        width: 20px;
+        height: 20px;
+        font-size: 0.7rem;
+    }
+
+    }
+</style>
