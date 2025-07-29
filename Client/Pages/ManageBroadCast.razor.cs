@@ -87,6 +87,9 @@ namespace WicsPlatform.Client.Pages
         private DotNetObjectReference<ManageBroadCast> _dotNetRef;
         protected BroadcastMicDataSection micDataSection;
         private bool _loopbackEnabled = false;
+
+        // Broadcast 관련 추가
+        private List<WicsPlatform.Server.Models.wics.Speaker> _currentOnlineSpeakers;
         #endregion
 
         #region Lifecycle Methods
@@ -251,6 +254,9 @@ namespace WicsPlatform.Client.Pages
                 if (!await ValidateAndNotifyOnlineStatus(onlineSpeakers, offlineSpeakers))
                     return;
 
+                // 온라인 스피커 목록 저장
+                _currentOnlineSpeakers = onlineSpeakers;
+
                 var onlineGroups = GetOnlineGroups(onlineSpeakers);
 
                 if (!await InitializeWebSocketBroadcast(onlineGroups))
@@ -266,12 +272,77 @@ namespace WicsPlatform.Client.Pages
                 }
 
                 InitializeBroadcastState();
+
+                // Broadcast 테이블에 데이터 삽입
+                await CreateBroadcastRecords(onlineSpeakers);
+
                 NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
                 await InvokeAsync(StateHasChanged);
             }
             catch (Exception ex)
             {
                 await HandleBroadcastError(ex);
+            }
+        }
+
+        private async Task CreateBroadcastRecords(List<WicsPlatform.Server.Models.wics.Speaker> onlineSpeakers)
+        {
+            try
+            {
+                foreach (var speaker in onlineSpeakers)
+                {
+                    var broadcast = new WicsPlatform.Server.Models.wics.Broadcast
+                    {
+                        ChannelId = selectedChannel.Id,
+                        SpeakerId = speaker.Id,
+                        MediaId = 1, // 우선 고정값
+                        OngoingYn = "Y",
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
+                    };
+
+                    await WicsService.CreateBroadcast(broadcast);
+                    _logger.LogInformation($"Broadcast record created for channel {selectedChannel.Id}, speaker {speaker.Id}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create broadcast records");
+                NotifyWarn("기록 생성 실패", "방송 기록 생성 중 오류가 발생했습니다. 방송은 계속됩니다.");
+            }
+        }
+
+        private async Task UpdateBroadcastRecordsToStopped()
+        {
+            try
+            {
+                if (_currentOnlineSpeakers == null || !_currentOnlineSpeakers.Any())
+                    return;
+
+                // 현재 진행 중인 방송 레코드 조회
+                var query = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {selectedChannel.Id} and OngoingYn eq 'Y'",
+                    OrderBy = "CreatedAt desc"
+                };
+
+                var broadcasts = await WicsService.GetBroadcasts(query);
+
+                foreach (var broadcast in broadcasts.Value)
+                {
+                    // 현재 방송 중인 스피커인 경우만 업데이트
+                    if (_currentOnlineSpeakers.Any(s => s.Id == broadcast.SpeakerId))
+                    {
+                        broadcast.OngoingYn = "N";
+                        broadcast.UpdatedAt = DateTime.Now;
+                        await WicsService.UpdateBroadcast(broadcast.Id, broadcast);
+                        _logger.LogInformation($"Broadcast record updated to stopped for channel {broadcast.ChannelId}, speaker {broadcast.SpeakerId}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update broadcast records to stopped");
             }
         }
 
@@ -926,6 +997,9 @@ namespace WicsPlatform.Client.Pages
             _broadcastTimer?.Dispose();
             _broadcastTimer = null;
 
+            // Broadcast 레코드 업데이트
+            await UpdateBroadcastRecordsToStopped();
+
             if (!string.IsNullOrEmpty(currentBroadcastId))
             {
                 await WebSocketService.StopBroadcastAsync(currentBroadcastId);
@@ -936,6 +1010,9 @@ namespace WicsPlatform.Client.Pages
             {
                 await StopRecording();
             }
+
+            // 온라인 스피커 목록 초기화
+            _currentOnlineSpeakers = null;
         }
 
         private void LogBroadcastStatistics(BroadcastStoppedEventArgs args)
