@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace WicsPlatform.Server.Services
@@ -15,12 +16,16 @@ namespace WicsPlatform.Server.Services
     public class UdpBroadcastService : IUdpBroadcastService, IDisposable
     {
         private readonly ILogger<UdpBroadcastService> _logger;
+        private readonly IConfiguration _configuration;
         private readonly ConcurrentDictionary<string, UdpClient> _udpClients = new();
-        private const int SPEAKER_PORT = 3000; // 스피커가 수신하는 UDP 포트
+        private readonly int _speakerPort;
 
-        public UdpBroadcastService(ILogger<UdpBroadcastService> logger)
+        public UdpBroadcastService(ILogger<UdpBroadcastService> logger, IConfiguration configuration)
         {
             _logger = logger;
+            _configuration = configuration;
+            _speakerPort = _configuration.GetValue<int>("UdpBroadcast:SpeakerPort", 3000); // 기본값 3000
+            _logger.LogInformation($"UDP Broadcast Service initialized with speaker port: {_speakerPort}");
         }
 
         public async Task SendAudioToSpeakers(List<SpeakerInfo> speakers, byte[] audioData)
@@ -43,7 +48,7 @@ namespace WicsPlatform.Server.Services
                 var udpClient = _udpClients.GetOrAdd(speaker.Ip, ip =>
                 {
                     var client = new UdpClient();
-                    client.Connect(ip, SPEAKER_PORT);
+                    client.Connect(ip, _speakerPort);
                     return client;
                 });
 
@@ -51,11 +56,11 @@ namespace WicsPlatform.Server.Services
                 var packet = CreateAudioPacket(speaker.ChannelId, audioData);
                 await udpClient.SendAsync(packet, packet.Length);
 
-                _logger.LogDebug($"Sent {packet.Length} bytes to speaker {speaker.Name} ({speaker.Ip})");
+                _logger.LogDebug($"Sent {packet.Length} bytes to speaker {speaker.Name} ({speaker.Ip}:{_speakerPort})");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Failed to send audio to speaker {speaker.Ip}");
+                _logger.LogError(ex, $"Failed to send audio to speaker {speaker.Ip}:{_speakerPort}");
 
                 // 실패한 클라이언트 제거
                 _udpClients.TryRemove(speaker.Ip, out _);

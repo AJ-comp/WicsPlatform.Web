@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OData.ModelBuilder;
-using Mythosia.Azure;
 using Radzen;
 using WicsPlatform.Server.Components;
 using WicsPlatform.Server.Data;
@@ -11,17 +10,13 @@ using WicsPlatform.Server.Middleware;
 using WicsPlatform.Server.Models;
 using WicsPlatform.Server.Services;
 
-static async Task RegisterDBContextWithKeyVaultAsync(WebApplicationBuilder builder)
+static void RegisterDBContext(WebApplicationBuilder builder)
 {
-    // Key Vault에서 접속 문자열 가져오기
-    SecretFetcher secretFatcher = new SecretFetcher("https://database-login.vault.azure.net", "WicsConnectionString");
-    var connectionString = await secretFatcher.GetKeyValueAsync();
+    // appsettings.json에서 연결 문자열 가져오기
+    var connectionString = builder.Configuration.GetConnectionString("wicsConnection");
+    
     // DbContext를 종속성 주입을 통해 등록
     builder.Services.AddDbContext<wicsContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
-    builder.Services.AddDbContext<wicsContext>(options =>
-    {
-        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
-    });
     builder.Services.AddDbContext<ApplicationIdentityDbContext>(options =>
     {
         options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
@@ -47,7 +42,7 @@ builder.Services.AddRadzenCookieThemeService(options =>
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<WicsPlatform.Server.wicsService>();
 builder.Services.AddSingleton<IUdpBroadcastService, UdpBroadcastService>();
-await RegisterDBContextWithKeyVaultAsync(builder);
+RegisterDBContext(builder);
 builder.Services.AddControllers().AddOData(opt =>
 {
     var oDataBuilderwics = new ODataConventionModelBuilder();
@@ -95,10 +90,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.SameSite = SameSiteMode.Lax; // None -> Lax 변경
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Always -> SameAsRequest 변경
 });
-builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
-{
-    options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
-});
+
 var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

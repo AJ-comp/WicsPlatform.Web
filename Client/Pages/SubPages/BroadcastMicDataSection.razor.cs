@@ -109,7 +109,11 @@ namespace WicsPlatform.Client.Pages.SubPages
             averageBitrate = bitrate;
             sampleRate = sampleRateValue;
 
-            await InvokeAsync(StateHasChanged);
+            // StateHasChanged 호출을 최소화 - 중요한 데이터 변경시에만 호출
+            if (packets % 20 == 0) // 20번의 패킷마다 한 번씩만 UI 업데이트
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
 
         // 방송 일시정지
@@ -176,8 +180,11 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             if (data != null && data.Length > 0 && isBroadcasting)
             {
-                // 실제 데이터 크기 로그
-                AddLog("INFO", $"오디오 데이터 수신: {data.Length} bytes");
+                // 실제 데이터 크기 로그 (로그 빈도 줄이기)
+                if (totalDataPackets % 100 == 0) // 100번째 패킷마다만 로그
+                {
+                    AddLog("INFO", $"오디오 데이터 수신: {data.Length} bytes");
+                }
 
                 // 디버깅 패널이 열려있으면 상세 데이터 처리
                 if (showDebugPanel)
@@ -185,7 +192,8 @@ namespace WicsPlatform.Client.Pages.SubPages
                     await ProcessDebugData(data);
                 }
 
-                await InvokeAsync(StateHasChanged);
+                // StateHasChanged 호출 최소화
+                // 오디오 데이터 처리는 빈번하므로 UI 업데이트는 별도로 관리
             }
         }
 
@@ -325,7 +333,12 @@ namespace WicsPlatform.Client.Pages.SubPages
                 broadcastLogs.RemoveAt(0);
             }
 
-            InvokeAsync(StateHasChanged);
+            // 로그 추가 시 StateHasChanged 호출 최소화
+            // 오류나 경고 로그의 경우에만 즉시 UI 업데이트
+            if (level == "ERROR" || level == "WARN")
+            {
+                InvokeAsync(StateHasChanged);
+            }
         }
 
         // 주기적 로그 업데이트 - 제거됨

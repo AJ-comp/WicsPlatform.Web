@@ -773,7 +773,11 @@ namespace WicsPlatform.Client.Pages
                 if (_loopbackEnabled && _speakerModule != null)
                     await _speakerModule.InvokeVoidAsync("feed", base64Data);
 
-                await InvokeAsync(StateHasChanged);
+                // StateHasChanged 호출 최적화 - 10번의 오디오 패킷마다 한 번씩만 UI 업데이트
+                if (totalDataPackets % 10 == 0)
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
             }
             catch (Exception ex)
             {
@@ -841,9 +845,16 @@ namespace WicsPlatform.Client.Pages
 
         protected async Task OnVolumeSaved()
         {
-            await LoadChannels();
-            if (selectedChannel != null)
-                selectedChannel = channels.FirstOrDefault(c => c.Id == selectedChannel.Id);
+            // ★ 방송 중이 아닐 때만 채널 목록을 다시 로드
+            // 방송 중에는 현재 선택된 채널 객체를 유지하여 UI 상태 보존
+            if (!isBroadcasting && !isTestBroadcasting)
+            {
+                await LoadChannels();
+                if (selectedChannel != null)
+                    selectedChannel = channels.FirstOrDefault(c => c.Id == selectedChannel.Id);
+            }
+            // 방송 중일 때는 로컬 채널 객체가 이미 BroadcastVolumeSection에서 업데이트되므로
+            // 추가적인 로드가 필요하지 않음
         }
 
         protected Task TogglePanel(string panelName)
@@ -939,7 +950,17 @@ namespace WicsPlatform.Client.Pages
                     totalDataPackets, totalDataSize, averageBitrate, sampleRate);
             }
 
-            await InvokeAsync(StateHasChanged);
+            // StateHasChanged 호출 빈도를 줄여서 화면 깜빡임 방지
+            // 방송 시간이 초 단위로 변경될 때만 UI 업데이트
+            try
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (ObjectDisposedException)
+            {
+                // 컴포넌트가 이미 disposed된 경우 무시
+                return;
+            }
         }
 
         private async void UpdateRecordingTime(object state)
@@ -950,7 +971,15 @@ namespace WicsPlatform.Client.Pages
             recordingDuration = elapsed.ToString(@"hh\:mm\:ss");
             recordingDataSize = recordedChunks.Sum(chunk => chunk.Length) / 1024.0 / 1024.0;
 
-            await InvokeAsync(StateHasChanged);
+            try
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (ObjectDisposedException)
+            {
+                // 컴포넌트가 이미 disposed된 경우 무시
+                return;
+            }
         }
         #endregion
 

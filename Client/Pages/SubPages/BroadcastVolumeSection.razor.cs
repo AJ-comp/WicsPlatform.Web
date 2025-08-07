@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components;
 using Radzen;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Threading;
 
 namespace WicsPlatform.Client.Pages.SubPages
 {
@@ -22,8 +23,27 @@ namespace WicsPlatform.Client.Pages.SubPages
         private int mediaVolume = 50;
         private int globalVolume = 50;
         private bool isSavingVolumes = false;
+        
+        // 디바운싱을 위한 필드
+        private Timer _debounceTimer;
+        private bool _hasUnsavedChanges = false;
+        private readonly object _debouncelock = new object();
+
+        // ★ 중복 초기화 방지를 위한 변수
+        private ulong? _lastLoadedChannelId = null;
 
         protected override void OnParametersSet()
+        {
+            // ★ 채널이 실제로 변경되었을 때만 볼륨 값을 초기화
+            if (Channel != null && _lastLoadedChannelId != Channel.Id)
+            {
+                _lastLoadedChannelId = Channel.Id;
+                LoadVolumeFromChannel();
+            }
+        }
+
+        // ★ 채널에서 볼륨 값을 로드하는 별도 메서드
+        private void LoadVolumeFromChannel()
         {
             if (Channel != null)
             {
@@ -32,6 +52,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 ttsVolume = (int)(Channel.TtsVolume * 100);
                 mediaVolume = (int)(Channel.MediaVolume * 100);
                 globalVolume = (int)(Channel.Volume * 100);
+                _hasUnsavedChanges = false;
             }
         }
 
@@ -57,6 +78,19 @@ namespace WicsPlatform.Client.Pages.SubPages
                     globalVolume = value;
                     break;
             }
+
+            // 변경 사항이 있음을 표시
+            _hasUnsavedChanges = true;
+
+            // 디바운싱을 위한 타이머 재설정
+            lock (_debouncelock)
+            {
+                _debounceTimer?.Dispose();
+                _debounceTimer = new Timer(async _ =>
+                {
+                    await InvokeAsync(StateHasChanged);
+                }, null, 100, Timeout.Infinite); // 100ms 후에만 UI 업데이트
+            }
         }
 
         private async Task SaveVolumes()
@@ -66,6 +100,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             try
             {
                 isSavingVolumes = true;
+                await InvokeAsync(StateHasChanged);
 
                 var updateData = new
                 {
@@ -80,6 +115,18 @@ namespace WicsPlatform.Client.Pages.SubPages
 
                 if (response.IsSuccessStatusCode)
                 {
+                    _hasUnsavedChanges = false;
+                    
+                    // ★ 로컬 채널 객체의 볼륨 값도 업데이트하여 동기화
+                    if (Channel != null)
+                    {
+                        Channel.MicVolume = micVolume / 100f;
+                        Channel.TtsVolume = ttsVolume / 100f;
+                        Channel.MediaVolume = mediaVolume / 100f;
+                        Channel.Volume = globalVolume / 100f;
+                        Channel.UpdatedAt = DateTime.Now;
+                    }
+                    
                     NotificationService.Notify(new NotificationMessage
                     {
                         Severity = NotificationSeverity.Success,
@@ -110,15 +157,19 @@ namespace WicsPlatform.Client.Pages.SubPages
             finally
             {
                 isSavingVolumes = false;
+                await InvokeAsync(StateHasChanged);
             }
         }
 
-        private void ResetVolumes()
+        private async Task ResetVolumes()
         {
             micVolume = 50;
             ttsVolume = 50;
             mediaVolume = 50;
             globalVolume = 50;
+            _hasUnsavedChanges = true;
+
+            await InvokeAsync(StateHasChanged);
 
             NotificationService.Notify(new NotificationMessage
             {
@@ -127,6 +178,11 @@ namespace WicsPlatform.Client.Pages.SubPages
                 Detail = "볼륨이 기본값(50%)으로 재설정되었습니다.",
                 Duration = 3000
             });
+        }
+
+        public void Dispose()
+        {
+            _debounceTimer?.Dispose();
         }
     }
 }

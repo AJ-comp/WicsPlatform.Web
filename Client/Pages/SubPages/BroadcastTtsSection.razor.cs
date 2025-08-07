@@ -37,16 +37,23 @@ namespace WicsPlatform.Client.Pages.SubPages
         private static readonly Dictionary<ulong, WicsPlatform.Server.Models.wics.MapChannelTt> channelTtsCache
             = new();
 
+        // ★ 중복 로딩 방지를 위한 변수들
+        private ulong? _lastLoadedChannelId = null;
+        private bool _hasLoadedTts = false;
+
         /* ────────────────────── [Life‑Cycle] ─────────────────────── */
         protected override async Task OnInitializedAsync()
         {
             await LoadTts();
+            _hasLoadedTts = true;
         }
 
         protected override async Task OnParametersSetAsync()
         {
-            if (Channel != null && !IsCollapsed)
+            // ★ 채널이 실제로 변경되었을 때만 채널 TTS를 다시 로드
+            if (Channel != null && !IsCollapsed && _lastLoadedChannelId != Channel.Id)
             {
+                _lastLoadedChannelId = Channel.Id;
                 await LoadChannelTts(Channel.Id);
             }
         }
@@ -57,8 +64,10 @@ namespace WicsPlatform.Client.Pages.SubPages
             var newCollapsedState = !IsCollapsed;
             await IsCollapsedChanged.InvokeAsync(newCollapsedState);
 
-            if (!newCollapsedState && Channel != null && !selectedTtsId.HasValue)
+            // ★ 패널이 열릴 때만 그리고 아직 로드되지 않은 경우에만 로드
+            if (!newCollapsedState && Channel != null && _lastLoadedChannelId != Channel.Id)
             {
+                _lastLoadedChannelId = Channel.Id;
                 await LoadChannelTts(Channel.Id);
             }
         }
@@ -66,6 +75,10 @@ namespace WicsPlatform.Client.Pages.SubPages
         /* ────────────────────── [TTS 목록] ───────────────────────── */
         private async Task LoadTts()
         {
+            // ★ 이미 로드된 경우 스킵
+            if (_hasLoadedTts && ttsList.Any())
+                return;
+
             try
             {
                 isLoadingTts = true;
@@ -80,6 +93,7 @@ namespace WicsPlatform.Client.Pages.SubPages
 
                 var result = await WicsService.GetTts(query);
                 ttsList = result.Value.AsODataEnumerable();
+                _hasLoadedTts = true;
             }
             catch (Exception ex)
             {
@@ -89,6 +103,13 @@ namespace WicsPlatform.Client.Pages.SubPages
             {
                 isLoadingTts = false;
             }
+        }
+
+        // ★ TTS 목록 강제 새로고침 메서드 추가
+        private async Task RefreshTtsList()
+        {
+            _hasLoadedTts = false;
+            await LoadTts();
         }
 
         /* ────────────────────── [채널‑TTS 매핑] ───────────────────── */
@@ -286,7 +307,7 @@ namespace WicsPlatform.Client.Pages.SubPages
 
             if (true.Equals(result))
             {
-                await LoadTts();          // 리스트 즉시 갱신
+                await RefreshTtsList();          // ★ 강제 새로고침 사용
             }
         }
 
@@ -308,7 +329,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 });
             if (result == true)
             {
-                await LoadTts();
+                await RefreshTtsList();       // ★ 강제 새로고침 사용
             }
         }
 
@@ -352,7 +373,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                         Detail = $"'{tts.Name}' TTS가 삭제되었습니다.",
                         Duration = 4000
                     });
-                    await LoadTts();
+                    await RefreshTtsList();       // ★ 강제 새로고침 사용
                 }
                 else
                 {
