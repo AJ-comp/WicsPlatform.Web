@@ -198,6 +198,75 @@
     <!-- 선택된 채널의 섹션들 -->
     @if (selectedChannel != null)
     {
+        <!-- ★ 오디오 설정 패널 ------------------------------------------------ -->
+        <RadzenCard class="mt-3" Style="padding: 1rem;">
+            <RadzenStack Gap="1rem">
+                <RadzenRow AlignItems="AlignItems.Center" class="mb-2">
+                    <RadzenColumn Size="1">
+                        <RadzenIcon Icon="tune" Style="font-size: 20px; color: var(--rz-primary);" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="11">
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="mb-0">오디오 설정</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+                
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenFormField Text="샘플레이트" Style="width: 100%">
+                            <RadzenDropDown @bind-Value="_preferredSampleRate" 
+                                          Data="@sampleRateOptions" 
+                                          TextProperty="Text" 
+                                          ValueProperty="Value"
+                                          Disabled="@isBroadcasting"
+                                          Change="@(args => ChangeSampleRate((int)args))" 
+                                          Style="width: 100%;" />
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenFormField Text="채널" Style="width: 100%">
+                            <RadzenDropDown @bind-Value="_preferredChannels" 
+                                          Data="@channelOptions" 
+                                          TextProperty="Text" 
+                                          ValueProperty="Value"
+                                          Disabled="@isBroadcasting"
+                                          Change="@(args => ChangeChannels((int)args))" 
+                                          Style="width: 100%;" />
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenFormField Text="현재 설정" Style="width: 100%">
+                            <RadzenTextBox Value="@($"{_currentAudioConfig.SampleRate}Hz, {_currentAudioConfig.ChannelCount}ch")" 
+                                         ReadOnly="true" 
+                                         Style="width: 100%; background-color: var(--rz-base-200);" />
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenFormField Text="상태" Style="width: 100%">
+                            <RadzenBadge BadgeStyle="@(isBroadcasting ? BadgeStyle.Success : BadgeStyle.Light)" 
+                                       IsPill="true"
+                                       Text="@(isBroadcasting ? "방송 중" : "대기 중")" 
+                                       Style="width: 100%; justify-content: center; height: 32px; display: flex; align-items: center;" />
+                        </RadzenFormField>
+                    </RadzenColumn>
+                </RadzenRow>
+                
+                @if (!isBroadcasting)
+                {
+                    <RadzenCard Style="background-color: var(--rz-info-lighter); padding: 0.75rem;">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="info" Style="color: var(--rz-info); font-size: 1rem;" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.8rem;">
+                                <strong>설정 변경은 방송 시작 전에만 가능합니다.</strong> 변경된 설정은 다음 방송부터 적용됩니다.
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenCard>
+                }
+            </RadzenStack>
+        </RadzenCard>
+
         <!-- ★ 방송 시작 버튼 ------------------------------------------------ -->
         <RadzenCard class="mt-3" Style="padding: 1rem;">
             <RadzenStack Gap="0.75rem">

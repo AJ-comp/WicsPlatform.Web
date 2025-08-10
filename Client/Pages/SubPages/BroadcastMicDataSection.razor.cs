@@ -376,6 +376,16 @@ namespace WicsPlatform.Client.Pages.SubPages
             AddLog("INFO", "방송 상태가 초기화되었습니다");
             InvokeAsync(StateHasChanged);
         }
+
+        // 오디오 설정 업데이트 메서드 추가
+        public async Task UpdateAudioConfiguration(dynamic config)
+        {
+            sampleRate = config.SampleRate;
+            audioChannels = config.ChannelCount;
+            
+            AddLog("INFO", $"오디오 설정 업데이트됨 - 샘플레이트: {sampleRate}Hz, 채널: {audioChannels}");
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     // 방송 종료 시 전달할 이벤트 인자

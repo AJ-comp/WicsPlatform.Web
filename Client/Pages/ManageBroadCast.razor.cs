@@ -92,6 +92,56 @@ namespace WicsPlatform.Client.Pages
         private List<WicsPlatform.Server.Models.wics.Speaker> _currentOnlineSpeakers;
         #endregion
 
+        #region Audio Configuration
+// 오디오 설정 클래스 추가
+public class AudioConfiguration
+{
+    public int SampleRate { get; set; } = 44100;
+    public int ChannelCount { get; set; } = 2;
+    public bool EchoCancellation { get; set; } = true;
+    public bool NoiseSuppression { get; set; } = true;
+    public bool AutoGainControl { get; set; } = true;
+    public string DeviceId { get; set; }
+    public string GroupId { get; set; }
+}
+
+// 오디오 설정 필드 추가
+private AudioConfiguration _currentAudioConfig = new AudioConfiguration();
+private int _preferredSampleRate = 44100; // 사용자가 설정할 수 있는 값
+private int _preferredChannels = 2;
+private int _preferredBitrate = 64000;
+
+// 샘플레이트 옵션
+private List<SampleRateOption> sampleRateOptions = new List<SampleRateOption>
+{
+    new SampleRateOption { Value = 8000, Text = "8000 Hz (전화품질)" },
+    new SampleRateOption { Value = 16000, Text = "16000 Hz (광대역)" },
+    new SampleRateOption { Value = 22050, Text = "22050 Hz (FM라디오)" },
+    new SampleRateOption { Value = 44100, Text = "44100 Hz (CD품질)" },
+    new SampleRateOption { Value = 48000, Text = "48000 Hz (프로페셔널)" },
+    new SampleRateOption { Value = 96000, Text = "96000 Hz (고해상도)" }
+};
+
+// 채널 옵션
+private List<ChannelOption> channelOptions = new List<ChannelOption>
+{
+    new ChannelOption { Value = 1, Text = "모노 (1채널)" },
+    new ChannelOption { Value = 2, Text = "스테레오 (2채널)" }
+};
+
+public class SampleRateOption
+{
+    public int Value { get; set; }
+    public string Text { get; set; }
+}
+
+public class ChannelOption
+{
+    public int Value { get; set; }
+    public string Text { get; set; }
+}
+#endregion
+
         #region Lifecycle Methods
         protected override async Task OnInitializedAsync()
         {
@@ -447,7 +497,20 @@ namespace WicsPlatform.Client.Pages
         private async Task<bool> StartMicrophoneRecording()
         {
             const int MicTimesliceMs = 50;
-            var ok = await _jsModule.InvokeAsync<bool>("start", _dotNetRef, new { timeslice = MicTimesliceMs });
+            
+            // ✅ 사용자 정의 오디오 설정으로 마이크 시작
+            var micConfig = new
+            {
+                timeslice = MicTimesliceMs,
+                sampleRate = _preferredSampleRate,    // 사용자가 원하는 샘플레이트
+                channels = _preferredChannels,        // 사용자가 원하는 채널 수
+                bitrate = _preferredBitrate,         // 사용자가 원하는 비트레이트
+                echoCancellation = true,             // 에코 제거
+                noiseSuppression = true,             // 노이즈 제거
+                autoGainControl = true               // 자동 게인 조절
+            };
+
+            var ok = await _jsModule.InvokeAsync<bool>("start", _dotNetRef, micConfig);
 
             if (!ok)
             {
@@ -818,6 +881,52 @@ namespace WicsPlatform.Client.Pages
                 new DialogOptions { Width = "600px", Resizable = true });
             return Task.CompletedTask;
         }
+
+        [JSInvokable]
+        public async Task OnAudioConfigurationDetected(AudioConfiguration config)
+        {
+            _currentAudioConfig = config;
+            
+            // ✅ 실제 감지된 샘플레이트로 업데이트
+            sampleRate = config.SampleRate;
+            
+            _logger.LogInformation($"오디오 설정 감지됨 - 샘플레이트: {config.SampleRate}Hz, " +
+                                  $"채널: {config.ChannelCount}, 에코제거: {config.EchoCancellation}");
+            
+            // MicDataSection에도 실제 설정 전달
+            if (micDataSection != null)
+            {
+                await micDataSection.UpdateAudioConfiguration(config);
+            }
+            
+            await InvokeAsync(StateHasChanged);
+        }
+
+        // 샘플레이트 변경 메서드 (UI에서 호출 가능)
+        protected async Task ChangeSampleRate(int newSampleRate)
+        {
+            if (isBroadcasting)
+            {
+                NotifyWarn("방송 중", "방송 중에는 오디오 설정을 변경할 수 없습니다.");
+                return;
+            }
+            
+            _preferredSampleRate = newSampleRate;
+            NotifyInfo("설정 변경", $"샘플레이트가 {newSampleRate}Hz로 설정되었습니다. 다음 방송부터 적용됩니다.");
+        }
+
+        // 채널 수 변경 메서드
+        protected async Task ChangeChannels(int newChannels)
+        {
+            if (isBroadcasting)
+            {
+                NotifyWarn("방송 중", "방송 중에는 오디오 설정을 변경할 수 없습니다.");
+                return;
+            }
+            
+            _preferredChannels = newChannels;
+            NotifyInfo("설정 변경", $"채널 수가 {newChannels}채널로 설정되었습니다. 다음 방송부터 적용됩니다.");
+        }
         #endregion
 
         #region Event Handlers
@@ -853,7 +962,7 @@ namespace WicsPlatform.Client.Pages
                 if (selectedChannel != null)
                     selectedChannel = channels.FirstOrDefault(c => c.Id == selectedChannel.Id);
             }
-            // 방송 중일 때는 로컬 채널 객체가 이미 BroadcastVolumeSection에서 업데이트되므로
+            // 방송 중일 때는 로컬 채널 객체가 이미 BroadcastVolumeSection에서 업데이트되었으므로
             // 추가적인 로드가 필요하지 않음
         }
 
