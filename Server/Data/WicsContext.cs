@@ -28,18 +28,6 @@ namespace WicsPlatform.Server.Data
               .HasForeignKey(i => i.ChannelId)
               .HasPrincipalKey(i => i.Id);
 
-            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
-              .HasOne(i => i.Medium)
-              .WithMany(i => i.Broadcasts)
-              .HasForeignKey(i => i.MediaId)
-              .HasPrincipalKey(i => i.Id);
-
-            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
-              .HasOne(i => i.Speaker)
-              .WithMany(i => i.Broadcasts)
-              .HasForeignKey(i => i.SpeakerId)
-              .HasPrincipalKey(i => i.Id);
-
             builder.Entity<WicsPlatform.Server.Models.wics.MapChannelMedium>()
               .HasOne(i => i.Channel)
               .WithMany(i => i.MapChannelMedia)
@@ -89,8 +77,40 @@ namespace WicsPlatform.Server.Data
               .HasPrincipalKey(i => i.Id);
 
             builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
+              .Property(p => p.SpeakerIdList)
+              .HasDefaultValueSql(@"''");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
+              .Property(p => p.MediaIdList)
+              .HasDefaultValueSql(@"''");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
+              .Property(p => p.TtsIdList)
+              .HasDefaultValueSql(@"''");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
+              .Property(p => p.LoopbackYn)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
               .Property(p => p.OngoingYn)
               .HasDefaultValueSql(@"'Y'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
+              .Property(p => p.Codec)
+              .HasDefaultValueSql(@"'OPUS'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
+              .Property(p => p.Channel1)
+              .HasDefaultValueSql(@"'mono'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
+              .Property(p => p.SamplingRate)
+              .HasDefaultValueSql(@"'24000'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
+              .Property(p => p.Bit)
+              .HasDefaultValueSql(@"'8'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
               .Property(p => p.Description)

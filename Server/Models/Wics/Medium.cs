@@ -34,8 +34,6 @@ namespace WicsPlatform.Server.Models.wics
         [Required]
         public DateTime UpdatedAt { get; set; }
 
-        public ICollection<Broadcast> Broadcasts { get; set; }
-
         public ICollection<MapChannelMedium> MapChannelMedia { get; set; }
 
         public ICollection<MapMediaGroup> MapMediaGroups { get; set; }

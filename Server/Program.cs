@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components.Authorization;
+﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +12,19 @@ using WicsPlatform.Server.Services;
 
 static void RegisterDBContext(WebApplicationBuilder builder)
 {
-    // appsettings.json에서 연결 문자열 가져오기
+    // Radzen Blazor Studio에서 스캐폴딩 시 이걸로 해야 함
+    builder.Services.AddDbContext<wicsContext>(options =>
+    {
+        options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
+    });
+    builder.Services.AddDbContext<ApplicationIdentityDbContext>(options =>
+    {
+        options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
+    });
+    builder.Services.AddIdentity<ApplicationUser, ApplicationRole>().AddEntityFrameworkStores<ApplicationIdentityDbContext>().AddDefaultTokenProviders();
+
+// appsettings.json에서 연결 문자열 가져오기
+/*
     var connectionString = builder.Configuration.GetConnectionString("wicsConnection");
     
     // DbContext를 종속성 주입을 통해 등록
@@ -22,11 +34,13 @@ static void RegisterDBContext(WebApplicationBuilder builder)
         options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
     });
     builder.Services.AddIdentity<ApplicationUser, ApplicationRole>().AddEntityFrameworkStores<ApplicationIdentityDbContext>().AddDefaultTokenProviders();
+
     builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
     {
         options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
     });
     builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastWebSocketService>();
+*/
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -90,7 +104,10 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.SameSite = SameSiteMode.Lax; // None -> Lax 변경
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Always -> SameAsRequest 변경
 });
-
+builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
+{
+    options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
+});
 var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

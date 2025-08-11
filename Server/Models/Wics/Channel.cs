@@ -39,6 +39,22 @@ namespace WicsPlatform.Server.Models.wics
         [Required]
         public float Volume { get; set; }
 
+        [Column("audio_method")]
+        [Required]
+        public byte AudioMethod { get; set; }
+
+        [Column("codec")]
+        public string Codec { get; set; }
+
+        [Column("channel")]
+        public string Channel1 { get; set; }
+
+        [Column("sampling_rate")]
+        public uint SamplingRate { get; set; }
+
+        [Column("bit")]
+        public byte Bit { get; set; }
+
         [Column("state")]
         [Required]
         public sbyte State { get; set; }

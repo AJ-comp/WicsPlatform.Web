@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -86,10 +86,12 @@ namespace WicsPlatform.Client.Pages
         private IJSObjectReference _speakerModule;
         private DotNetObjectReference<ManageBroadCast> _dotNetRef;
         protected BroadcastMicDataSection micDataSection;
-        private bool _loopbackEnabled = false;
 
         // Broadcast 관련 추가
         private List<WicsPlatform.Server.Models.wics.Speaker> _currentOnlineSpeakers;
+        
+        // 루프백 설정 - 이제 Broadcast 테이블 기반으로 관리
+        private bool _currentLoopbackSetting = false;
         #endregion
 
         #region Audio Configuration
@@ -107,7 +109,7 @@ public class AudioConfiguration
 
 // 오디오 설정 필드 추가
 private AudioConfiguration _currentAudioConfig = new AudioConfiguration();
-private int _preferredSampleRate = 44100; // 사용자가 설정할 수 있는 값
+private int _preferredSampleRate = 48000; // 기본값을 48000Hz로 변경
 private int _preferredChannels = 2;
 private int _preferredBitrate = 64000;
 
@@ -116,10 +118,8 @@ private List<SampleRateOption> sampleRateOptions = new List<SampleRateOption>
 {
     new SampleRateOption { Value = 8000, Text = "8000 Hz (전화품질)" },
     new SampleRateOption { Value = 16000, Text = "16000 Hz (광대역)" },
-    new SampleRateOption { Value = 22050, Text = "22050 Hz (FM라디오)" },
-    new SampleRateOption { Value = 44100, Text = "44100 Hz (CD품질)" },
-    new SampleRateOption { Value = 48000, Text = "48000 Hz (프로페셔널)" },
-    new SampleRateOption { Value = 96000, Text = "96000 Hz (고해상도)" }
+    new SampleRateOption { Value = 24000, Text = "24000 Hz (고품질)" },
+    new SampleRateOption { Value = 48000, Text = "48000 Hz (프로페셔널)" }
 };
 
 // 채널 옵션
@@ -267,7 +267,50 @@ public class ChannelOption
             selectedChannel = channel;
             selectedGroups.Clear();
             ResetAllPanels();
+            
+            // 선택된 채널의 오디오 설정으로 UI 업데이트
+            if (channel != null)
+            {
+                var channelSampleRate = (int)(channel.SamplingRate > 0 ? channel.SamplingRate : 48000);
+                
+                // 지원되는 샘플레이트 목록 중에서 가장 가까운 값 찾기
+                var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
+                _preferredSampleRate = FindClosestSampleRate(channelSampleRate, supportedSampleRates);
+                
+                // 채널에 저장된 값과 다르면 업데이트
+                if (_preferredSampleRate != channelSampleRate && channel.SamplingRate > 0)
+                {
+                    try
+                    {
+                        channel.SamplingRate = (uint)_preferredSampleRate;
+                        channel.UpdatedAt = DateTime.Now;
+                        await WicsService.UpdateChannel(channel.Id, channel);
+                        
+                        _logger.LogInformation($"Channel {channel.Id} sampling rate auto-adjusted from {channelSampleRate}Hz to {_preferredSampleRate}Hz");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Failed to update channel {channel.Id} sampling rate");
+                    }
+                }
+                
+                _preferredChannels = channel.Channel1 == "mono" ? 1 : 2;
+                
+                _logger.LogInformation($"Channel selected: {channel.Name}, SamplingRate: {_preferredSampleRate}Hz, Channels: {_preferredChannels}");
+            }
+            
             await InvokeAsync(StateHasChanged);
+        }
+
+        // 지원되는 샘플레이트 중에서 가장 가까운 값을 찾는 메서드
+        private int FindClosestSampleRate(int targetSampleRate, int[] supportedSampleRates)
+        {
+            if (supportedSampleRates.Contains(targetSampleRate))
+                return targetSampleRate;
+            
+            return supportedSampleRates
+                .OrderBy(rate => Math.Abs(rate - targetSampleRate))
+                .First();
         }
 
         protected async Task ToggleBroadcast(ulong channelId)
@@ -323,7 +366,7 @@ public class ChannelOption
 
                 InitializeBroadcastState();
 
-                // Broadcast 테이블에 데이터 삽입
+                // Broadcast 테이블에 데이터 삽입 (LoopbackYn 포함)
                 await CreateBroadcastRecords(onlineSpeakers);
 
                 NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
@@ -339,29 +382,89 @@ public class ChannelOption
         {
             try
             {
-                foreach (var speaker in onlineSpeakers)
+                // 선택된 미디어와 TTS ID 가져오기
+                var selectedMediaIds = await GetSelectedMediaIds();
+                var selectedTtsIds = await GetSelectedTtsIds();
+                
+                // ✅ 띄어쓰기 구분 문자열로 단일 레코드 생성
+                var broadcast = new WicsPlatform.Server.Models.wics.Broadcast
                 {
-                    var broadcast = new WicsPlatform.Server.Models.wics.Broadcast
-                    {
-                        ChannelId = selectedChannel.Id,
-                        SpeakerId = speaker.Id,
-                        MediaId = 1, // 우선 고정값
-                        OngoingYn = "Y",
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now
-                    };
+                    ChannelId = selectedChannel.Id,
+                    
+                    // 편의 프로퍼티 사용 (내부적으로 띄어쓰기 구분 문자열로 변환됨)
+                    SpeakerIds = onlineSpeakers.Select(s => s.Id).ToList(),
+                    MediaIds = selectedMediaIds,
+                    TtsIds = selectedTtsIds,
+                    
+                    LoopbackYn = "N",
+                    OngoingYn = "Y",
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                };
 
-                    await WicsService.CreateBroadcast(broadcast);
-                    _logger.LogInformation($"Broadcast record created for channel {selectedChannel.Id}, speaker {speaker.Id}");
-                }
+                await WicsService.CreateBroadcast(broadcast);
+                
+                _logger.LogInformation($"Broadcast created: Channel={selectedChannel.Id}, " +
+                                      $"SpeakerIdList='{broadcast.SpeakerIdList}', " +
+                                      $"MediaIdList='{broadcast.MediaIdList}', " +
+                                      $"TtsIdList='{broadcast.TtsIdList}'");
+                
+                _currentLoopbackSetting = false;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to create broadcast records");
+                _logger.LogError(ex, "Failed to create broadcast record");
                 NotifyWarn("기록 생성 실패", "방송 기록 생성 중 오류가 발생했습니다. 방송은 계속됩니다.");
             }
         }
 
+        // ✅ 현재 채널에 설정된 미디어 ID 가져오기
+        private async Task<List<ulong>> GetSelectedMediaIds()
+        {
+            try
+            {
+                if (selectedChannel == null) return new List<ulong>();
+                
+                // MapChannelMedium에서 현재 채널에 연결된 미디어 가져오기
+                var query = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {selectedChannel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)",
+                    Expand = "Medium"
+                };
+                
+                var channelMedia = await WicsService.GetMapChannelMedia(query);
+                return channelMedia.Value.Select(m => m.MediaId).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get selected media IDs");
+                return new List<ulong>();
+            }
+        }
+
+        // ✅ 현재 채널에 설정된 TTS ID 가져오기
+        private async Task<List<ulong>> GetSelectedTtsIds()
+        {
+            try
+            {
+                if (selectedChannel == null) return new List<ulong>();
+                
+                // MapChannelTt에서 현재 채널에 연결된 TTS 가져오기
+                var query = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {selectedChannel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)",
+                    Expand = "Tt"
+                };
+                
+                var channelTts = await WicsService.GetMapChannelTts(query);
+                return channelTts.Value.Select(t => t.TtsId).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get selected TTS IDs");
+                return new List<ulong>();
+            }
+        }
         private async Task UpdateBroadcastRecordsToStopped()
         {
             try
@@ -369,7 +472,7 @@ public class ChannelOption
                 if (_currentOnlineSpeakers == null || !_currentOnlineSpeakers.Any())
                     return;
 
-                // 현재 진행 중인 방송 레코드 조회
+                // ✅ 현재 진행 중인 방송 레코드 조회 (띄어쓰기 구분 문자열 방식)
                 var query = new Radzen.Query
                 {
                     Filter = $"ChannelId eq {selectedChannel.Id} and OngoingYn eq 'Y'",
@@ -380,13 +483,19 @@ public class ChannelOption
 
                 foreach (var broadcast in broadcasts.Value)
                 {
-                    // 현재 방송 중인 스피커인 경우만 업데이트
-                    if (_currentOnlineSpeakers.Any(s => s.Id == broadcast.SpeakerId))
+                    // ✅ 띄어쓰기 구분 문자열에서 스피커 ID 확인
+                    var broadcastSpeakerIds = broadcast.SpeakerIds; // 자동으로 파싱됨
+                    var currentSpeakerIds = _currentOnlineSpeakers.Select(s => s.Id).ToList();
+                    
+                    // 현재 방송 중인 스피커가 포함된 경우만 업데이트
+                    if (broadcastSpeakerIds.Any(id => currentSpeakerIds.Contains(id)))
                     {
                         broadcast.OngoingYn = "N";
                         broadcast.UpdatedAt = DateTime.Now;
                         await WicsService.UpdateBroadcast(broadcast.Id, broadcast);
-                        _logger.LogInformation($"Broadcast record updated to stopped for channel {broadcast.ChannelId}, speaker {broadcast.SpeakerId}");
+                        
+                        _logger.LogInformation($"Broadcast record updated to stopped for channel {broadcast.ChannelId}, " +
+                                              $"speaker_id_list: '{broadcast.SpeakerIdList}'");
                     }
                 }
             }
@@ -485,7 +594,8 @@ public class ChannelOption
                 _dotNetRef = DotNetObjectReference.Create(this);
             }
 
-            if (_loopbackEnabled && _speakerModule == null)
+            // 루프백이 활성화된 경우에만 스피커 모듈 초기화
+            if (_currentLoopbackSetting && _speakerModule == null)
             {
                 _speakerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/speaker.js");
                 await _speakerModule.InvokeVoidAsync("init");
@@ -498,12 +608,16 @@ public class ChannelOption
         {
             const int MicTimesliceMs = 50;
             
-            // ✅ 사용자 정의 오디오 설정으로 마이크 시작
+            // 선택된 채널의 샘플링 레이트를 우선 사용, 없으면 사용자 설정값 사용
+            var channelSampleRate = selectedChannel?.SamplingRate > 0 ? (int)selectedChannel.SamplingRate : _preferredSampleRate;
+            var channelChannels = selectedChannel?.Channel1 == "mono" ? 1 : _preferredChannels;
+            
+            // ✅ 채널 설정 또는 사용자 정의 오디오 설정으로 마이크 시작
             var micConfig = new
             {
                 timeslice = MicTimesliceMs,
-                sampleRate = _preferredSampleRate,    // 사용자가 원하는 샘플레이트
-                channels = _preferredChannels,        // 사용자가 원하는 채널 수
+                sampleRate = channelSampleRate,      // 채널 또는 사용자가 원하는 샘플레이트
+                channels = channelChannels,          // 채널 또는 사용자가 원하는 채널 수
                 bitrate = _preferredBitrate,         // 사용자가 원하는 비트레이트
                 echoCancellation = true,             // 에코 제거
                 noiseSuppression = true,             // 노이즈 제거
@@ -518,6 +632,7 @@ public class ChannelOption
                 return false;
             }
 
+            _logger.LogInformation($"Microphone started with SampleRate: {channelSampleRate}Hz, Channels: {channelChannels}");
             return true;
         }
 
@@ -571,6 +686,83 @@ public class ChannelOption
                 NotifyError("방송 시작", ex);
 
             await InvokeAsync(StateHasChanged);
+        }
+        #endregion
+
+        #region Loopback Control
+        // 루프백 설정을 위한 메서드 추가
+        private async Task<bool> GetLoopbackSetting()
+        {
+            try
+            {
+                // ✅ 현재 진행 중인 방송에서 루프백 설정 확인 (띄어쓰기 구분 문자열 방식)
+                var query = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {selectedChannel.Id} and OngoingYn eq 'Y'",
+                    Top = 1,
+                    OrderBy = "CreatedAt desc"
+                };
+
+                var broadcasts = await WicsService.GetBroadcasts(query);
+                var currentBroadcast = broadcasts.Value.FirstOrDefault();
+                
+                _currentLoopbackSetting = currentBroadcast?.LoopbackYn == "Y";
+                return _currentLoopbackSetting;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get loopback setting");
+                return false; // 기본값
+            }
+        }
+
+        // 루프백 설정 토글 메서드 추가 (UI에서 호출 가능)
+        protected async Task ToggleLoopback()
+        {
+            try
+            {
+                if (!isBroadcasting)
+                {
+                    NotifyWarn("방송 필요", "방송 중일 때만 루프백 설정을 변경할 수 있습니다.");
+                    return;
+                }
+
+                // ✅ 현재 진행 중인 방송 레코드들 조회 (띄어쓰기 구분 문자열 방식)
+                var query = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {selectedChannel.Id} and OngoingYn eq 'Y'"
+                };
+
+                var broadcasts = await WicsService.GetBroadcasts(query);
+                var currentLoopback = broadcasts.Value.FirstOrDefault()?.LoopbackYn == "Y";
+                var newLoopback = !currentLoopback;
+
+                // ✅ 모든 진행 중인 방송 레코드의 루프백 설정 업데이트
+                foreach (var broadcast in broadcasts.Value)
+                {
+                    broadcast.LoopbackYn = newLoopback ? "Y" : "N";
+                    broadcast.UpdatedAt = DateTime.Now;
+                    await WicsService.UpdateBroadcast(broadcast.Id, broadcast);
+                }
+
+                _currentLoopbackSetting = newLoopback;
+
+                // 루프백 모듈 초기화/해제
+                if (newLoopback && _speakerModule == null)
+                {
+                    _speakerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/speaker.js");
+                    await _speakerModule.InvokeVoidAsync("init");
+                }
+
+                NotifySuccess("루프백 설정 변경", 
+                    $"루프백이 {(newLoopback ? "활성화" : "비활성화")}되었습니다.");
+
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                NotifyError("루프백 설정 변경", ex);
+            }
         }
         #endregion
 
@@ -833,7 +1025,8 @@ public class ChannelOption
                 if (!string.IsNullOrEmpty(currentBroadcastId))
                     await WebSocketService.SendAudioDataAsync(currentBroadcastId, data);
 
-                if (_loopbackEnabled && _speakerModule != null)
+                // 루프백 설정을 동적으로 확인하여 스피커로 피드
+                if (_currentLoopbackSetting && _speakerModule != null)
                     await _speakerModule.InvokeVoidAsync("feed", base64Data);
 
                 // StateHasChanged 호출 최적화 - 10번의 오디오 패킷마다 한 번씩만 UI 업데이트
@@ -911,8 +1104,40 @@ public class ChannelOption
                 return;
             }
             
+            // 지원되는 샘플레이트인지 확인
+            var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
+            if (!supportedSampleRates.Contains(newSampleRate))
+            {
+                NotifyWarn("지원되지 않는 샘플레이트", $"{newSampleRate}Hz는 지원되지 않는 샘플레이트입니다.");
+                return;
+            }
+            
             _preferredSampleRate = newSampleRate;
-            NotifyInfo("설정 변경", $"샘플레이트가 {newSampleRate}Hz로 설정되었습니다. 다음 방송부터 적용됩니다.");
+            
+            // 선택된 채널이 있으면 채널의 SamplingRate도 업데이트
+            if (selectedChannel != null)
+            {
+                try
+                {
+                    selectedChannel.SamplingRate = (uint)newSampleRate;
+                    selectedChannel.UpdatedAt = DateTime.Now;
+                    await WicsService.UpdateChannel(selectedChannel.Id, selectedChannel);
+                    
+                    NotifySuccess("설정 저장", 
+                        $"채널 '{selectedChannel.Name}'의 샘플레이트가 {newSampleRate}Hz로 저장되었습니다.");
+                    
+                    _logger.LogInformation($"Channel {selectedChannel.Id} sampling rate updated to {newSampleRate}Hz");
+                }
+                catch (Exception ex)
+                {
+                    NotifyError("설정 저장", ex);
+                    _logger.LogError(ex, $"Failed to update channel {selectedChannel.Id} sampling rate");
+                }
+            }
+            else
+            {
+                NotifyInfo("설정 변경", $"샘플레이트가 {newSampleRate}Hz로 설정되었습니다. 다음 방송부터 적용됩니다.");
+            }
         }
 
         // 채널 수 변경 메서드
@@ -925,7 +1150,31 @@ public class ChannelOption
             }
             
             _preferredChannels = newChannels;
-            NotifyInfo("설정 변경", $"채널 수가 {newChannels}채널로 설정되었습니다. 다음 방송부터 적용됩니다.");
+            
+            // 선택된 채널이 있으면 채널의 Channel1 필드도 업데이트
+            if (selectedChannel != null)
+            {
+                try
+                {
+                    selectedChannel.Channel1 = newChannels == 1 ? "mono" : "stereo";
+                    selectedChannel.UpdatedAt = DateTime.Now;
+                    await WicsService.UpdateChannel(selectedChannel.Id, selectedChannel);
+                    
+                    NotifySuccess("설정 저장", 
+                        $"채널 '{selectedChannel.Name}'의 채널 수가 {newChannels}채널로 저장되었습니다.");
+                    
+                    _logger.LogInformation($"Channel {selectedChannel.Id} channels updated to {newChannels}");
+                }
+                catch (Exception ex)
+                {
+                    NotifyError("설정 저장", ex);
+                    _logger.LogError(ex, $"Failed to update channel {selectedChannel.Id} channels");
+                }
+            }
+            else
+            {
+                NotifyInfo("설정 변경", $"채널 수가 {newChannels}채널로 설정되었습니다. 다음 방송부터 적용됩니다.");
+            }
         }
         #endregion
 
@@ -960,7 +1209,18 @@ public class ChannelOption
             {
                 await LoadChannels();
                 if (selectedChannel != null)
+                {
                     selectedChannel = channels.FirstOrDefault(c => c.Id == selectedChannel.Id);
+                    
+                    // 채널 설정이 업데이트된 경우 UI에 반영
+                    if (selectedChannel != null)
+                    {
+                        var channelSampleRate = (int)(selectedChannel.SamplingRate > 0 ? selectedChannel.SamplingRate : 48000);
+                        var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
+                        _preferredSampleRate = FindClosestSampleRate(channelSampleRate, supportedSampleRates);
+                        _preferredChannels = selectedChannel.Channel1 == "mono" ? 1 : 2;
+                    }
+                }
             }
             // 방송 중일 때는 로컬 채널 객체가 이미 BroadcastVolumeSection에서 업데이트되었으므로
             // 추가적인 로드가 필요하지 않음
@@ -1121,6 +1381,11 @@ public class ChannelOption
                 TtsVolume = 0.5f,
                 MediaVolume = 0.5f,
                 Volume = 0.5f,
+                SamplingRate = 48000, // 기본 샘플링 레이트를 48000Hz로 설정
+                AudioMethod = 0,
+                Codec = "webm",
+                Channel1 = "stereo",
+                Bit = 16,
                 Description = "",
                 DeleteYn = "N",
                 CreatedAt = DateTime.Now,
@@ -1149,8 +1414,9 @@ public class ChannelOption
                 await StopRecording();
             }
 
-            // 온라인 스피커 목록 초기화
+            // 온라인 스피커 목록 및 루프백 설정 초기화
             _currentOnlineSpeakers = null;
+            _currentLoopbackSetting = false;
         }
 
         private void LogBroadcastStatistics(BroadcastStoppedEventArgs args)

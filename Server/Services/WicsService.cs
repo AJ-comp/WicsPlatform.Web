@@ -85,8 +85,6 @@ namespace WicsPlatform.Server
             var items = Context.Broadcasts.AsQueryable();
 
             items = items.Include(i => i.Channel);
-            items = items.Include(i => i.Medium);
-            items = items.Include(i => i.Speaker);
 
             if (query != null)
             {
@@ -118,8 +116,6 @@ namespace WicsPlatform.Server
                               .Where(i => i.Id == id);
 
             items = items.Include(i => i.Channel);
-            items = items.Include(i => i.Medium);
-            items = items.Include(i => i.Speaker);
  
             OnGetBroadcastById(ref items);
 
@@ -1356,7 +1352,6 @@ namespace WicsPlatform.Server
         {
             var itemToDelete = Context.Media
                               .Where(i => i.Id == id)
-                              .Include(i => i.Broadcasts)
                               .Include(i => i.MapChannelMedia)
                               .Include(i => i.MapMediaGroups)
                               .FirstOrDefault();
@@ -1681,7 +1676,6 @@ namespace WicsPlatform.Server
         {
             var itemToDelete = Context.Speakers
                               .Where(i => i.Id == id)
-                              .Include(i => i.Broadcasts)
                               .Include(i => i.MapSpeakerGroups)
                               .FirstOrDefault();
 

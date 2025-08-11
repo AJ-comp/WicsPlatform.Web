@@ -60,8 +60,6 @@ namespace WicsPlatform.Server.Models.wics
         [Required]
         public DateTime UpdatedAt { get; set; }
 
-        public ICollection<Broadcast> Broadcasts { get; set; }
-
         public ICollection<MapSpeakerGroup> MapSpeakerGroups { get; set; }
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net;
 using System.Data;
 using System.Linq;
@@ -112,7 +112,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.SaveChanges();
 
                 var itemToReturn = this.context.Broadcasts.Where(i => i.Id == Id);
-                Request.QueryString = Request.QueryString.Add("$expand", "Channel,Medium,Speaker");
+                Request.QueryString = Request.QueryString.Add("$expand", "Channel");
                 this.OnAfterBroadcastUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
             }
@@ -147,7 +147,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.SaveChanges();
 
                 var itemToReturn = this.context.Broadcasts.Where(i => i.Id == Id);
-                Request.QueryString = Request.QueryString.Add("$expand", "Channel,Medium,Speaker");
+                Request.QueryString = Request.QueryString.Add("$expand", "Channel");
                 this.OnAfterBroadcastUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
             }
@@ -183,7 +183,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
                 var itemToReturn = this.context.Broadcasts.Where(i => i.Id == item.Id);
 
-                Request.QueryString = Request.QueryString.Add("$expand", "Channel,Medium,Speaker");
+                Request.QueryString = Request.QueryString.Add("$expand", "Channel");
 
                 this.OnAfterBroadcastCreated(item);
 
