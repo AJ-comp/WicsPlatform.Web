@@ -67,6 +67,11 @@ namespace WicsPlatform.Client.Pages
         protected int sampleRate = 44100;
         private System.Threading.Timer _broadcastTimer;
 
+        // ✅ 방송 소스 선택 체크박스 (새로 추가)
+        protected bool isMicEnabled = true;     // 마이크 - 기본값 true (기존 동작 유지)
+        protected bool isMediaEnabled = false;  // 미디어
+        protected bool isTtsEnabled = false;    // TTS
+
         // 테스트 방송 상태
         protected bool isTestBroadcasting = false;
         protected string testBroadcastId = null;
@@ -358,10 +363,31 @@ public class ChannelOption
                 if (!await InitializeAudioModules())
                     return;
 
-                if (!await StartMicrophoneRecording())
+                // ✅ 마이크가 활성화된 경우에만 마이크 녹음 시작
+                if (isMicEnabled)
                 {
-                    await CleanupFailedBroadcast();
-                    return;
+                    if (!await StartMicrophoneRecording())
+                    {
+                        await CleanupFailedBroadcast();
+                        return;
+                    }
+                }
+
+                // ✅ 미디어가 활성화된 경우 미디어 스트리밍 시작
+                if (isMediaEnabled)
+                {
+                    if (!await StartMediaStreaming())
+                    {
+                        await CleanupFailedBroadcast();
+                        return;
+                    }
+                }
+
+                // ✅ TTS가 활성화된 경우 TTS 스트리밍 시작 (향후 구현)
+                if (isTtsEnabled)
+                {
+                    // TODO: StartTtsStreaming() 구현
+                    _logger.LogInformation("TTS streaming will be implemented in future updates");
                 }
 
                 InitializeBroadcastState();
@@ -519,6 +545,13 @@ public class ChannelOption
                 return false;
             }
 
+            // ✅ 최소 하나의 방송 소스가 활성화되어야 함
+            if (!isMicEnabled && !isMediaEnabled && !isTtsEnabled)
+            {
+                NotifyWarn("방송 소스 선택", "최소 하나의 방송 소스(마이크, 미디어, TTS)를 활성화해주세요.");
+                return false;
+            }
+
             return true;
         }
 
@@ -655,17 +688,27 @@ public class ChannelOption
             List<WicsPlatform.Server.Models.wics.Speaker> onlineSpeakers,
             List<WicsPlatform.Server.Models.wics.Speaker> offlineSpeakers)
         {
+            // ✅ 활성화된 방송 소스를 알림 메시지에 포함
+            var enabledSources = new List<string>();
+            if (isMicEnabled) enabledSources.Add("마이크");
+            if (isMediaEnabled) enabledSources.Add("미디어");
+            if (isTtsEnabled) enabledSources.Add("TTS");
+            
+            var sourcesText = string.Join(", ", enabledSources);
+            
             if (offlineSpeakers.Any())
             {
                 NotifyInfo("방송 시작",
                     $"'{selectedChannel.Name}' 채널 방송을 시작했습니다. " +
-                    $"온라인 스피커 {onlineSpeakers.Count}대로 방송 중입니다.");
+                    $"온라인 스피커 {onlineSpeakers.Count}대로 방송 중입니다. " +
+                    $"활성 소스: {sourcesText}");
             }
             else
             {
                 NotifySuccess("방송 시작",
                     $"'{selectedChannel.Name}' 채널 방송이 정상적으로 시작되었습니다. " +
-                    $"모든 스피커({onlineSpeakers.Count}대)가 온라인 상태입니다.");
+                    $"모든 스피커({onlineSpeakers.Count}대)가 온라인 상태입니다. " +
+                    $"활성 소스: {sourcesText}");
             }
         }
 
@@ -1008,7 +1051,8 @@ public class ChannelOption
         [JSInvokable]
         public async Task OnAudioCaptured(string base64Data)
         {
-            if (string.IsNullOrWhiteSpace(base64Data)) return;
+            // ✅ 마이크가 비활성화된 경우 오디오 처리 중단
+            if (!isMicEnabled || string.IsNullOrWhiteSpace(base64Data)) return;
 
             try
             {
@@ -1409,12 +1453,33 @@ public class ChannelOption
                 currentBroadcastId = null;
             }
 
-            if (isRecording)
+            // ✅ 마이크가 활성화된 경우에만 마이크 모듈 정지
+            if (isMicEnabled && _jsModule != null)
             {
-                await StopRecording();
+                try
+                {
+                    await _jsModule.InvokeVoidAsync("stop");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to stop microphone module");
+                }
             }
 
-            // 온라인 스피커 목록 및 루프백 설정 초기화
+            // ✅ 미디어가 활성화된 경우 미디어 스트리밍 정지
+            if (isMediaEnabled)
+            {
+                await StopMediaStreaming();
+            }
+
+            // ✅ TTS가 활성화된 경우 TTS 스트리밍 정지 (향후 구현)
+            if (isTtsEnabled)
+            {
+                // TODO: StopTtsStreaming() 구현
+                _logger.LogInformation("TTS streaming stop will be implemented in future updates");
+            }
+
+            // онлайн спикеры 목록 및 루프백 설정 초기화
             _currentOnlineSpeakers = null;
             _currentLoopbackSetting = false;
         }
@@ -1436,6 +1501,9 @@ public class ChannelOption
             _broadcastTimer?.Dispose();
             _recordingTimer?.Dispose();
             _testDataTimer?.Dispose();
+            
+            // ✅ 미디어 스트리머 모듈 정리
+            _mediaStreamerModule?.DisposeAsync();
         }
 
         // Group & Speaker Helpers
@@ -1507,6 +1575,302 @@ public class ChannelOption
 
         private void NotifyInfo(string summary, string detail) =>
             NotificationService.Notify(NotificationSeverity.Info, summary, detail, 4000);
+        #endregion
+
+        #region Broadcast Source Control (새로 추가)
+        /// <summary>
+        /// 마이크 활성화/비활성화 토글
+        /// </summary>
+        protected async Task ToggleMicEnabled()
+        {
+            if (isBroadcasting)
+            {
+                NotifyWarn("방송 중", "방송 중에는 마이크 설정을 변경할 수 없습니다.");
+                return;
+            }
+
+            isMicEnabled = !isMicEnabled;
+            
+            var status = isMicEnabled ? "활성화" : "비활성화";
+            NotifyInfo("마이크 설정", $"마이크가 {status}되었습니다.");
+            
+            await InvokeAsync(StateHasChanged);
+        }
+
+        /// <summary>
+        /// 미디어 활성화/비활성화 토글
+        /// </summary>
+        protected async Task ToggleMediaEnabled()
+        {
+            if (isBroadcasting)
+            {
+                NotifyWarn("방송 중", "방송 중에는 미디어 설정을 변경할 수 없습니다.");
+                return;
+            }
+
+            isMediaEnabled = !isMediaEnabled;
+            
+            var status = isMediaEnabled ? "활성화" : "비활성화";
+            NotifyInfo("미디어 설정", $"미디어가 {status}되었습니다.");
+            
+            await InvokeAsync(StateHasChanged);
+        }
+
+        /// <summary>
+        /// TTS 활성화/비활성화 토글
+        /// </summary>
+        protected async Task ToggleTtsEnabled()
+        {
+            if (isBroadcasting)
+            {
+                NotifyWarn("방송 중", "방송 중에는 TTS 설정을 변경할 수 없습니다.");
+                return;
+            }
+
+            isTtsEnabled = !isTtsEnabled;
+            
+            var status = isTtsEnabled ? "활성화" : "비활성화";
+            NotifyInfo("TTS 설정", $"TTS가 {status}되었습니다.");
+            
+            await InvokeAsync(StateHasChanged);
+        }
+        #endregion
+
+        #region Media Streaming Control (새로 추가)
+        
+        // ✅ 미디어 스트리밍 관련 필드
+        private IJSObjectReference _mediaStreamerModule;
+        private bool _isMediaStreaming = false;
+        private List<string> _currentMediaPlaylist = new List<string>();
+
+        /// <summary>
+        /// 미디어 스트리밍 시작
+        /// </summary>
+        private async Task<bool> StartMediaStreaming()
+        {
+            if (!isMediaEnabled)
+            {
+                _logger.LogInformation("Media is disabled, skipping media streaming");
+                return true; // 미디어가 비활성화된 경우 성공으로 처리
+            }
+
+            try
+            {
+                // 미디어 스트리머 모듈 로드
+                if (_mediaStreamerModule == null)
+                {
+                    _mediaStreamerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/mediastreamer.js");
+                }
+
+                // 오디오 설정 구성
+                var channelSampleRate = selectedChannel?.SamplingRate > 0 ? (int)selectedChannel.SamplingRate : _preferredSampleRate;
+                var channelChannels = selectedChannel?.Channel1 == "mono" ? 1 : _preferredChannels;
+
+                var mediaConfig = new
+                {
+                    sampleRate = channelSampleRate,
+                    channels = channelChannels,
+                    timeslice = 50 // 50ms 간격
+                };
+
+                // 미디어 스트리머 초기화
+                var initialized = await _mediaStreamerModule.InvokeAsync<bool>("initializeMediaStreamer", _dotNetRef, mediaConfig);
+                if (!initialized)
+                {
+                    _logger.LogError("Failed to initialize media streamer");
+                    return false;
+                }
+
+                // 선택된 미디어 파일 URL 목록 가져오기
+                var mediaUrls = await GetMediaPlaylistUrls();
+                if (!mediaUrls.Any())
+                {
+                    _logger.LogInformation("No media files selected for streaming");
+                    return true; // 미디어가 없는 경우 성공으로 처리
+                }
+
+                // 플레이리스트 로드 및 스트리밍 시작
+                var started = await _mediaStreamerModule.InvokeAsync<bool>("loadAndStreamMediaPlaylist", mediaUrls.ToArray());
+                if (started)
+                {
+                    _isMediaStreaming = true;
+                    _currentMediaPlaylist = mediaUrls.ToList();
+                    _logger.LogInformation($"Media streaming started with {mediaUrls.Count} files");
+                    return true;
+                }
+                else
+                {
+                    _logger.LogError("Failed to start media streaming");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error starting media streaming");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 선택된 미디어 파일들의 URL 목록 가져오기
+        /// </summary>
+        private async Task<List<string>> GetMediaPlaylistUrls()
+        {
+            try
+            {
+                var selectedMediaIds = await GetSelectedMediaIds();
+                if (!selectedMediaIds.Any())
+                {
+                    return new List<string>();
+                }
+
+                var query = new Radzen.Query
+                {
+                    Filter = $"Id in ({string.Join(",", selectedMediaIds)}) and (DeleteYn eq 'N' or DeleteYn eq null)",
+                    OrderBy = "CreatedAt asc"
+                };
+
+                var result = await WicsService.GetMedia(query);
+                var mediaFiles = result.Value.ToList();
+
+                return mediaFiles.Select(m => GetMediaFileUrl(m)).Where(url => !string.IsNullOrEmpty(url)).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get media playlist URLs");
+                return new List<string>();
+            }
+        }
+
+        /// <summary>
+        /// 미디어 파일의 실제 URL 생성
+        /// </summary>
+        private string GetMediaFileUrl(WicsPlatform.Server.Models.wics.Medium mediaFile)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(mediaFile.FullPath))
+                {
+                    return null;
+                }
+
+                // 상대 경로를 절대 URL로 변환
+                var baseUri = NavigationManager.BaseUri.TrimEnd('/');
+                
+                if (mediaFile.FullPath.StartsWith("/"))
+                {
+                    return $"{baseUri}{mediaFile.FullPath}";
+                }
+                else if (!mediaFile.FullPath.StartsWith("http"))
+                {
+                    return $"{baseUri}/Uploads/{mediaFile.FullPath}";
+                }
+                else
+                {
+                    return mediaFile.FullPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error generating URL for media file {mediaFile.Id}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 미디어 스트리밍 중지
+        /// </summary>
+        private async Task StopMediaStreaming()
+        {
+            if (_mediaStreamerModule != null && _isMediaStreaming)
+            {
+                try
+                {
+                    await _mediaStreamerModule.InvokeVoidAsync("stopMediaStreaming");
+                    _isMediaStreaming = false;
+                    _currentMediaPlaylist.Clear();
+                    _logger.LogInformation("Media streaming stopped");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error stopping media streaming");
+                }
+            }
+        }
+
+        /// <summary>
+        /// JavaScript에서 호출되는 미디어 오디오 캡처 핸들러
+        /// </summary>
+        [JSInvokable]
+        public async Task OnMediaAudioCaptured(string base64Data)
+        {
+            // ✅ 미디어가 비활성화된 경우 처리 중단
+            if (!isMediaEnabled || string.IsNullOrWhiteSpace(base64Data)) return;
+
+            try
+            {
+                byte[] data = Convert.FromBase64String(base64Data);
+
+                // 마이크와 동일한 통계 업데이트 (별도 추적 가능)
+                UpdateAudioStatistics(data);
+
+                // 녹음에 추가 (마이크와 미디어 모두 녹음됨)
+                if (isRecording)
+                    recordedChunks.Add(data);
+
+                // 모니터링 섹션에 데이터 전달
+                if (micDataSection != null)
+                    await micDataSection.OnAudioCaptured(data);
+
+                // ✅ 개별 전송: 미디어 데이터를 별도 UDP 패킷으로 전송
+                if (!string.IsNullOrEmpty(currentBroadcastId))
+                    await WebSocketService.SendAudioDataAsync(currentBroadcastId, data);
+
+                // 루프백 설정시 스피커로 피드
+                if (_currentLoopbackSetting && _speakerModule != null)
+                    await _speakerModule.InvokeVoidAsync("feed", base64Data);
+
+                // UI 업데이트 최적화
+                if (totalDataPackets % 10 == 0)
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"OnMediaAudioCaptured – 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// JavaScript에서 호출되는 미디어 플레이리스트 종료 핸들러
+        /// </summary>
+        [JSInvokable]
+        public async Task OnMediaPlaylistEnded()
+        {
+            _logger.LogInformation("Media playlist ended");
+            _isMediaStreaming = false;
+            
+            // 플레이리스트가 끝났을 때의 처리 (필요시 반복 재생 등)
+            if (isMediaEnabled && isBroadcasting)
+            {
+                // 루프 재생 (선택사항)
+                var mediaUrls = await GetMediaPlaylistUrls();
+                if (mediaUrls.Any())
+                {
+                    await Task.Delay(1000); // 1초 대기 후 재시작
+                    var restarted = await _mediaStreamerModule.InvokeAsync<bool>("loadAndStreamMediaPlaylist", mediaUrls.ToArray());
+                    if (restarted)
+                    {
+                        _isMediaStreaming = true;
+                        _logger.LogInformation("Media playlist restarted for loop playback");
+                    }
+                }
+            }
+            
+            await InvokeAsync(StateHasChanged);
+        }
+
         #endregion
     }
 }
