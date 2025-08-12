@@ -13,6 +13,7 @@ using WicsPlatform.Client.Pages.SubPages;
 using WicsPlatform.Client.Services;
 using Microsoft.Extensions.Logging;
 using System.Threading;
+using WicsPlatform.Client.Services.Interfaces;
 
 namespace WicsPlatform.Client.Pages
 {
@@ -30,6 +31,7 @@ namespace WicsPlatform.Client.Pages
         [Inject] protected HttpClient Http { get; set; }
         [Inject] protected BroadcastWebSocketService WebSocketService { get; set; }
         [Inject] protected ILogger<ManageBroadCast> _logger { get; set; }
+        [Inject] protected IBroadcastDataService BroadcastDataService { get; set; }
         #endregion
 
         #region Fields & Properties
@@ -151,7 +153,7 @@ public class ChannelOption
         protected override async Task OnInitializedAsync()
         {
             SubscribeToWebSocketEvents();
-            await LoadAllDataAsync();
+            await LoadInitialData();
         }
 
         public void Dispose()
@@ -162,108 +164,32 @@ public class ChannelOption
         #endregion
 
         #region Data Loading Methods
-        private async Task LoadAllDataAsync()
+        private async Task LoadInitialData()
         {
-            var tasks = new List<Task>
+            isLoading = true;
+            StateHasChanged(); // 로딩 시작 시 UI 업데이트
+
+            var initialData = await BroadcastDataService.LoadInitialDataAsync();
+            if (initialData != null)
             {
-                LoadChannels(),
-                LoadSpeakerGroups(),
-                LoadSpeakers(),
-                LoadSpeakerGroupMappings()
-            };
-            await Task.WhenAll(tasks);
-        }
-
-        protected async Task LoadChannels()
-        {
-            await ExecuteWithLoading(
-                async () =>
-                {
-                    var query = new Radzen.Query
-                    {
-                        Filter = "DeleteYn eq 'N' or DeleteYn eq null",
-                        OrderBy = "CreatedAt desc"
-                    };
-                    var result = await WicsService.GetChannels(query);
-                    channels = result.Value.AsODataEnumerable();
-                },
-                loading => isLoading = loading,
-                "채널 목록"
-            );
-        }
-
-        protected async Task LoadSpeakerGroups()
-        {
-            await ExecuteWithLoading(
-                async () =>
-                {
-                    var result = await WicsService.GetGroups(new Radzen.Query
-                    {
-                        Filter = "DeleteYn eq 'N' or DeleteYn eq null"
-                    });
-                    speakerGroups = result.Value.AsODataEnumerable();
-                },
-                loading => isLoadingGroups = loading,
-                "스피커 그룹 목록"
-            );
-        }
-
-        protected async Task LoadSpeakers()
-        {
-            await ExecuteWithLoading(
-                async () =>
-                {
-                    var q = new Radzen.Query
-                    {
-                        Filter = "DeleteYn eq 'N' or DeleteYn eq null",
-                        Expand = "Channel"
-                    };
-                    var result = await WicsService.GetSpeakers(q);
-                    allSpeakers = result.Value.AsODataEnumerable();
-                },
-                loading => isLoadingSpeakers = loading,
-                "스피커 목록"
-            );
-        }
-
-        protected async Task LoadSpeakerGroupMappings()
-        {
-            await ExecuteWithLoading(
-                async () =>
-                {
-                    var result = await WicsService.GetMapSpeakerGroups(new Radzen.Query
-                    {
-                        Expand = "Group,Speaker",
-                        Filter = "LastYn eq 'Y'"
-                    });
-                    speakerGroupMappings = result.Value.AsODataEnumerable();
-                },
-                null,
-                "매핑 정보"
-            );
+                channels = initialData.Channels;
+                speakerGroups = initialData.SpeakerGroups;
+                allSpeakers = initialData.AllSpeakers;
+                speakerGroupMappings = initialData.SpeakerGroupMappings;
+            }
+            isLoading = false;
+            StateHasChanged(); // 데이터 로딩 완료 후 UI 업데이트
         }
         #endregion
 
         #region Channel Management
         protected async Task CreateChannel()
         {
-            if (string.IsNullOrWhiteSpace(newChannelName))
+            var createdChannel = await BroadcastDataService.CreateChannelAsync(newChannelName);
+            if (createdChannel != null)
             {
-                NotifyWarn("입력 필요", "채널명을 입력해주세요.");
-                return;
-            }
-
-            try
-            {
-                var newChannel = CreateNewChannelObject(newChannelName.Trim());
-                await WicsService.CreateChannel(newChannel);
-                NotifySuccess("생성 완료", $"'{newChannelName}' 채널이 생성되었습니다.");
                 newChannelName = "";
-                await LoadChannels();
-            }
-            catch (Exception ex)
-            {
-                NotifyError("채널 생성", ex);
+                await LoadInitialData();
             }
         }
 
@@ -285,18 +211,7 @@ public class ChannelOption
                 // 채널에 저장된 값과 다르면 업데이트
                 if (_preferredSampleRate != channelSampleRate && channel.SamplingRate > 0)
                 {
-                    try
-                    {
-                        channel.SamplingRate = (uint)_preferredSampleRate;
-                        channel.UpdatedAt = DateTime.Now;
-                        await WicsService.UpdateChannel(channel.Id, channel);
-                        
-                        _logger.LogInformation($"Channel {channel.Id} sampling rate auto-adjusted from {channelSampleRate}Hz to {_preferredSampleRate}Hz");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, $"Failed to update channel {channel.Id} sampling rate");
-                    }
+                    await BroadcastDataService.UpdateChannelAudioSettingsAsync(channel, _preferredSampleRate, null);
                 }
                 
                 _preferredChannels = channel.Channel1 == "mono" ? 1 : 2;
@@ -924,11 +839,13 @@ public class ChannelOption
 
             try
             {
-                var dataSize = _testRandom.Next(1024, 4096);
-                var randomData = new byte[dataSize];
-                _testRandom.NextBytes(randomData);
-
-                await WebSocketService.SendAudioDataAsync(testBroadcastId, randomData);
+                // ✅ 가상의 랜덤 데이터 생성 제거
+                // 실제 테스트 방송에서는 의미 있는 테스트 톤이나 실제 오디오 데이터 사용
+                // 지금은 단순히 연결 테스트만 수행
+                var dataSize = 1024; // 고정 크기
+                var testData = new byte[dataSize]; // 빈 데이터
+                
+                await WebSocketService.SendAudioDataAsync(testBroadcastId, testData);
 
                 Interlocked.Increment(ref totalDataPackets);
                 var sizeDelta = dataSize / 1024.0;
@@ -1090,6 +1007,21 @@ public class ChannelOption
             totalDataPackets++;
             totalDataSize += data.Length / 1024.0;
             audioLevel = CalculateAudioLevel(data);
+            
+            // ✅ UDP 송신 시뮬레이션 로그 추가 - 빈도 조정 (10번째 패킷마다)
+            if (micDataSection != null && totalDataPackets % 10 == 0) // 10번째 패킷마다 로그 (약 500ms마다)
+            {
+                // 온라인 스피커들에게 송신되는 정보를 로그로 표시
+                if (_currentOnlineSpeakers != null)
+                {
+                    foreach (var speaker in _currentOnlineSpeakers)
+                    {
+                        var speakerIp = speaker.VpnUseYn == "Y" ? speaker.VpnIp : speaker.Ip;
+                        var packetSize = data.Length + 16; // 헤더 16바이트 포함
+                        micDataSection.AddUdpTransmissionLog(speakerIp, 5001, packetSize, speaker.Name);
+                    }
+                }
+            }
         }
 
         private double CalculateAudioLevel(byte[] audioData)
@@ -1158,25 +1090,9 @@ public class ChannelOption
             
             _preferredSampleRate = newSampleRate;
             
-            // 선택된 채널이 있으면 채널의 SamplingRate도 업데이트
             if (selectedChannel != null)
             {
-                try
-                {
-                    selectedChannel.SamplingRate = (uint)newSampleRate;
-                    selectedChannel.UpdatedAt = DateTime.Now;
-                    await WicsService.UpdateChannel(selectedChannel.Id, selectedChannel);
-                    
-                    NotifySuccess("설정 저장", 
-                        $"채널 '{selectedChannel.Name}'의 샘플레이트가 {newSampleRate}Hz로 저장되었습니다.");
-                    
-                    _logger.LogInformation($"Channel {selectedChannel.Id} sampling rate updated to {newSampleRate}Hz");
-                }
-                catch (Exception ex)
-                {
-                    NotifyError("설정 저장", ex);
-                    _logger.LogError(ex, $"Failed to update channel {selectedChannel.Id} sampling rate");
-                }
+                await BroadcastDataService.UpdateChannelAudioSettingsAsync(selectedChannel, newSampleRate, null);
             }
             else
             {
@@ -1195,25 +1111,9 @@ public class ChannelOption
             
             _preferredChannels = newChannels;
             
-            // 선택된 채널이 있으면 채널의 Channel1 필드도 업데이트
             if (selectedChannel != null)
             {
-                try
-                {
-                    selectedChannel.Channel1 = newChannels == 1 ? "mono" : "stereo";
-                    selectedChannel.UpdatedAt = DateTime.Now;
-                    await WicsService.UpdateChannel(selectedChannel.Id, selectedChannel);
-                    
-                    NotifySuccess("설정 저장", 
-                        $"채널 '{selectedChannel.Name}'의 채널 수가 {newChannels}채널로 저장되었습니다.");
-                    
-                    _logger.LogInformation($"Channel {selectedChannel.Id} channels updated to {newChannels}");
-                }
-                catch (Exception ex)
-                {
-                    NotifyError("설정 저장", ex);
-                    _logger.LogError(ex, $"Failed to update channel {selectedChannel.Id} channels");
-                }
+                await BroadcastDataService.UpdateChannelAudioSettingsAsync(selectedChannel, null, newChannels);
             }
             else
             {
@@ -1251,7 +1151,7 @@ public class ChannelOption
             // 방송 중에는 현재 선택된 채널 객체를 유지하여 UI 상태 보존
             if (!isBroadcasting && !isTestBroadcasting)
             {
-                await LoadChannels();
+                await LoadInitialData();
                 if (selectedChannel != null)
                 {
                     selectedChannel = channels.FirstOrDefault(c => c.Id == selectedChannel.Id);
@@ -1397,46 +1297,6 @@ public class ChannelOption
         #endregion
 
         #region Helper Methods
-        private async Task ExecuteWithLoading(Func<Task> action, Action<bool> setLoading, string errorContext)
-        {
-            try
-            {
-                setLoading?.Invoke(true);
-                await action();
-            }
-            catch (Exception ex)
-            {
-                NotifyError(errorContext, ex);
-            }
-            finally
-            {
-                setLoading?.Invoke(false);
-            }
-        }
-
-        private WicsPlatform.Server.Models.wics.Channel CreateNewChannelObject(string name)
-        {
-            return new WicsPlatform.Server.Models.wics.Channel
-            {
-                Name = name,
-                Type = 0,
-                State = 0,
-                MicVolume = 0.5f,
-                TtsVolume = 0.5f,
-                MediaVolume = 0.5f,
-                Volume = 0.5f,
-                SamplingRate = 48000, // 기본 샘플링 레이트를 48000Hz로 설정
-                AudioMethod = 0,
-                Codec = "webm",
-                Channel1 = "stereo",
-                Bit = 16,
-                Description = "",
-                DeleteYn = "N",
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
-            };
-        }
-
         private async Task HandleBroadcastStopped()
         {
             isBroadcasting = false;
@@ -1479,7 +1339,7 @@ public class ChannelOption
                 _logger.LogInformation("TTS streaming stop will be implemented in future updates");
             }
 
-            // онлайн спикеры 목록 및 루프백 설정 초기화
+            // 온라인 스피커 목록 및 루프백 설정 초기화
             _currentOnlineSpeakers = null;
             _currentLoopbackSetting = false;
         }
@@ -1564,76 +1424,57 @@ public class ChannelOption
             state == 0 ? "오프라인" : "알 수 없음";
 
         // Notification Helpers
+        private void Notify(NotificationSeverity severity, string summary, string detail, int duration = 4000) =>
+            NotificationService.Notify(new NotificationMessage { Severity = severity, Summary = summary, Detail = detail, Duration = duration });
+
         private void NotifySuccess(string summary, string detail) =>
-            NotificationService.Notify(NotificationSeverity.Success, summary, detail, 4000);
+            Notify(NotificationSeverity.Success, summary, detail);
 
         private void NotifyError(string summary, Exception ex) =>
-            NotificationService.Notify(NotificationSeverity.Error, "오류", $"{summary} 중 오류: {ex.Message}", 4000);
+            Notify(NotificationSeverity.Error, "오류", $"{summary} 중 오류: {ex.Message}");
 
         private void NotifyWarn(string summary, string detail) =>
-            NotificationService.Notify(NotificationSeverity.Warning, summary, detail, 4000);
+            Notify(NotificationSeverity.Warning, summary, detail);
 
         private void NotifyInfo(string summary, string detail) =>
-            NotificationService.Notify(NotificationSeverity.Info, summary, detail, 4000);
+            Notify(NotificationSeverity.Info, summary, detail);
         #endregion
 
         #region Broadcast Source Control (새로 추가)
         /// <summary>
-        /// 마이크 활성화/비활성화 토글
+        /// 방송 소스 활성화/비활성화 토글
         /// </summary>
-        protected async Task ToggleMicEnabled()
+        private async Task ToggleBroadcastSource(Func<bool> getSource, Action<bool> setSource, string sourceName)
         {
             if (isBroadcasting)
             {
-                NotifyWarn("방송 중", "방송 중에는 마이크 설정을 변경할 수 없습니다.");
+                NotifyWarn("방송 중", $"방송 중에는 {sourceName} 설정을 변경할 수 없습니다.");
                 return;
             }
 
-            isMicEnabled = !isMicEnabled;
-            
-            var status = isMicEnabled ? "활성화" : "비활성화";
-            NotifyInfo("마이크 설정", $"마이크가 {status}되었습니다.");
-            
+            var newValue = !getSource();
+            setSource(newValue);
+
+            var status = newValue ? "활성화" : "비활성화";
+            NotifyInfo($"{sourceName} 설정", $"{sourceName}가 {status}되었습니다.");
+
             await InvokeAsync(StateHasChanged);
         }
+
+        /// <summary>
+        /// 마이크 활성화/비활성화 토글
+        /// </summary>
+        protected Task ToggleMicEnabled() => ToggleBroadcastSource(() => isMicEnabled, v => isMicEnabled = v, "마이크");
 
         /// <summary>
         /// 미디어 활성화/비활성화 토글
         /// </summary>
-        protected async Task ToggleMediaEnabled()
-        {
-            if (isBroadcasting)
-            {
-                NotifyWarn("방송 중", "방송 중에는 미디어 설정을 변경할 수 없습니다.");
-                return;
-            }
-
-            isMediaEnabled = !isMediaEnabled;
-            
-            var status = isMediaEnabled ? "활성화" : "비활성화";
-            NotifyInfo("미디어 설정", $"미디어가 {status}되었습니다.");
-            
-            await InvokeAsync(StateHasChanged);
-        }
+        protected Task ToggleMediaEnabled() => ToggleBroadcastSource(() => isMediaEnabled, v => isMediaEnabled = v, "미디어");
 
         /// <summary>
         /// TTS 활성화/비활성화 토글
         /// </summary>
-        protected async Task ToggleTtsEnabled()
-        {
-            if (isBroadcasting)
-            {
-                NotifyWarn("방송 중", "방송 중에는 TTS 설정을 변경할 수 없습니다.");
-                return;
-            }
-
-            isTtsEnabled = !isTtsEnabled;
-            
-            var status = isTtsEnabled ? "활성화" : "비활성화";
-            NotifyInfo("TTS 설정", $"TTS가 {status}되었습니다.");
-            
-            await InvokeAsync(StateHasChanged);
-        }
+        protected Task ToggleTtsEnabled() => ToggleBroadcastSource(() => isTtsEnabled, v => isTtsEnabled = v, "TTS");
         #endregion
 
         #region Media Streaming Control (새로 추가)
@@ -1756,7 +1597,7 @@ public class ChannelOption
 
                 // 상대 경로를 절대 URL로 변환
                 var baseUri = NavigationManager.BaseUri.TrimEnd('/');
-                
+
                 if (mediaFile.FullPath.StartsWith("/"))
                 {
                     return $"{baseUri}{mediaFile.FullPath}";
@@ -1814,7 +1655,7 @@ public class ChannelOption
                 // 마이크와 동일한 통계 업데이트 (별도 추적 가능)
                 UpdateAudioStatistics(data);
 
-                // 녹음에 추가 (마이크와 미디어 모두 녹음됨)
+                // 녹음에 추가 (마이크와 미EDIA 모두 녹음됨)
                 if (isRecording)
                     recordedChunks.Add(data);
 
@@ -1864,13 +1705,18 @@ public class ChannelOption
                     {
                         _isMediaStreaming = true;
                         _logger.LogInformation("Media playlist restarted for loop playback");
+                     
+                    }
+                    else
+                    {
+                        _logger.LogError("Failed to restart media playlist");
                     }
                 }
             }
-            
+
+            // UI 업데이트
             await InvokeAsync(StateHasChanged);
         }
-
         #endregion
     }
 }

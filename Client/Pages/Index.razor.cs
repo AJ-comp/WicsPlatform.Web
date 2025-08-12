@@ -105,9 +105,10 @@ namespace WicsPlatform.Client.Pages
                 var ttsResult = await WicsService.GetTts(ttsQuery);
                 totalTts = ttsResult.Value?.Count() ?? 0;
 
-                // 스토리지 사용량 시뮬레이션 (실제로는 서버에서 계산)
-                storageUsage = new Random().Next(20, 85);
-                totalSize = $"{new Random().Next(100, 999)} MB";
+                // ✅ 스토리지 사용량 계산 - 가상 데이터 제거
+                // TODO: 실제 시스템에서는 서버에서 실제 스토리지 사용량을 계산해야 함
+                storageUsage = 0; // 실제 데이터가 없을 때는 0으로 표시
+                totalSize = "0 MB"; // 실제 데이터가 없을 때는 0으로 표시
             }
             catch (Exception ex)
             {
@@ -127,47 +128,22 @@ namespace WicsPlatform.Client.Pages
             {
                 isLoadingActivities = true;
 
-                // 최근 활동 데이터 시뮬레이션 (실제로는 로그 테이블에서 가져와야 함)
+                // ✅ 가상의 최근 활동 데이터 시뮬레이션 제거
+                // 실제 시스템에서는 데이터베이스에서 실제 로그 데이터를 가져와야 함
                 await Task.Delay(500); // 로딩 시뮬레이션
 
-                recentActivities = new List<RecentActivity>
-                {
-                    new RecentActivity
-                    {
-                        Type = "broadcast",
-                        Description = "채널 '1층 로비' 방송 시작",
-                        User = Security.User?.Name ?? "관리자",
-                        Timestamp = DateTime.Now.AddMinutes(-5)
-                    },
-                    new RecentActivity
-                    {
-                        Type = "speaker",
-                        Description = "스피커 'SP-001' 추가됨",
-                        User = Security.User?.Name ?? "관리자",
-                        Timestamp = DateTime.Now.AddMinutes(-30)
-                    },
-                    new RecentActivity
-                    {
-                        Type = "media",
-                        Description = "배경음악 3개 파일 업로드",
-                        User = Security.User?.Name ?? "관리자",
-                        Timestamp = DateTime.Now.AddHours(-1)
-                    },
-                    new RecentActivity
-                    {
-                        Type = "tts",
-                        Description = "안내 방송 TTS 생성",
-                        User = Security.User?.Name ?? "관리자",
-                        Timestamp = DateTime.Now.AddHours(-2)
-                    },
-                    new RecentActivity
-                    {
-                        Type = "system",
-                        Description = "시스템 백업 완료",
-                        User = "시스템",
-                        Timestamp = DateTime.Now.AddHours(-3)
-                    }
-                };
+                // TODO: 실제 데이터베이스에서 로그 데이터 조회
+                // var query = new Radzen.Query
+                // {
+                //     Filter = "CreatedAt >= @0",
+                //     FilterParameters = new object[] { DateTime.Now.AddDays(-7) },
+                //     OrderBy = "CreatedAt desc",
+                //     Top = 5
+                // };
+                // var result = await WicsService.GetSystemLogs(query);
+                // recentActivities = result.Value.ToList();
+                
+                recentActivities = new List<RecentActivity>(); // 빈 목록으로 초기화
             }
             catch (Exception ex)
             {

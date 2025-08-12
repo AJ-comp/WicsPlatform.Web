@@ -70,10 +70,9 @@ namespace WicsPlatform.Client.Pages.SubPages
 
         protected override async Task OnInitializedAsync()
         {
-            // 초기 로그 메시지
-            AddLog("INFO", "마이크데이터 섹션이 초기화되었습니다.");
-            AddLog("INFO", $"채널: {Channel?.Name ?? "Unknown"}");
-
+            // ✅ 의미없는 초기화 로그 제거
+            // 실제 기능 시작될 때만 로그 출력하도록 변경
+            
             await Task.CompletedTask;
         }
 
@@ -180,12 +179,9 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             if (data != null && data.Length > 0 && isBroadcasting)
             {
-                // 실제 데이터 크기 로그 (로그 빈도 줄이기)
-                if (totalDataPackets % 100 == 0) // 100번째 패킷마다만 로그
-                {
-                    AddLog("INFO", $"오디오 데이터 수신: {data.Length} bytes");
-                }
-
+                // ✅ 의미없는 로그 제거 - 실제 오디오 수신 시에만 필요한 로그만 유지
+                // 로그 빈도를 크게 줄여서 실제 문제 발생 시에만 출력
+                
                 // 디버깅 패널이 열려있으면 상세 데이터 처리
                 if (showDebugPanel)
                 {
@@ -354,6 +350,16 @@ namespace WicsPlatform.Client.Pages.SubPages
             AddLog(level, message);
         }
 
+        // ✅ UDP 송신 로그 추가 전용 메서드
+        public void AddUdpTransmissionLog(string ip, int port, int bytes, string speakerName = null)
+        {
+            var message = string.IsNullOrEmpty(speakerName) 
+                ? $"UDP 송신: {ip}:{port} → {bytes} bytes"
+                : $"UDP 송신: {ip}:{port} → {bytes} bytes (스피커: {speakerName})";
+            
+            AddLog("INFO", message);
+        }
+
         // 방송 상태 리셋 (외부에서 호출 가능)
         public void ResetBroadcastState()
         {
@@ -373,7 +379,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             bufferUnderruns = 0;
             recentAudioData.Clear();
 
-            AddLog("INFO", "방송 상태가 초기화되었습니다");
+            // ✅ 의미없는 리셋 로그 제거
             InvokeAsync(StateHasChanged);
         }
 

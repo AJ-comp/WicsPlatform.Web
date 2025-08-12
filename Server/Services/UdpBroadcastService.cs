@@ -19,13 +19,68 @@ namespace WicsPlatform.Server.Services
         private readonly IConfiguration _configuration;
         private readonly ConcurrentDictionary<string, UdpClient> _udpClients = new();
         private readonly int _speakerPort;
+        
+        // ✅ UDP 송신 로그 빈도 조절을 위한 패킷 카운터
+        private readonly ConcurrentDictionary<string, long> _packetCounters = new();
 
         public UdpBroadcastService(ILogger<UdpBroadcastService> logger, IConfiguration configuration)
         {
             _logger = logger;
             _configuration = configuration;
-            _speakerPort = _configuration.GetValue<int>("UdpBroadcast:SpeakerPort", 3000); // 기본값 3000
+            
+            // ✅ 설정 읽기 방식 개선
+            _speakerPort = GetSpeakerPortFromConfiguration();
             _logger.LogInformation($"UDP Broadcast Service initialized with speaker port: {_speakerPort}");
+        }
+
+        private int GetSpeakerPortFromConfiguration()
+        {
+            try
+            {
+                // 1. 먼저 UdpBroadcast:SpeakerPort 경로로 시도
+                var port = _configuration.GetValue<int?>("UdpBroadcast:SpeakerPort");
+                if (port.HasValue && port.Value > 0)
+                {
+                    _logger.LogDebug($"Found UdpBroadcast:SpeakerPort = {port.Value}");
+                    return port.Value;
+                }
+
+                // 2. 섹션 바인딩으로 시도
+                var udpSection = _configuration.GetSection("UdpBroadcast");
+                if (udpSection.Exists())
+                {
+                    var sectionPort = udpSection.GetValue<int?>("SpeakerPort");
+                    if (sectionPort.HasValue && sectionPort.Value > 0)
+                    {
+                        _logger.LogDebug($"Found UdpBroadcast section SpeakerPort = {sectionPort.Value}");
+                        return sectionPort.Value;
+                    }
+                }
+
+                // 3. 모든 설정 키 로그 출력 (디버깅용)
+                _logger.LogWarning("UdpBroadcast:SpeakerPort not found, checking all configuration keys:");
+                LogAllConfigurationKeys(_configuration, "");
+
+                // 4. 기본값 6001 사용 (설정에서 읽지 못한 경우)
+                _logger.LogWarning($"Could not read UdpBroadcast:SpeakerPort from configuration, using default port 6001");
+                return 6001; // ⭐ 기본값을 6001로 변경
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading speaker port configuration, using default port 6001");
+                return 6001; // ⭐ 오류 시에도 6001 사용
+            }
+        }
+
+        private void LogAllConfigurationKeys(IConfiguration config, string prefix)
+        {
+            foreach (var kvp in config.AsEnumerable())
+            {
+                if (!string.IsNullOrEmpty(kvp.Value))
+                {
+                    _logger.LogDebug($"Config: {kvp.Key} = {kvp.Value}");
+                }
+            }
         }
 
         public async Task SendAudioToSpeakers(List<SpeakerInfo> speakers, byte[] audioData)
@@ -56,7 +111,12 @@ namespace WicsPlatform.Server.Services
                 var packet = CreateAudioPacket(speaker.ChannelId, audioData);
                 await udpClient.SendAsync(packet, packet.Length);
 
-                _logger.LogDebug($"Sent {packet.Length} bytes to speaker {speaker.Name} ({speaker.Ip}:{_speakerPort})");
+                // ✅ UDP 송신 로그 추가 - 빈도 조절 (10번째 패킷마다만 로그)
+                var packetCount = _packetCounters.AddOrUpdate(speaker.Ip, 1, (key, value) => value + 1);
+                if (packetCount % 10 == 0) // 10번째 패킷마다만 로그 출력 (약 500ms마다)
+                {
+                    _logger.LogInformation($"UDP 송신: {speaker.Ip}:{_speakerPort} → {packet.Length} bytes (스피커: {speaker.Name}) [#{packetCount}]");
+                }
             }
             catch (Exception ex)
             {
@@ -64,6 +124,7 @@ namespace WicsPlatform.Server.Services
 
                 // 실패한 클라이언트 제거
                 _udpClients.TryRemove(speaker.Ip, out _);
+                _packetCounters.TryRemove(speaker.Ip, out _); // ✅ 패킷 카운터도 제거
             }
         }
 
@@ -98,6 +159,7 @@ namespace WicsPlatform.Server.Services
                 catch { }
             }
             _udpClients.Clear();
+            _packetCounters.Clear(); // ✅ 패킷 카운터도 정리
         }
     }
 
