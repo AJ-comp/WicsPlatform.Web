@@ -1,0 +1,252 @@
+﻿@using WicsPlatform.Server.Models.wics
+
+<RadzenCard class="mt-4 collapsible-panel-container">
+    <!-- 클릭 가능한 커스텀 헤더 -->
+    <div @onclick="TogglePanel"
+         style="background-color: var(--rz-sidebar-background-color); padding: 1rem 1.5rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="monitoring" Style="font-size: 1.5rem; color: var(--rz-success);" />
+                <RadzenText TextStyle="TextStyle.H5" class="mb-0">
+                    @(Channel?.Name ?? "채널") - 방송 모니터링
+                </RadzenText>
+                <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="방송 중" Class="ms-2" />
+            </RadzenStack>
+            <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")"
+                        Style="font-size: 1.5rem; transition: transform 0.3s ease;"
+                        class="@(IsCollapsed ? "rotate-icon" : "")" />
+        </RadzenStack>
+    </div>
+
+    <!-- 패널 내용 -->
+    @if (!IsCollapsed)
+    {
+        <div class="panel-content">
+            <RadzenStack Gap="1rem">
+                <!-- 방송 상태 정보 -->
+                <RadzenRow Gap="1rem">
+                    <!-- 활성 소스 표시 -->
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenCard>
+                            <RadzenStack Gap="0.5rem">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-1">
+                                    <RadzenIcon Icon="source" class="me-2" />
+                                    활성 방송 소스
+                                </RadzenText>
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                    @if (IsMicEnabled)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true" Text="마이크" />
+                                    }
+                                    @if (IsMediaEnabled)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" IsPill="true" Text="미디어" />
+                                    }
+                                    @if (IsTtsEnabled)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="TTS" />
+                                    }
+                                </RadzenStack>
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenColumn>
+
+                    <!-- 오디오 레벨 (마이크가 활성화된 경우만) -->
+                    @if (IsMicEnabled)
+                    {
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenCard>
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-1">
+                                        <RadzenIcon Icon="volume_up" class="me-2" />
+                                        오디오 레벨
+                                    </RadzenText>
+                                    <RadzenProgressBar Value="@AudioLevel" Max="100"
+                                                       Style="height: 20px;"
+                                                       ProgressBarStyle="ProgressBarStyle.Success" />
+                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted">
+                                        현재 레벨: @AudioLevel.ToString("F1")%
+                                    </RadzenText>
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    }
+
+                    <!-- 방송 시간 -->
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenCard>
+                            <RadzenStack Gap="0.5rem">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-1">
+                                    <RadzenIcon Icon="timer" class="me-2" />
+                                    방송 시간
+                                </RadzenText>
+                                <RadzenText TextStyle="TextStyle.H4" class="mb-0">
+                                    @BroadcastDuration
+                                </RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted">
+                                    시작: @BroadcastStartTime.ToString("HH:mm:ss")
+                                </RadzenText>
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <!-- 데이터 통계 -->
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-3">
+                        <RadzenIcon Icon="analytics" class="me-2" />
+                        방송 데이터 통계
+                    </RadzenText>
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="6" SizeMD="3">
+                            <div class="text-center">
+                                <RadzenText TextStyle="TextStyle.H6" class="mb-1">@TotalDataPackets</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted">전송 패킷</RadzenText>
+                            </div>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6" SizeMD="3">
+                            <div class="text-center">
+                                <RadzenText TextStyle="TextStyle.H6" class="mb-1">@TotalDataSize KB</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted">총 데이터량</RadzenText>
+                            </div>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6" SizeMD="3">
+                            <div class="text-center">
+                                <RadzenText TextStyle="TextStyle.H6" class="mb-1">@AverageBitrate kbps</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted">평균 비트레이트</RadzenText>
+                            </div>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6" SizeMD="3">
+                            <div class="text-center">
+                                <RadzenText TextStyle="TextStyle.H6" class="mb-1">@SampleRate Hz</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted">샘플레이트</RadzenText>
+                            </div>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenCard>
+
+                <!-- 방송 제어 버튼들 -->
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn Size="6">
+                        <RadzenButton Text="방송 일시정지"
+                                      Icon="pause_circle"
+                                      ButtonStyle="ButtonStyle.Warning"
+                                      Size="ButtonSize.Medium"
+                                      Style="width: 100%"
+                                      Click="@PauseBroadcast" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="6">
+                        <RadzenButton Text="방송 종료"
+                                      Icon="stop_circle"
+                                      ButtonStyle="ButtonStyle.Danger"
+                                      Size="ButtonSize.Medium"
+                                      Style="width: 100%"
+                                      Click="@StopBroadcast" />
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <!-- 실시간 로그 -->
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-3">
+                        <RadzenIcon Icon="receipt_long" class="me-2" />
+                        실시간 로그
+                    </RadzenText>
+                    <div class="broadcast-log"
+                         style="height: 200px; overflow-y: auto;
+                                    border-radius: var(--rz-border-radius);
+                                    padding: 1rem; font-family: monospace; font-size: 0.875rem;
+                                    background-color: var(--rz-base-background-color);
+                                    border: 1px solid var(--rz-border-color);
+                                    color: var(--rz-text-color);">
+                        @foreach (var log in broadcastLogs.TakeLast(50).Reverse())
+                        {
+                            <div class="log-entry" style="margin-bottom: 0.25rem; color: @GetLogColor(log.Level);">
+                                <span style="color: var(--rz-text-secondary-color);">[@log.Timestamp.ToString("HH:mm:ss")]</span>
+                                <span style="font-weight: bold;">[@log.Level]</span>
+                                @log.Message
+                            </div>
+                        }
+                    </div>
+                </RadzenCard>
+
+                <!-- 마이크 디버깅 패널 (마이크가 활성화된 경우만) -->
+                @if (IsMicEnabled && showDebugPanel)
+                {
+                    <RadzenCard class="mt-3">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="mb-3">
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="bug_report" Style="color: var(--rz-warning);" />
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0">
+                                    마이크 데이터 디버깅
+                                </RadzenText>
+                            </RadzenStack>
+                            <RadzenSwitch @bind-Value="@showDebugPanel" Change="@(() => StateHasChanged())" />
+                        </RadzenStack>
+                        <!-- 디버깅 내용은 기존과 동일 -->
+                    </RadzenCard>
+                }
+            </RadzenStack>
+        </div>
+    }
+</RadzenCard>
+
+<style>
+    .collapsible-panel-container {
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .panel-content {
+        padding: 1.5rem;
+        animation: slideDown 0.3s ease-out;
+        background-color: var(--rz-base-background-color);
+        border-radius: 0 0 var(--rz-border-radius) var(--rz-border-radius);
+        border: 1px solid var(--rz-border-color);
+        border-top: none;
+    }
+
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rotate-icon {
+        transform: rotate(-90deg);
+    }
+
+    .broadcast-log {
+        scrollbar-width: thin;
+        scrollbar-color: var(--rz-border-color) transparent;
+        background-color: var(--rz-base-background-color) !important;
+        color: var(--rz-text-color) !important;
+        border-color: var(--rz-border-color) !important;
+    }
+
+        .broadcast-log::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .broadcast-log::-webkit-scrollbar-track {
+            background: var(--rz-base-background-color);
+        }
+
+        .broadcast-log::-webkit-scrollbar-thumb {
+            background: var(--rz-border-color);
+            border-radius: 3px;
+        }
+
+            .broadcast-log::-webkit-scrollbar-thumb:hover {
+                background: var(--rz-text-secondary-color);
+            }
+
+    .log-entry {
+        line-height: 1.4;
+    }
+</style>

@@ -444,15 +444,18 @@
             </RadzenStack>
         </RadzenCard>
 
-        <!-- 마이크데이터 패널 (방송 중일 때만 표시) -->
+        <!-- 방송 모니터링 패널 (방송 중일 때 항상 표시) -->
         @if (isBroadcasting)
         {
-            <BroadcastMicDataSection Channel="@selectedChannel"
-                                     @bind-IsCollapsed="@micDataPanelCollapsed"
-                                     JSModule="@_jsModule"
-                                     OnBroadcastStatusChanged="@OnBroadcastStatusChanged"
-                                     OnBroadcastStopped="@OnBroadcastStopped"
-                                     @ref="micDataSection" />
+            <BroadcastMonitoringSection Channel="@selectedChannel"
+                                        @bind-IsCollapsed="@monitoringPanelCollapsed"
+                                        IsMicEnabled="@isMicEnabled"
+                                        IsMediaEnabled="@isMediaEnabled"
+                                        IsTtsEnabled="@isTtsEnabled"
+                                        JSModule="@_jsModule"
+                                        OnBroadcastStatusChanged="@OnBroadcastStatusChanged"
+                                        OnBroadcastStopped="@OnBroadcastStopped"
+                                        @ref="monitoringSection" />
         }
 
         <!-- 스피커 그룹 관리 패널 -->
@@ -625,7 +628,8 @@
 
         <!-- 플레이리스트 설정 패널 -->
         <BroadcastPlaylistSection Channel="@selectedChannel"
-                                  @bind-IsCollapsed="@playlistPanelCollapsed" />
+                                  @bind-IsCollapsed="@playlistPanelCollapsed"
+                                  @ref="playlistSection" />
 
     }
 </RadzenStack>

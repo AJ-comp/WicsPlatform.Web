@@ -1,18 +1,19 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Radzen;
 
 namespace WicsPlatform.Client.Pages.SubPages
 {
-    public partial class BroadcastMicDataSection : IDisposable
+    public partial class BroadcastMonitoringSection : IDisposable
     {
         [Parameter] public WicsPlatform.Server.Models.wics.Channel Channel { get; set; }
         [Parameter] public bool IsCollapsed { get; set; }
         [Parameter] public EventCallback<bool> IsCollapsedChanged { get; set; }
+
+        // 방송 소스 상태 파라미터 추가
+        [Parameter] public bool IsMicEnabled { get; set; }
+        [Parameter] public bool IsMediaEnabled { get; set; }
+        [Parameter] public bool IsTtsEnabled { get; set; }
 
         // JS 모듈 관련 파라미터
         [Parameter] public IJSObjectReference JSModule { get; set; }
@@ -24,7 +25,7 @@ namespace WicsPlatform.Client.Pages.SubPages
         [Inject] protected NotificationService NotificationService { get; set; }
         [Inject] protected IJSRuntime JSRuntime { get; set; }
 
-        // 마이크데이터 관련 내부 필드
+        // 방송 모니터링 관련 내부 필드
         private double audioLevel = 0.0;
         private DateTime broadcastStartTime = DateTime.Now;
         private string broadcastDuration = "00:00:00";
@@ -33,9 +34,6 @@ namespace WicsPlatform.Client.Pages.SubPages
         private double averageBitrate = 0.0;
         private int sampleRate = 44100;
         private bool isBroadcasting = true; // 섹션이 표시되면 방송 중
-
-        // 타이머 및 기타
-        private Random _random = new Random();
 
         // 로그 관련
         private List<BroadcastLogEntry> broadcastLogs = new List<BroadcastLogEntry>();
@@ -70,15 +68,12 @@ namespace WicsPlatform.Client.Pages.SubPages
 
         protected override async Task OnInitializedAsync()
         {
-            // ✅ 의미없는 초기화 로그 제거
-            // 실제 기능 시작될 때만 로그 출력하도록 변경
-            
             await Task.CompletedTask;
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (firstRender)
+            if (firstRender && IsMicEnabled)
             {
                 try
                 {
@@ -108,8 +103,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             averageBitrate = bitrate;
             sampleRate = sampleRateValue;
 
-            // StateHasChanged 호출을 최소화 - 중요한 데이터 변경시에만 호출
-            if (packets % 20 == 0) // 20번의 패킷마다 한 번씩만 UI 업데이트
+            if (packets % 20 == 0)
             {
                 await InvokeAsync(StateHasChanged);
             }
@@ -120,7 +114,7 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             try
             {
-                if (JSModule != null)
+                if (JSModule != null && IsMicEnabled)
                 {
                     await JSModule.InvokeVoidAsync("pause");
                 }
@@ -142,7 +136,7 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             try
             {
-                if (JSModule != null)
+                if (JSModule != null && IsMicEnabled)
                 {
                     await JSModule.InvokeVoidAsync("stop");
                 }
@@ -174,26 +168,17 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
         }
 
-        // 오디오 캡처 데이터 처리
+        // 오디오 캡처 데이터 처리 (마이크가 활성화된 경우만)
         public async Task OnAudioCaptured(byte[] data)
         {
-            if (data != null && data.Length > 0 && isBroadcasting)
+            if (data != null && data.Length > 0 && isBroadcasting && IsMicEnabled)
             {
-                // ✅ 의미없는 로그 제거 - 실제 오디오 수신 시에만 필요한 로그만 유지
-                // 로그 빈도를 크게 줄여서 실제 문제 발생 시에만 출력
-                
-                // 디버깅 패널이 열려있으면 상세 데이터 처리
                 if (showDebugPanel)
                 {
                     await ProcessDebugData(data);
                 }
-
-                // StateHasChanged 호출 최소화
-                // 오디오 데이터 처리는 빈번하므로 UI 업데이트는 별도로 관리
             }
         }
-
-        // 디버깅 데이터 초기화 - 제거됨
 
         // 디버그 데이터 처리
         private async Task ProcessDebugData(byte[] data)
@@ -214,13 +199,9 @@ namespace WicsPlatform.Client.Pages.SubPages
                 recentAudioData.Add(debugInfo);
                 if (recentAudioData.Count > 50) recentAudioData.RemoveAt(0);
 
-                // 오디오 레벨 분석
                 AnalyzeAudioLevels(data);
-
-                // 성능 지표 업데이트
                 UpdatePerformanceMetrics();
 
-                // 웨이브폼 그리기
                 if (_canvasModule != null && showDebugPanel)
                 {
                     try
@@ -233,11 +214,8 @@ namespace WicsPlatform.Client.Pages.SubPages
                     }
                 }
 
-                // 스트림 상태 업데이트
                 streamStatus = "활성 (스트리밍 중)";
                 bufferSize = data.Length;
-
-                // 실제 처리 시간 계산
                 processingTime = (DateTime.Now - startTime).TotalMilliseconds;
             }
             catch (Exception ex)
@@ -251,7 +229,6 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             if (data.Length < 2) return;
 
-            // 16비트 오디오 샘플로 가정
             double sum = 0;
             double peak = 0;
             int sampleCount = data.Length / 2;
@@ -278,10 +255,8 @@ namespace WicsPlatform.Client.Pages.SubPages
         // 성능 지표 업데이트
         private void UpdatePerformanceMetrics()
         {
-            // 실제 처리 시간 측정
             var startTime = DateTime.Now;
 
-            // 성능 데이터 추가
             performanceData.Add(new PerformanceDataPoint
             {
                 Time = DateTime.Now.ToString("mm:ss"),
@@ -293,7 +268,6 @@ namespace WicsPlatform.Client.Pages.SubPages
                 performanceData.RemoveAt(0);
             }
 
-            // 평균 레이턴시 계산
             if (performanceData.Any())
             {
                 averageLatency = performanceData.Average(p => p.Latency);
@@ -308,6 +282,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 "ERROR" => "var(--rz-danger)",
                 "WARN" => "var(--rz-warning)",
                 "INFO" => "var(--rz-info)",
+                "SUCCESS" => "var(--rz-success)",
                 "DEBUG" => "var(--rz-text-secondary-color)",
                 _ => "var(--rz-text-color)"
             };
@@ -323,21 +298,16 @@ namespace WicsPlatform.Client.Pages.SubPages
                 Message = message
             });
 
-            // 최대 100개 로그만 유지
             if (broadcastLogs.Count > 100)
             {
                 broadcastLogs.RemoveAt(0);
             }
 
-            // 로그 추가 시 StateHasChanged 호출 최소화
-            // 오류나 경고 로그의 경우에만 즉시 UI 업데이트
             if (level == "ERROR" || level == "WARN")
             {
                 InvokeAsync(StateHasChanged);
             }
         }
-
-        // 주기적 로그 업데이트 - 제거됨
 
         public void Dispose()
         {
@@ -350,13 +320,13 @@ namespace WicsPlatform.Client.Pages.SubPages
             AddLog(level, message);
         }
 
-        // ✅ UDP 송신 로그 추가 전용 메서드
+        // UDP 송신 로그 추가 전용 메서드
         public void AddUdpTransmissionLog(string ip, int port, int bytes, string speakerName = null)
         {
-            var message = string.IsNullOrEmpty(speakerName) 
+            var message = string.IsNullOrEmpty(speakerName)
                 ? $"UDP 송신: {ip}:{port} → {bytes} bytes"
                 : $"UDP 송신: {ip}:{port} → {bytes} bytes (스피커: {speakerName})";
-            
+
             AddLog("INFO", message);
         }
 
@@ -370,7 +340,6 @@ namespace WicsPlatform.Client.Pages.SubPages
             averageBitrate = 0.0;
             broadcastDuration = "00:00:00";
 
-            // 디버깅 데이터도 초기화
             streamStatus = "대기 중";
             peakLevel = 0.0;
             rmsLevel = 0.0;
@@ -379,7 +348,6 @@ namespace WicsPlatform.Client.Pages.SubPages
             bufferUnderruns = 0;
             recentAudioData.Clear();
 
-            // ✅ 의미없는 리셋 로그 제거
             InvokeAsync(StateHasChanged);
         }
 
@@ -388,13 +356,13 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             sampleRate = config.SampleRate;
             audioChannels = config.ChannelCount;
-            
+
             AddLog("INFO", $"오디오 설정 업데이트됨 - 샘플레이트: {sampleRate}Hz, 채널: {audioChannels}");
             await InvokeAsync(StateHasChanged);
         }
     }
 
-    // 방송 종료 시 전달할 이벤트 인자
+    // 이벤트 인자 및 데이터 클래스들은 그대로 유지
     public class BroadcastStoppedEventArgs
     {
         public string Duration { get; set; }
@@ -403,7 +371,6 @@ namespace WicsPlatform.Client.Pages.SubPages
         public double AverageBitrate { get; set; }
     }
 
-    // 로그 엔트리 클래스
     public class BroadcastLogEntry
     {
         public DateTime Timestamp { get; set; }
@@ -411,7 +378,6 @@ namespace WicsPlatform.Client.Pages.SubPages
         public string Message { get; set; }
     }
 
-    // 디버깅용 클래스들
     public class AudioDataDebugInfo
     {
         public DateTime Timestamp { get; set; }

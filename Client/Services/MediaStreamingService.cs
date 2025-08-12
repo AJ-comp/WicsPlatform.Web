@@ -52,57 +52,47 @@ namespace WicsPlatform.Client.Services
 
             try
             {
-                // 미디어 스트리머 모듈 로드
-                if (_mediaStreamerModule == null)
-                {
-                    _mediaStreamerModule = await _jsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/mediastreamer.js");
-                }
-
-                // 오디오 설정 구성
-                var channelSampleRate = selectedChannel?.SamplingRate > 0 ? (int)selectedChannel.SamplingRate : preferredSampleRate;
-                var channelChannels = selectedChannel?.Channel1 == "mono" ? 1 : preferredChannels;
-
-                var mediaConfig = new
-                {
-                    sampleRate = channelSampleRate,
-                    channels = channelChannels,
-                    timeslice = 50 // 50ms 간격
-                };
-
-                // 미디어 스트리머 초기화
-                var initialized = await _mediaStreamerModule.InvokeAsync<bool>("initializeMediaStreamer", dotNetRef, mediaConfig);
-                if (!initialized)
-                {
-                    _logger.LogError("Failed to initialize media streamer");
-                    return false;
-                }
-
                 // 선택된 미디어 파일 URL 목록 가져오기
                 var mediaUrls = await GetMediaPlaylistUrls(selectedChannel);
-                if (!mediaUrls.Any())
+
+                // ★ 미디어 로딩 로그 추가 (public 메서드 사용)
+                if (dotNetRef?.Value is ManageBroadCast manageBroadCast)
                 {
-                    _logger.LogInformation("No media files selected for streaming");
-                    return true; // 미디어가 없는 경우 성공으로 처리
+                    if (!mediaUrls.Any())
+                    {
+                        manageBroadCast.AddBroadcastLog("WARN", "선택된 미디어 파일이 없습니다. 미디어 스트리밍을 건너뜁니다.");
+                        _logger.LogInformation("No media files selected for streaming");
+                        return true; // 미디어가 없는 경우 성공으로 처리
+                    }
+                    else
+                    {
+                        manageBroadCast.AddBroadcastLog("INFO", $"미디어 플레이리스트 로드 완료 (총 {mediaUrls.Count}개 파일)");
+                        foreach (var url in mediaUrls)
+                        {
+                            var fileName = System.IO.Path.GetFileName(new Uri(url).LocalPath);
+                            manageBroadCast.AddBroadcastLog("INFO", $"미디어 파일 준비: {fileName}");
+                        }
+
+                        // ★ 일단 여기까지만 - JavaScript 호출 없이 미디어 파일 정보만 저장
+                        _currentMediaPlaylist = mediaUrls.ToList();
+                        _isMediaStreaming = false; // 실제 스트리밍은 하지 않음
+
+                        manageBroadCast.AddBroadcastLog("SUCCESS", $"미디어 파일 {mediaUrls.Count}개 준비 완료");
+                    }
                 }
 
-                // 플레이리스트 로드 및 스트리밍 시작
-                var started = await _mediaStreamerModule.InvokeAsync<bool>("loadAndStreamMediaPlaylist", mediaUrls.ToArray());
-                if (started)
-                {
-                    _isMediaStreaming = true;
-                    _currentMediaPlaylist = mediaUrls.ToList();
-                    _logger.LogInformation($"Media streaming started with {mediaUrls.Count} files");
-                    return true;
-                }
-                else
-                {
-                    _logger.LogError("Failed to start media streaming");
-                    return false;
-                }
+                _logger.LogInformation($"Media files prepared: {mediaUrls.Count} files");
+                return true; // 성공으로 처리
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error starting media streaming");
+                // ★ 예외 발생 로그 추가
+                if (dotNetRef?.Value is ManageBroadCast mbEx)
+                {
+                    mbEx.AddBroadcastLog("ERROR", $"미디어 준비 오류: {ex.Message}");
+                }
+
+                _logger.LogError(ex, "Error preparing media files");
                 return false;
             }
         }
@@ -120,9 +110,12 @@ namespace WicsPlatform.Client.Services
                     return new List<string>();
                 }
 
+                // ★ 중복 제거
+                var uniqueMediaIds = selectedMediaIds.Distinct().ToList();
+
                 var query = new Radzen.Query
                 {
-                    Filter = $"Id in ({string.Join(",", selectedMediaIds)}) and (DeleteYn eq 'N' or DeleteYn eq null)",
+                    Filter = $"Id in ({string.Join(",", uniqueMediaIds)}) and DeleteYn eq 'N'",
                     OrderBy = "CreatedAt asc"
                 };
 
@@ -147,10 +140,10 @@ namespace WicsPlatform.Client.Services
             {
                 if (selectedChannel == null) return new List<ulong>();
 
-                // MapChannelMedium에서 현재 채널에 연결된 미디어 가져오기
+                // MapChannelMedium에서 현재 채널에 연결된 미디어 가져오기 (delete_yn 조건 수정)
                 var query = new Radzen.Query
                 {
-                    Filter = $"ChannelId eq {selectedChannel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)",
+                    Filter = $"ChannelId eq {selectedChannel.Id} and DeleteYn eq 'N'",
                     Expand = "Medium"
                 };
 
@@ -173,10 +166,10 @@ namespace WicsPlatform.Client.Services
             {
                 if (selectedChannel == null) return new List<ulong>();
 
-                // MapChannelTt에서 현재 채널에 연결된 TTS 가져오기
+                // MapChannelTt에서 현재 채널에 연결된 TTS 가져오기 (delete_yn 조건 수정)
                 var query = new Radzen.Query
                 {
-                    Filter = $"ChannelId eq {selectedChannel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)",
+                    Filter = $"ChannelId eq {selectedChannel.Id} and DeleteYn eq 'N'",
                     Expand = "Tt"
                 };
 
@@ -230,19 +223,20 @@ namespace WicsPlatform.Client.Services
         /// </summary>
         public async Task StopMediaStreaming()
         {
-            if (_mediaStreamerModule != null && _isMediaStreaming)
+            try
             {
-                try
-                {
-                    await _mediaStreamerModule.InvokeVoidAsync("stopMediaStreaming");
-                    _isMediaStreaming = false;
-                    _currentMediaPlaylist.Clear();
-                    _logger.LogInformation("Media streaming stopped");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error stopping media streaming");
-                }
+                _isMediaStreaming = false;
+
+                var playlistCount = _currentMediaPlaylist.Count;
+                _currentMediaPlaylist.Clear();
+
+                _logger.LogInformation($"Media streaming stopped (had {playlistCount} files prepared)");
+
+                await Task.CompletedTask; // JavaScript 호출 없이 종료
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error stopping media streaming");
             }
         }
 
@@ -251,27 +245,9 @@ namespace WicsPlatform.Client.Services
         /// </summary>
         public async Task<bool> RestartPlaylist(Channel selectedChannel, bool isMediaEnabled, bool isBroadcasting)
         {
-            if (isMediaEnabled && isBroadcasting)
-            {
-                var mediaUrls = await GetMediaPlaylistUrls(selectedChannel);
-                if (mediaUrls.Any())
-                {
-                    await Task.Delay(1000); // 1초 대기 후 재시작
-                    var restarted = await _mediaStreamerModule.InvokeAsync<bool>("loadAndStreamMediaPlaylist", mediaUrls.ToArray());
-                    if (restarted)
-                    {
-                        _isMediaStreaming = true;
-                        _logger.LogInformation("Media playlist restarted for loop playback");
-                        return true;
-                    }
-                    else
-                    {
-                        _logger.LogError("Failed to restart media playlist");
-                        return false;
-                    }
-                }
-            }
-            return false;
+            // ★ JavaScript 호출 없이 단순히 false 반환
+            _logger.LogInformation("Media playlist restart requested but JavaScript streaming is disabled");
+            return await Task.FromResult(false);
         }
 
         public bool IsMediaStreaming => _isMediaStreaming;
