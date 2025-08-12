@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components.Authorization;
+﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Radzen;
@@ -15,6 +15,8 @@ builder.Services.AddRadzenCookieThemeService(options =>
 builder.Services.AddTransient(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddScoped<WicsPlatform.Client.wicsService>();
 builder.Services.AddScoped<BroadcastWebSocketService>();
+builder.Services.AddScoped<MediaStreamingService>();
+builder.Services.AddScoped<BroadcastRecordingService>();
 builder.Services.AddScoped<IBroadcastDataService, BroadcastDataService>();
 
 builder.Services.AddAuthorizationCore();

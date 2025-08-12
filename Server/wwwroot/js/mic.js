@@ -1,4 +1,4 @@
-// ──────────────────────────────────────────────────────────────
+﻿// ──────────────────────────────────────────────────────────────
 // Blazor WASM – 마이크 캡처 유틸리티 (50 ms / Base64 전송)
 // 2025‑08‑08 수정 - 사용자 정의 샘플레이트 지원
 //   • DEFAULT_TIMESLICE = 50 ms
@@ -194,10 +194,15 @@ export async function start(dotNetRef, cfg = {}) {
 
 /* ───── 유틸 ───── */
 export function stop() {
-    if (mediaRecorder?.state !== 'inactive') mediaRecorder.stop();
-    mediaStream?.getTracks().forEach(t => t.stop());
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+    }
 
-    mediaStream = mediaRecorder = null;
+    mediaStream = null;
+    mediaRecorder = null;
     chunks = [];
 }
 
