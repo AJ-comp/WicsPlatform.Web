@@ -17,6 +17,7 @@ builder.Services.AddScoped<WicsPlatform.Client.wicsService>();
 builder.Services.AddScoped<BroadcastWebSocketService>();
 builder.Services.AddScoped<MediaStreamingService>();
 builder.Services.AddScoped<BroadcastRecordingService>();
+builder.Services.AddScoped<BroadcastLoggingService>(); // 추가
 builder.Services.AddScoped<IBroadcastDataService, BroadcastDataService>();
 
 builder.Services.AddAuthorizationCore();

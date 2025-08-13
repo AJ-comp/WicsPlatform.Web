@@ -34,6 +34,7 @@ namespace WicsPlatform.Client.Pages
         [Inject] protected IBroadcastDataService BroadcastDataService { get; set; }
         [Inject] protected MediaStreamingService MediaStreamingService { get; set; }
         [Inject] protected BroadcastRecordingService RecordingService { get; set; }
+        [Inject] protected BroadcastLoggingService LoggingService { get; set; } // 추가
         #endregion
 
         #region Fields & Properties
@@ -207,7 +208,7 @@ namespace WicsPlatform.Client.Pages
                 }
 
                 _preferredChannels = channel.Channel1 == "mono" ? 1 : 2;
-                _logger.LogInformation($"Channel selected: {channel.Name}, SamplingRate: {_preferredSampleRate}Hz, Channels: {_preferredChannels}");
+                _logger.LogInformation($"Channel selected: {channel.Name}, SampleRate: {_preferredSampleRate}Hz, Channels: {_preferredChannels}");
             }
 
             await InvokeAsync(StateHasChanged);
@@ -246,7 +247,7 @@ namespace WicsPlatform.Client.Pages
         #region Broadcast Control
         protected async Task StartBroadcast()
         {
-            Console.WriteLine("StartBroadcast 메서드 호출됨");
+            _logger.LogInformation("StartBroadcast 메서드 호출됨");
 
             if (!ValidateBroadcastPrerequisites()) return;
 
@@ -267,7 +268,7 @@ namespace WicsPlatform.Client.Pages
                 if (!await InitializeAudioModules())
                     return;
 
-                // ★ 선택된 미디어를 채널에 매핑 (방송 시작 전에 저장)
+                // 선택된 미디어를 채널에 매핑 (방송 시작 전에 저장)
                 if (isMediaEnabled)
                 {
                     await SaveSelectedMediaToChannel();
@@ -618,7 +619,7 @@ namespace WicsPlatform.Client.Pages
             {
                 if (!isBroadcasting)
                 {
-                    NotifyWarn("방송 필요", "방송 중일 때만 루프백 설정을 변경할 수 있습니다.");
+                    NotifyWarn("방송 필요", "방송이 시작된 상태에서만 루프백 설정을 변경할 수 있습니다.");
                     return;
                 }
 
@@ -844,7 +845,7 @@ namespace WicsPlatform.Client.Pages
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"ProcessAudioData – 오류: {ex.Message}");
+                _logger.LogError(ex, $"ProcessAudioData 오류: {ex.Message}");
             }
         }
 
@@ -853,16 +854,6 @@ namespace WicsPlatform.Client.Pages
             totalDataPackets++;
             totalDataSize += data.Length / 1024.0;
             audioLevel = CalculateAudioLevel(data);
-
-            if (monitoringSection != null && totalDataPackets % 10 == 0 && _currentOnlineSpeakers != null)
-            {
-                foreach (var speaker in _currentOnlineSpeakers)
-                {
-                    var speakerIp = speaker.VpnUseYn == "Y" ? speaker.VpnIp : speaker.Ip;
-                    var packetSize = data.Length + 16;
-                    monitoringSection.AddUdpTransmissionLog(speakerIp, 5001, packetSize, speaker.Name);
-                }
-            }
         }
 
         private double CalculateAudioLevel(byte[] audioData)
@@ -951,15 +942,31 @@ namespace WicsPlatform.Client.Pages
         protected Task ChangeChannels(int newChannels) => ChangeAudioSetting(null, newChannels);
 
         [JSInvokable]
-        [JSInvokable]
         public async Task OnMediaPlaylistEnded()
         {
-            _logger.LogInformation("Media playlist ended (JavaScript streaming disabled)");
+            _logger.LogInformation("Media playlist ended - attempting to restart");
 
-            // ★ 플레이리스트 종료 로그 추가
-            AddBroadcastLog("INFO", "미디어 플레이리스트 기능 비활성화 상태");
+            // 로그에 표시
+            LoggingService.AddLog("INFO", "미디어 플레이리스트 재생 완료");
 
-            // UI 업데이트
+            // 루프 재생 설정 확인 (향후 구현 가능)
+            var shouldLoop = true; // 나중에 UI에서 설정 가능하도록
+
+            if (shouldLoop && isMediaEnabled && isBroadcasting)
+            {
+                LoggingService.AddLog("INFO", "미디어 플레이리스트 루프 재생 시작");
+                var success = await MediaStreamingService.RestartPlaylist(selectedChannel, isMediaEnabled, isBroadcasting);
+
+                if (!success)
+                {
+                    LoggingService.AddLog("WARN", "미디어 플레이리스트 재시작 실패");
+                }
+            }
+            else
+            {
+                LoggingService.AddLog("INFO", "미디어 플레이리스트 종료");
+            }
+
             await InvokeAsync(StateHasChanged);
         }
         #endregion
@@ -1134,7 +1141,6 @@ namespace WicsPlatform.Client.Pages
         }
 
         // 통합된 소스 정지 메서드
-        // 통합된 소스 정지 메서드
         private async Task StopEnabledSources()
         {
             if (isMicEnabled && _jsModule != null)
@@ -1151,8 +1157,6 @@ namespace WicsPlatform.Client.Pages
 
             if (isMediaEnabled)
             {
-                // ★ 미디어 스트리밍 중지 로그 추가
-                monitoringSection?.AddExternalLog("INFO", "미디어 스트리밍 중지");
                 await MediaStreamingService.StopMediaStreaming();
             }
 
@@ -1171,7 +1175,7 @@ namespace WicsPlatform.Client.Pages
                 // playlistSection이 없으면 미디어 매핑을 건너뜀
                 if (playlistSection == null)
                 {
-                    AddBroadcastLog("INFO", "플레이리스트 섹션이 초기화되지 않았습니다.");
+                    _logger.LogInformation("플레이리스트 섹션이 초기화되지 않았습니다.");
                     return;
                 }
 
@@ -1184,7 +1188,6 @@ namespace WicsPlatform.Client.Pages
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to save selected media to channel");
-                AddBroadcastLog("ERROR", $"미디어 매핑 저장 실패: {ex.Message}");
             }
         }
 
@@ -1201,11 +1204,11 @@ namespace WicsPlatform.Client.Pages
 
                 if (!existingMappings.Value.Any())
                 {
-                    AddBroadcastLog("INFO", "제거할 기존 미디어 매핑이 없습니다.");
+                    _logger.LogInformation("제거할 기존 미디어 매핑이 없습니다.");
                     return;
                 }
 
-                AddBroadcastLog("INFO", $"기존 미디어 매핑 {existingMappings.Value.Count()}개를 제거 중...");
+                _logger.LogInformation($"기존 미디어 매핑 {existingMappings.Value.Count()}개를 제거 중...");
 
                 foreach (var mapping in existingMappings.Value)
                 {
@@ -1214,7 +1217,6 @@ namespace WicsPlatform.Client.Pages
                     await WicsService.UpdateMapChannelMedium(mapping.Id, mapping);
                 }
 
-                AddBroadcastLog("INFO", "기존 미디어 매핑 제거 완료");
                 _logger.LogInformation($"Soft deleted {existingMappings.Value.Count()} existing media mappings for channel {selectedChannel.Id}");
             }
             catch (Exception ex)
@@ -1233,11 +1235,11 @@ namespace WicsPlatform.Client.Pages
 
                 if (selectedMedia == null || !selectedMedia.Any())
                 {
-                    AddBroadcastLog("WARN", "선택된 미디어가 없습니다.");
+                    _logger.LogWarning("선택된 미디어가 없습니다.");
                     return;
                 }
 
-                AddBroadcastLog("INFO", $"선택된 미디어 {selectedMedia.Count()}개를 채널에 매핑 중...");
+                _logger.LogInformation($"선택된 미디어 {selectedMedia.Count()}개를 채널에 매핑 중...");
 
                 var addedCount = 0;
                 foreach (var media in selectedMedia)
@@ -1253,10 +1255,9 @@ namespace WicsPlatform.Client.Pages
 
                     await WicsService.CreateMapChannelMedium(mapping);
                     addedCount++;
-                    AddBroadcastLog("INFO", $"미디어 매핑 [{addedCount}/{selectedMedia.Count()}]: {media.FileName}");
+                    _logger.LogInformation($"미디어 매핑 [{addedCount}/{selectedMedia.Count()}]: {media.FileName}");
                 }
 
-                AddBroadcastLog("SUCCESS", $"총 {addedCount}개 미디어가 채널에 매핑되었습니다.");
                 _logger.LogInformation($"Added {addedCount} new media mappings for channel {selectedChannel.Id}");
             }
             catch (Exception ex)
@@ -1268,7 +1269,7 @@ namespace WicsPlatform.Client.Pages
 
         private void LogBroadcastStatistics(BroadcastStoppedEventArgs args)
         {
-            Console.WriteLine($"방송 종료 - 시간: {args.Duration}, 패킷: {args.TotalPackets}, 데이터: {args.TotalDataSize}KB");
+            _logger.LogInformation($"방송 종료 - 시간: {args.Duration}, 패킷: {args.TotalPackets}, 데이터: {args.TotalDataSize}KB");
         }
 
         private void ResetAllPanels()
@@ -1380,22 +1381,6 @@ namespace WicsPlatform.Client.Pages
         protected Task ToggleMicEnabled() => ToggleBroadcastSource(() => isMicEnabled, v => isMicEnabled = v, "마이크");
         protected Task ToggleMediaEnabled() => ToggleBroadcastSource(() => isMediaEnabled, v => isMediaEnabled = v, "미디어");
         protected Task ToggleTtsEnabled() => ToggleBroadcastSource(() => isTtsEnabled, v => isTtsEnabled = v, "TTS");
-        #endregion
-
-
-        #region Public Logging Methods for External Services
-        public void AddBroadcastLog(string level, string message)
-        {
-            if (monitoringSection != null)
-            {
-                monitoringSection.AddExternalLog(level, message);
-            }
-            else
-            {
-                // 모니터링 섹션이 아직 생성되지 않은 경우 콘솔에 출력
-                _logger.LogInformation($"[BroadcastLog-Pending] [{level}] {message}");
-            }
-        }
         #endregion
     }
 }

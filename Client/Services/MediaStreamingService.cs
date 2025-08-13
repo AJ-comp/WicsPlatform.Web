@@ -17,21 +17,25 @@ namespace WicsPlatform.Client.Services
         private readonly NavigationManager _navigationManager;
         private readonly wicsService _wicsService;
         private readonly ILogger<MediaStreamingService> _logger;
+        private readonly BroadcastLoggingService _loggingService;
 
         private IJSObjectReference _mediaStreamerModule;
         private bool _isMediaStreaming = false;
         private List<string> _currentMediaPlaylist = new List<string>();
+        private DotNetObjectReference<ManageBroadCast> _currentDotNetRef;
 
         public MediaStreamingService(
             IJSRuntime jsRuntime,
             NavigationManager navigationManager,
             wicsService wicsService,
-            ILogger<MediaStreamingService> logger)
+            ILogger<MediaStreamingService> logger,
+            BroadcastLoggingService loggingService)
         {
             _jsRuntime = jsRuntime;
             _navigationManager = navigationManager;
             _wicsService = wicsService;
             _logger = logger;
+            _loggingService = loggingService;
         }
 
         /// <summary>
@@ -47,52 +51,88 @@ namespace WicsPlatform.Client.Services
             if (!isMediaEnabled)
             {
                 _logger.LogInformation("Media is disabled, skipping media streaming");
-                return true; // 미디어가 비활성화된 경우 성공으로 처리
+                return true;
             }
 
             try
             {
+                _currentDotNetRef = dotNetRef;
+                _loggingService.AddLog("INFO", "미디어 스트리밍 초기화 시작...");
+
+                // JavaScript 모듈 로드
+                if (_mediaStreamerModule == null)
+                {
+                    _mediaStreamerModule = await _jsRuntime.InvokeAsync<IJSObjectReference>(
+                        "import", "./js/mediastreamer.js");
+                    _loggingService.AddLog("INFO", "미디어 스트리머 모듈 로드 완료");
+                }
+
+                // 미디어 스트리머 초기화
+                var config = new
+                {
+                    sampleRate = preferredSampleRate,
+                    channels = preferredChannels,
+                    timeslice = 50  // 50ms 간격
+                };
+
+                var initSuccess = await _mediaStreamerModule.InvokeAsync<bool>(
+                    "initializeMediaStreamer", dotNetRef, config);
+
+                if (!initSuccess)
+                {
+                    _loggingService.AddLog("ERROR", "미디어 스트리머 초기화 실패");
+                    return false;
+                }
+
+                _loggingService.AddLog("SUCCESS", $"미디어 스트리머 초기화 완료 (샘플레이트: {preferredSampleRate}Hz, 채널: {preferredChannels})");
+
                 // 선택된 미디어 파일 URL 목록 가져오기
                 var mediaUrls = await GetMediaPlaylistUrls(selectedChannel);
 
-                // ★ 미디어 로딩 로그 추가 (public 메서드 사용)
-                if (dotNetRef?.Value is ManageBroadCast manageBroadCast)
+                if (!mediaUrls.Any())
                 {
-                    if (!mediaUrls.Any())
+                    _loggingService.AddLog("WARN", "선택된 미디어 파일이 없습니다. 미디어 스트리밍을 건너뜁니다.");
+                    _logger.LogInformation("No media files selected for streaming");
+                    return true;
+                }
+
+                _loggingService.AddLog("INFO", $"미디어 플레이리스트 로드 중... (총 {mediaUrls.Count}개 파일)");
+
+                foreach (var url in mediaUrls)
+                {
+                    try
                     {
-                        manageBroadCast.AddBroadcastLog("WARN", "선택된 미디어 파일이 없습니다. 미디어 스트리밍을 건너뜁니다.");
-                        _logger.LogInformation("No media files selected for streaming");
-                        return true; // 미디어가 없는 경우 성공으로 처리
+                        var fileName = System.IO.Path.GetFileName(new Uri(url).LocalPath);
+                        _loggingService.AddLog("INFO", $"미디어 파일 준비: {fileName}");
                     }
-                    else
+                    catch
                     {
-                        manageBroadCast.AddBroadcastLog("INFO", $"미디어 플레이리스트 로드 완료 (총 {mediaUrls.Count}개 파일)");
-                        foreach (var url in mediaUrls)
-                        {
-                            var fileName = System.IO.Path.GetFileName(new Uri(url).LocalPath);
-                            manageBroadCast.AddBroadcastLog("INFO", $"미디어 파일 준비: {fileName}");
-                        }
-
-                        // ★ 일단 여기까지만 - JavaScript 호출 없이 미디어 파일 정보만 저장
-                        _currentMediaPlaylist = mediaUrls.ToList();
-                        _isMediaStreaming = false; // 실제 스트리밍은 하지 않음
-
-                        manageBroadCast.AddBroadcastLog("SUCCESS", $"미디어 파일 {mediaUrls.Count}개 준비 완료");
+                        _loggingService.AddLog("INFO", $"미디어 파일 준비: {url}");
                     }
                 }
 
-                _logger.LogInformation($"Media files prepared: {mediaUrls.Count} files");
-                return true; // 성공으로 처리
+                // JavaScript에서 미디어 파일 로드 및 스트리밍 시작
+                var streamSuccess = await _mediaStreamerModule.InvokeAsync<bool>(
+                    "loadAndStreamMediaPlaylist", mediaUrls.ToArray());
+
+                if (!streamSuccess)
+                {
+                    _loggingService.AddLog("ERROR", "미디어 플레이리스트 로드 실패");
+                    return false;
+                }
+
+                _currentMediaPlaylist = mediaUrls.ToList();
+                _isMediaStreaming = true;
+
+                _loggingService.AddLog("SUCCESS", $"미디어 스트리밍 시작 - {mediaUrls.Count}개 파일 재생 중");
+                _logger.LogInformation($"Media streaming started with {mediaUrls.Count} files");
+
+                return true;
             }
             catch (Exception ex)
             {
-                // ★ 예외 발생 로그 추가
-                if (dotNetRef?.Value is ManageBroadCast mbEx)
-                {
-                    mbEx.AddBroadcastLog("ERROR", $"미디어 준비 오류: {ex.Message}");
-                }
-
-                _logger.LogError(ex, "Error preparing media files");
+                _loggingService.AddLog("ERROR", $"미디어 스트리밍 시작 오류: {ex.Message}");
+                _logger.LogError(ex, "Error starting media streaming");
                 return false;
             }
         }
@@ -104,25 +144,38 @@ namespace WicsPlatform.Client.Services
         {
             try
             {
+                _logger.LogInformation($"Getting media playlist URLs for channel: {selectedChannel?.Id}");
+
                 var selectedMediaIds = await GetSelectedMediaIds(selectedChannel);
                 if (!selectedMediaIds.Any())
                 {
+                    _logger.LogInformation("No media IDs found for channel");
                     return new List<string>();
                 }
 
-                // ★ 중복 제거
                 var uniqueMediaIds = selectedMediaIds.Distinct().ToList();
+                _logger.LogInformation($"Found {uniqueMediaIds.Count} unique media IDs");
 
                 var query = new Radzen.Query
                 {
-                    Filter = $"Id in ({string.Join(",", uniqueMediaIds)}) and DeleteYn eq 'N'",
+                    Filter = $"Id in ({string.Join(",", uniqueMediaIds)}) and (DeleteYn eq 'N' or DeleteYn eq null)",
                     OrderBy = "CreatedAt asc"
                 };
 
                 var result = await _wicsService.GetMedia(query);
                 var mediaFiles = result.Value.ToList();
 
-                return mediaFiles.Select(m => GetMediaFileUrl(m)).Where(url => !string.IsNullOrEmpty(url)).ToList();
+                _logger.LogInformation($"Retrieved {mediaFiles.Count} media files from database");
+
+                var urls = mediaFiles.Select(m => GetMediaFileUrl(m)).Where(url => !string.IsNullOrEmpty(url)).ToList();
+
+                // 전체 URL 경로 로깅
+                foreach (var url in urls)
+                {
+                    _logger.LogInformation($"Media URL: {url}");
+                }
+
+                return urls;
             }
             catch (Exception ex)
             {
@@ -138,17 +191,26 @@ namespace WicsPlatform.Client.Services
         {
             try
             {
-                if (selectedChannel == null) return new List<ulong>();
+                if (selectedChannel == null)
+                {
+                    _logger.LogWarning("Selected channel is null");
+                    return new List<ulong>();
+                }
 
-                // MapChannelMedium에서 현재 채널에 연결된 미디어 가져오기 (delete_yn 조건 수정)
                 var query = new Radzen.Query
                 {
-                    Filter = $"ChannelId eq {selectedChannel.Id} and DeleteYn eq 'N'",
+                    Filter = $"ChannelId eq {selectedChannel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)",
                     Expand = "Medium"
                 };
 
+                _logger.LogInformation($"Querying MapChannelMedia with filter: {query.Filter}");
+
                 var channelMedia = await _wicsService.GetMapChannelMedia(query);
-                return channelMedia.Value.Select(m => m.MediaId).ToList();
+                var mediaIds = channelMedia.Value.Select(m => m.MediaId).ToList();
+
+                _logger.LogInformation($"Found {mediaIds.Count} media IDs for channel {selectedChannel.Id}");
+
+                return mediaIds;
             }
             catch (Exception ex)
             {
@@ -166,10 +228,9 @@ namespace WicsPlatform.Client.Services
             {
                 if (selectedChannel == null) return new List<ulong>();
 
-                // MapChannelTt에서 현재 채널에 연결된 TTS 가져오기 (delete_yn 조건 수정)
                 var query = new Radzen.Query
                 {
-                    Filter = $"ChannelId eq {selectedChannel.Id} and DeleteYn eq 'N'",
+                    Filter = $"ChannelId eq {selectedChannel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)",
                     Expand = "Tt"
                 };
 
@@ -192,24 +253,51 @@ namespace WicsPlatform.Client.Services
             {
                 if (string.IsNullOrEmpty(mediaFile.FullPath))
                 {
+                    _logger.LogWarning($"Media file {mediaFile.Id} has empty FullPath");
                     return null;
                 }
 
-                // 상대 경로를 절대 URL로 변환
                 var baseUri = _navigationManager.BaseUri.TrimEnd('/');
+                string finalUrl;
 
-                if (mediaFile.FullPath.StartsWith("/"))
+                // FullPath가 이미 전체 경로를 포함하는 경우
+                if (mediaFile.FullPath.StartsWith("http://") || mediaFile.FullPath.StartsWith("https://"))
                 {
-                    return $"{baseUri}{mediaFile.FullPath}";
+                    finalUrl = mediaFile.FullPath;
                 }
-                else if (!mediaFile.FullPath.StartsWith("http"))
+                // 절대 경로인 경우 (/로 시작)
+                else if (mediaFile.FullPath.StartsWith("/"))
                 {
-                    return $"{baseUri}/Uploads/{mediaFile.FullPath}";
+                    // /Uploads/로 시작하면 그대로 사용
+                    if (mediaFile.FullPath.StartsWith("/Uploads/"))
+                    {
+                        finalUrl = $"{baseUri}{mediaFile.FullPath}";
+                    }
+                    else
+                    {
+                        finalUrl = $"{baseUri}/Uploads{mediaFile.FullPath}";
+                    }
                 }
+                // 상대 경로인 경우
                 else
                 {
-                    return mediaFile.FullPath;
+                    // Uploads/로 시작하면 /를 추가
+                    if (mediaFile.FullPath.StartsWith("Uploads/"))
+                    {
+                        finalUrl = $"{baseUri}/{mediaFile.FullPath}";
+                    }
+                    // 파일명만 있는 경우
+                    else
+                    {
+                        finalUrl = $"{baseUri}/Uploads/{mediaFile.FullPath}";
+                    }
                 }
+
+                _logger.LogInformation($"Generated URL for media {mediaFile.Id} ({mediaFile.FileName}): {finalUrl}");
+                _logger.LogInformation($"  - Original FullPath: {mediaFile.FullPath}");
+                _logger.LogInformation($"  - BaseUri: {baseUri}");
+
+                return finalUrl;
             }
             catch (Exception ex)
             {
@@ -225,14 +313,18 @@ namespace WicsPlatform.Client.Services
         {
             try
             {
+                if (_mediaStreamerModule != null && _isMediaStreaming)
+                {
+                    await _mediaStreamerModule.InvokeVoidAsync("stopMediaStreaming");
+                    _loggingService.AddLog("INFO", "미디어 스트리밍 중지");
+                }
+
                 _isMediaStreaming = false;
 
                 var playlistCount = _currentMediaPlaylist.Count;
                 _currentMediaPlaylist.Clear();
 
-                _logger.LogInformation($"Media streaming stopped (had {playlistCount} files prepared)");
-
-                await Task.CompletedTask; // JavaScript 호출 없이 종료
+                _logger.LogInformation($"Media streaming stopped (had {playlistCount} files)");
             }
             catch (Exception ex)
             {
@@ -241,13 +333,78 @@ namespace WicsPlatform.Client.Services
         }
 
         /// <summary>
-        /// 플레이리스트 재시작 (루프 재생용)
+        /// 미디어 일시정지
+        /// </summary>
+        public async Task PauseMediaStreaming()
+        {
+            try
+            {
+                if (_mediaStreamerModule != null && _isMediaStreaming)
+                {
+                    await _mediaStreamerModule.InvokeVoidAsync("pauseMediaStreaming");
+                    _loggingService.AddLog("INFO", "미디어 재생 일시정지");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error pausing media streaming");
+            }
+        }
+
+        /// <summary>
+        /// 미디어 재생 재개
+        /// </summary>
+        public async Task ResumeMediaStreaming()
+        {
+            try
+            {
+                if (_mediaStreamerModule != null && _isMediaStreaming)
+                {
+                    await _mediaStreamerModule.InvokeVoidAsync("resumeMediaStreaming");
+                    _loggingService.AddLog("INFO", "미디어 재생 재개");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resuming media streaming");
+            }
+        }
+
+        /// <summary>
+        /// 플레이리스트 재시작 (루프 재생)
         /// </summary>
         public async Task<bool> RestartPlaylist(Channel selectedChannel, bool isMediaEnabled, bool isBroadcasting)
         {
-            // ★ JavaScript 호출 없이 단순히 false 반환
-            _logger.LogInformation("Media playlist restart requested but JavaScript streaming is disabled");
-            return await Task.FromResult(false);
+            if (!isBroadcasting || !isMediaEnabled || _mediaStreamerModule == null)
+            {
+                _logger.LogInformation("Cannot restart playlist - broadcasting or media not enabled");
+                return false;
+            }
+
+            try
+            {
+                _loggingService.AddLog("INFO", "플레이리스트 재시작 중...");
+
+                // 현재 플레이리스트로 다시 시작
+                if (_currentMediaPlaylist.Any())
+                {
+                    var success = await _mediaStreamerModule.InvokeAsync<bool>(
+                        "loadAndStreamMediaPlaylist", _currentMediaPlaylist.ToArray());
+
+                    if (success)
+                    {
+                        _loggingService.AddLog("SUCCESS", "플레이리스트 재시작 완료");
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error restarting playlist");
+                return false;
+            }
         }
 
         public bool IsMediaStreaming => _isMediaStreaming;
@@ -257,7 +414,15 @@ namespace WicsPlatform.Client.Services
         {
             if (_mediaStreamerModule != null)
             {
-                await _mediaStreamerModule.DisposeAsync();
+                try
+                {
+                    await StopMediaStreaming();
+                    await _mediaStreamerModule.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error disposing media streamer module");
+                }
             }
         }
     }

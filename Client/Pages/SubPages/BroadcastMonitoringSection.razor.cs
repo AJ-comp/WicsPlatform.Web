@@ -1,6 +1,11 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Radzen;
+using WicsPlatform.Client.Services;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace WicsPlatform.Client.Pages.SubPages
 {
@@ -10,7 +15,7 @@ namespace WicsPlatform.Client.Pages.SubPages
         [Parameter] public bool IsCollapsed { get; set; }
         [Parameter] public EventCallback<bool> IsCollapsedChanged { get; set; }
 
-        // 방송 소스 상태 파라미터 추가
+        // 방송 소스 상태 파라미터
         [Parameter] public bool IsMicEnabled { get; set; }
         [Parameter] public bool IsMediaEnabled { get; set; }
         [Parameter] public bool IsTtsEnabled { get; set; }
@@ -24,18 +29,19 @@ namespace WicsPlatform.Client.Pages.SubPages
 
         [Inject] protected NotificationService NotificationService { get; set; }
         [Inject] protected IJSRuntime JSRuntime { get; set; }
+        [Inject] protected BroadcastLoggingService LoggingService { get; set; }
 
         // 방송 모니터링 관련 내부 필드
         private double audioLevel = 0.0;
         private DateTime broadcastStartTime = DateTime.Now;
         private string broadcastDuration = "00:00:00";
         private int totalDataPackets = 0;
-        private double totalDataSize = 0.0; // KB 단위
+        private double totalDataSize = 0.0;
         private double averageBitrate = 0.0;
         private int sampleRate = 44100;
-        private bool isBroadcasting = true; // 섹션이 표시되면 방송 중
+        private bool isBroadcasting = true;
 
-        // 로그 관련
+        // 로그 관련 - Services의 BroadcastLogEntry 사용
         private List<BroadcastLogEntry> broadcastLogs = new List<BroadcastLogEntry>();
 
         // 디버깅 패널 관련 필드
@@ -68,6 +74,17 @@ namespace WicsPlatform.Client.Pages.SubPages
 
         protected override async Task OnInitializedAsync()
         {
+            // 기존 버퍼된 로그 로드
+            var bufferedLogs = LoggingService.GetBufferedLogs();
+            foreach (var log in bufferedLogs)
+            {
+                broadcastLogs.Add(log);
+            }
+
+            // 새 로그 구독
+            LoggingService.OnLogAdded += OnLogAdded;
+            LoggingService.OnLogsCleared += OnLogsCleared;
+
             await Task.CompletedTask;
         }
 
@@ -84,6 +101,22 @@ namespace WicsPlatform.Client.Pages.SubPages
                     AddLog("ERROR", $"웨이브폼 모듈 로드 실패: {ex.Message}");
                 }
             }
+        }
+
+        private void OnLogAdded(BroadcastLogEntry log)
+        {
+            broadcastLogs.Add(log);
+            if (broadcastLogs.Count > 100)
+            {
+                broadcastLogs.RemoveAt(0);
+            }
+            InvokeAsync(StateHasChanged);
+        }
+
+        private void OnLogsCleared()
+        {
+            broadcastLogs.Clear();
+            InvokeAsync(StateHasChanged);
         }
 
         private async Task TogglePanel()
@@ -168,7 +201,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
         }
 
-        // 오디오 캡처 데이터 처리 (마이크가 활성화된 경우만)
+        // 오디오 캡처 데이터 처리
         public async Task OnAudioCaptured(byte[] data)
         {
             if (data != null && data.Length > 0 && isBroadcasting && IsMicEnabled)
@@ -288,49 +321,20 @@ namespace WicsPlatform.Client.Pages.SubPages
             };
         }
 
-        // 로그 추가
+        // 로그 추가 (LoggingService 사용)
         private void AddLog(string level, string message)
         {
-            broadcastLogs.Add(new BroadcastLogEntry
-            {
-                Timestamp = DateTime.Now,
-                Level = level,
-                Message = message
-            });
-
-            if (broadcastLogs.Count > 100)
-            {
-                broadcastLogs.RemoveAt(0);
-            }
-
-            if (level == "ERROR" || level == "WARN")
-            {
-                InvokeAsync(StateHasChanged);
-            }
+            LoggingService.AddLog(level, message);
         }
 
         public void Dispose()
         {
+            LoggingService.OnLogAdded -= OnLogAdded;
+            LoggingService.OnLogsCleared -= OnLogsCleared;
             _canvasModule?.DisposeAsync();
         }
 
-        // 외부에서 로그를 추가할 수 있는 메서드
-        public void AddExternalLog(string level, string message)
-        {
-            AddLog(level, message);
-        }
-
-        // UDP 송신 로그 추가 전용 메서드
-        public void AddUdpTransmissionLog(string ip, int port, int bytes, string speakerName = null)
-        {
-            var message = string.IsNullOrEmpty(speakerName)
-                ? $"UDP 송신: {ip}:{port} → {bytes} bytes"
-                : $"UDP 송신: {ip}:{port} → {bytes} bytes (스피커: {speakerName})";
-
-            AddLog("INFO", message);
-        }
-
-        // 방송 상태 리셋 (외부에서 호출 가능)
+        // 방송 상태 리셋
         public void ResetBroadcastState()
         {
             isBroadcasting = false;
@@ -351,7 +355,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             InvokeAsync(StateHasChanged);
         }
 
-        // 오디오 설정 업데이트 메서드 추가
+        // 오디오 설정 업데이트 메서드
         public async Task UpdateAudioConfiguration(dynamic config)
         {
             sampleRate = config.SampleRate;
@@ -362,20 +366,13 @@ namespace WicsPlatform.Client.Pages.SubPages
         }
     }
 
-    // 이벤트 인자 및 데이터 클래스들은 그대로 유지
+    // 이벤트 인자 클래스들 (BroadcastLogEntry는 Services에서 사용)
     public class BroadcastStoppedEventArgs
     {
         public string Duration { get; set; }
         public int TotalPackets { get; set; }
         public double TotalDataSize { get; set; }
         public double AverageBitrate { get; set; }
-    }
-
-    public class BroadcastLogEntry
-    {
-        public DateTime Timestamp { get; set; }
-        public string Level { get; set; }
-        public string Message { get; set; }
     }
 
     public class AudioDataDebugInfo
