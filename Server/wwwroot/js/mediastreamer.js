@@ -1,7 +1,7 @@
 ﻿// ──────────────────────────────────────────────────────────────
 // Blazor WASM – 미디어 파일 스트리머 유틸리티 (50ms / Base64 전송)
 // 마이크와 동일한 WebM/Opus 형식으로 인코딩하여 전송
-// 2025-01-09 수정: WebM/Opus 인코딩 통일
+// 2025-01-09 수정: 로컬 재생 옵션 추가
 // ──────────────────────────────────────────────────────────────
 console.log('[mediastreamer.js] 모듈 로드됨');
 
@@ -30,7 +30,8 @@ let streamConfig = {
     sampleRate: 48000,
     channels: 2,
     timeslice: 50,  // 50ms 간격
-    bitrate: 64000  // 64kbps (mic.js와 동일)
+    bitrate: 64000,  // 64kbps (mic.js와 동일)
+    localPlayback: false  // 로컬 재생 옵션 (기본값: false)
 };
 
 /* ───── 버퍼 → Base64 → C# (mic.js와 동일) ───── */
@@ -68,7 +69,8 @@ export async function initializeMediaStreamer(dotNetRef, config = {}) {
         sampleRate: config.sampleRate || 48000,
         channels: config.channels || 2,
         timeslice: config.timeslice || 50,
-        bitrate: config.bitrate || 64000
+        bitrate: config.bitrate || 64000,
+        localPlayback: config.localPlayback !== undefined ? config.localPlayback : false  // 로컬 재생 옵션
     };
 
     try {
@@ -85,6 +87,7 @@ export async function initializeMediaStreamer(dotNetRef, config = {}) {
 
         console.log('[mediastreamer.js] 오디오 컨텍스트 초기화 완료');
         console.log('[mediastreamer.js] 설정:', streamConfig);
+        console.log('[mediastreamer.js] 로컬 재생:', streamConfig.localPlayback ? '활성화' : '비활성화');
         return true;
 
     } catch (error) {
@@ -95,12 +98,32 @@ export async function initializeMediaStreamer(dotNetRef, config = {}) {
 
 /* ───── 플레이리스트 로드 및 스트리밍 ───── */
 export async function loadAndStreamMediaPlaylist(mediaUrls) {
-    console.log('[mediastreamer.js] === 플레이리스트 로드 ===', mediaUrls);
+    console.log('[mediastreamer.js] === 플레이리스트 로드 ===');
+    console.log('[mediastreamer.js] 받은 데이터:', mediaUrls);
+    console.log('[mediastreamer.js] 데이터 타입:', typeof mediaUrls);
+    console.log('[mediastreamer.js] 배열 여부:', Array.isArray(mediaUrls));
+
+    // 배열이 아니면 배열로 변환
+    if (!Array.isArray(mediaUrls)) {
+        console.warn('[mediastreamer.js] mediaUrls가 배열이 아닙니다. 변환 시도...');
+        if (typeof mediaUrls === 'object' && mediaUrls !== null) {
+            // 객체를 배열로 변환
+            mediaUrls = Object.values(mediaUrls);
+        } else {
+            console.error('[mediastreamer.js] mediaUrls를 배열로 변환할 수 없습니다.');
+            return false;
+        }
+    }
 
     if (!mediaUrls || !mediaUrls.length) {
         console.warn('[mediastreamer.js] 빈 플레이리스트입니다.');
         return false;
     }
+
+    // URL 목록 출력
+    mediaUrls.forEach((url, index) => {
+        console.log(`[mediastreamer.js] URL ${index + 1}: ${url}`);
+    });
 
     currentPlaylist = mediaUrls;
     currentIndex = 0;
@@ -126,10 +149,13 @@ export async function playCurrentMedia() {
         // 기존 스트리밍 정리
         await cleanupCurrentStream();
 
-        // 새 Audio 엘리먼트 생성
+        // 새 Audio 엘리먼트 생성 (mediaplayer.js와 동일한 방식)
         audioElement = new Audio();
         audioElement.crossOrigin = "anonymous";
         audioElement.preload = "auto";
+
+        // 미디어 로드 시작 (바로 src 설정)
+        audioElement.src = mediaUrl;
 
         // MediaStreamDestination 생성 (MediaRecorder용)
         streamDestination = audioContext.createMediaStreamDestination();
@@ -141,35 +167,33 @@ export async function playCurrentMedia() {
         audioSource = audioContext.createMediaElementSource(audioElement);
 
         // 오디오 체인 연결
-        // audioSource → channelMerger → streamDestination
         if (streamConfig.channels === 1) {
-            // 모노: 좌우 채널을 모노로 병합
             audioSource.connect(channelMerger, 0, 0);
         } else {
-            // 스테레오: 그대로 연결
             audioSource.connect(channelMerger);
         }
 
+        // 스트리밍 대상에 연결
         channelMerger.connect(streamDestination);
 
-        // 스피커로도 출력 (선택사항)
-        channelMerger.connect(audioContext.destination);
+        // 로컬 재생 옵션이 true일 때만 스피커로 출력
+        if (streamConfig.localPlayback) {
+            channelMerger.connect(audioContext.destination);
+            console.log('[mediastreamer.js] 로컬 재생 활성화됨');
+        } else {
+            console.log('[mediastreamer.js] 로컬 재생 비활성화됨');
+        }
 
         // MediaStream 가져오기
         mediaStream = streamDestination.stream;
 
-        // MediaRecorder 생성 (mic.js와 동일한 설정)
-        try {
-            mediaRecorder = new MediaRecorder(mediaStream, {
-                mimeType: MIME_TYPE,
-                audioBitsPerSecond: streamConfig.bitrate
-            });
-        } catch (err) {
-            console.error('[mediastreamer.js] MediaRecorder 생성 실패:', err);
-            return false;
-        }
+        // MediaRecorder 생성
+        mediaRecorder = new MediaRecorder(mediaStream, {
+            mimeType: MIME_TYPE,
+            audioBitsPerSecond: streamConfig.bitrate
+        });
 
-        // MediaRecorder 이벤트 바인딩 (mic.js와 동일)
+        // MediaRecorder 이벤트 바인딩
         mediaRecorder.ondataavailable = e => {
             if (e.data?.size) {
                 chunks.push(e.data);
@@ -183,56 +207,56 @@ export async function playCurrentMedia() {
             flushChunks();
         };
 
-        mediaRecorder.onerror = e => {
-            console.error('[mediastreamer.js] MediaRecorder 오류:', e.error);
+        // Audio 엘리먼트 이벤트 리스너
+        audioElement.oncanplaythrough = () => {
+            console.log('[mediastreamer.js] 미디어 재생 준비 완료');
+
+            // MediaRecorder 시작
+            mediaRecorder.start(streamConfig.timeslice);
+            console.log(`[mediastreamer.js] MediaRecorder 시작 – timeslice: ${streamConfig.timeslice} ms`);
+
+            // 오디오 재생 시작
+            audioElement.play().catch(error => {
+                console.error('[mediastreamer.js] 재생 시작 오류:', error);
+                // 재생 오류 시 다음 파일로
+                currentIndex++;
+                playCurrentMedia();
+            });
         };
 
-        // Audio 엘리먼트 이벤트 리스너
         audioElement.onended = async () => {
             console.log('[mediastreamer.js] 현재 미디어 종료');
-
-            // MediaRecorder 정지
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 mediaRecorder.stop();
             }
-
             currentIndex++;
             await playCurrentMedia();
         };
 
         audioElement.onerror = (error) => {
-            console.error('[mediastreamer.js] 미디어 로드 오류:', error);
+            console.error('[mediastreamer.js] 미디어 로드 오류:', mediaUrl, error);
+            // 오류 시 다음 파일로
             currentIndex++;
-            playCurrentMedia();
-        };
-
-        audioElement.oncanplaythrough = () => {
-            console.log('[mediastreamer.js] 미디어 재생 준비 완료');
-
-            // MediaRecorder 시작
-            try {
-                mediaRecorder.start(streamConfig.timeslice);
-                console.log(`[mediastreamer.js] MediaRecorder 시작 – timeslice: ${streamConfig.timeslice} ms`);
-            } catch (err) {
-                console.error('[mediastreamer.js] MediaRecorder 시작 실패:', err);
+            if (currentIndex < currentPlaylist.length) {
+                playCurrentMedia();
+            } else {
+                console.log('[mediastreamer.js] 모든 미디어 재생 실패');
+                if (dotNetObj) {
+                    dotNetObj.invokeMethodAsync('OnMediaPlaylistEnded');
+                }
             }
-
-            // 오디오 재생 시작
-            audioElement.play().catch(error => {
-                console.error('[mediastreamer.js] 재생 시작 오류:', error);
-            });
         };
 
-        // 미디어 로드 시작
-        audioElement.src = mediaUrl;
+        // load() 호출로 미디어 로드 시작
         audioElement.load();
 
         isStreaming = true;
         return true;
 
     } catch (error) {
-        console.error('[mediastreamer.js] 미디어 로드 실패:', error);
-        return false;
+        console.error('[mediastreamer.js] 미디어 처리 실패:', error);
+        currentIndex++;
+        return await playCurrentMedia();
     }
 }
 
@@ -308,6 +332,27 @@ export async function resumeMediaStreaming() {
     }
 }
 
+/* ───── 로컬 재생 설정 변경 ───── */
+export function setLocalPlayback(enabled) {
+    streamConfig.localPlayback = enabled;
+    console.log(`[mediastreamer.js] 로컬 재생 ${enabled ? '활성화' : '비활성화'}`);
+
+    // 현재 재생 중이면 설정 즉시 적용
+    if (isStreaming && audioSource) {
+        try {
+            if (enabled) {
+                // 스피커 연결
+                audioSource.connect(audioContext.destination);
+            } else {
+                // 스피커 연결 해제
+                audioSource.disconnect(audioContext.destination);
+            }
+        } catch (error) {
+            console.error('[mediastreamer.js] 로컬 재생 설정 변경 오류:', error);
+        }
+    }
+}
+
 /* ───── 상태 조회 ───── */
 export function isMediaStreaming() {
     return isStreaming;
@@ -320,7 +365,8 @@ export function getCurrentMediaInfo() {
         totalCount: currentPlaylist.length,
         currentUrl: currentPlaylist[currentIndex] || null,
         duration: audioElement ? audioElement.duration : 0,
-        currentTime: audioElement ? audioElement.currentTime : 0
+        currentTime: audioElement ? audioElement.currentTime : 0,
+        localPlayback: streamConfig.localPlayback
     };
 }
 
@@ -335,6 +381,7 @@ export function getDebugInfo() {
         config: streamConfig,
         mimeType: MIME_TYPE,
         chunks: chunks.length,
-        dotNetObj: !!dotNetObj
+        dotNetObj: !!dotNetObj,
+        localPlayback: streamConfig.localPlayback
     };
 }

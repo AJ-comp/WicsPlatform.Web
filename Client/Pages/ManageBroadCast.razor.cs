@@ -1176,17 +1176,45 @@ namespace WicsPlatform.Client.Pages
                 if (playlistSection == null)
                 {
                     _logger.LogInformation("플레이리스트 섹션이 초기화되지 않았습니다.");
+                    LoggingService.AddLog("WARN", "플레이리스트 섹션이 초기화되지 않았습니다.");
                     return;
                 }
+
+                // 선택된 미디어 가져오기
+                var selectedMedia = playlistSection.GetSelectedMedia();
+
+                if (selectedMedia == null || !selectedMedia.Any())
+                {
+                    LoggingService.AddLog("WARN", "선택된 미디어가 없습니다.");
+                    return;
+                }
+
+                LoggingService.AddLog("INFO", $"선택된 미디어 {selectedMedia.Count()}개를 채널에 매핑 중...");
 
                 // 1. 기존 매핑 소프트 삭제
                 await SoftDeleteExistingChannelMediaMappings();
 
-                // 2. 플레이리스트 섹션에서 선택된 미디어 가져와서 매핑
-                await AddNewChannelMediaMappings();
+                // 2. 새 매핑 추가
+                foreach (var media in selectedMedia)
+                {
+                    var mapping = new WicsPlatform.Server.Models.wics.MapChannelMedium
+                    {
+                        ChannelId = selectedChannel.Id,
+                        MediaId = media.Id,
+                        DeleteYn = "N",
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
+                    };
+
+                    await WicsService.CreateMapChannelMedium(mapping);
+                    LoggingService.AddLog("SUCCESS", $"미디어 매핑 완료: {media.FileName}");
+                }
+
+                LoggingService.AddLog("SUCCESS", $"{selectedMedia.Count()}개 미디어가 채널에 매핑되었습니다.");
             }
             catch (Exception ex)
             {
+                LoggingService.AddLog("ERROR", $"미디어 매핑 실패: {ex.Message}");
                 _logger.LogError(ex, "Failed to save selected media to channel");
             }
         }

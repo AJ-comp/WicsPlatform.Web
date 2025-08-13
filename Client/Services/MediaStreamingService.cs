@@ -50,7 +50,7 @@ namespace WicsPlatform.Client.Services
         {
             if (!isMediaEnabled)
             {
-                _logger.LogInformation("Media is disabled, skipping media streaming");
+                _loggingService.AddLog("WARN", "Media is disabled, skipping media streaming");
                 return true;
             }
 
@@ -72,7 +72,8 @@ namespace WicsPlatform.Client.Services
                 {
                     sampleRate = preferredSampleRate,
                     channels = preferredChannels,
-                    timeslice = 50  // 50ms 간격
+                    timeslice = 50,
+                    localPlayback = false
                 };
 
                 var initSuccess = await _mediaStreamerModule.InvokeAsync<bool>(
@@ -89,31 +90,21 @@ namespace WicsPlatform.Client.Services
                 // 선택된 미디어 파일 URL 목록 가져오기
                 var mediaUrls = await GetMediaPlaylistUrls(selectedChannel);
 
-                if (!mediaUrls.Any())
+                if (mediaUrls == null || !mediaUrls.Any())
                 {
                     _loggingService.AddLog("WARN", "선택된 미디어 파일이 없습니다. 미디어 스트리밍을 건너뜁니다.");
                     _logger.LogInformation("No media files selected for streaming");
-                    return true;
+                    return true; // 에러가 아닌 성공으로 처리 (미디어가 없을 뿐)
                 }
 
                 _loggingService.AddLog("INFO", $"미디어 플레이리스트 로드 중... (총 {mediaUrls.Count}개 파일)");
 
-                foreach (var url in mediaUrls)
-                {
-                    try
-                    {
-                        var fileName = System.IO.Path.GetFileName(new Uri(url).LocalPath);
-                        _loggingService.AddLog("INFO", $"미디어 파일 준비: {fileName}");
-                    }
-                    catch
-                    {
-                        _loggingService.AddLog("INFO", $"미디어 파일 준비: {url}");
-                    }
-                }
+                // URL 배열을 object[]로 변환하여 전달
+                var urlArray = mediaUrls.ToArray();
 
                 // JavaScript에서 미디어 파일 로드 및 스트리밍 시작
                 var streamSuccess = await _mediaStreamerModule.InvokeAsync<bool>(
-                    "loadAndStreamMediaPlaylist", mediaUrls.ToArray());
+                    "loadAndStreamMediaPlaylist", (object)urlArray); // object로 캐스팅
 
                 if (!streamSuccess)
                 {
@@ -144,42 +135,64 @@ namespace WicsPlatform.Client.Services
         {
             try
             {
-                _logger.LogInformation($"Getting media playlist URLs for channel: {selectedChannel?.Id}");
+                _loggingService.AddLog("INFO", $"Getting media playlist URLs for channel: {selectedChannel?.Id}");
 
                 var selectedMediaIds = await GetSelectedMediaIds(selectedChannel);
                 if (!selectedMediaIds.Any())
                 {
-                    _logger.LogInformation("No media IDs found for channel");
+                    _loggingService.AddLog("WARN", "No media IDs found for channel");
                     return new List<string>();
                 }
 
                 var uniqueMediaIds = selectedMediaIds.Distinct().ToList();
-                _logger.LogInformation($"Found {uniqueMediaIds.Count} unique media IDs");
+                _loggingService.AddLog("INFO", $"Found {uniqueMediaIds.Count} media IDs: {string.Join(", ", uniqueMediaIds)}");
 
+                // 한 번에 모든 미디어 조회 (개별 조회 대신)
+                var idFilter = string.Join(" or ", uniqueMediaIds.Select(id => $"Id eq {id}"));
                 var query = new Radzen.Query
                 {
-                    Filter = $"Id in ({string.Join(",", uniqueMediaIds)}) and (DeleteYn eq 'N' or DeleteYn eq null)",
+                    Filter = $"({idFilter}) and (DeleteYn eq 'N' or DeleteYn eq null)",
                     OrderBy = "CreatedAt asc"
                 };
+
+                _loggingService.AddLog("INFO", $"Media query filter: {query.Filter}");
 
                 var result = await _wicsService.GetMedia(query);
                 var mediaFiles = result.Value.ToList();
 
-                _logger.LogInformation($"Retrieved {mediaFiles.Count} media files from database");
+                _loggingService.AddLog("INFO", $"Retrieved {mediaFiles.Count} media files from database");
 
-                var urls = mediaFiles.Select(m => GetMediaFileUrl(m)).Where(url => !string.IsNullOrEmpty(url)).ToList();
-
-                // 전체 URL 경로 로깅
-                foreach (var url in urls)
+                // 각 미디어 파일 정보 로깅
+                foreach (var media in mediaFiles)
                 {
-                    _logger.LogInformation($"Media URL: {url}");
+                    _loggingService.AddLog("INFO", $"Media: ID={media.Id}, File={media.FileName}, Path={media.FullPath}");
+                }
+
+                var urls = new List<string>();
+                foreach (var media in mediaFiles)
+                {
+                    var url = GetMediaFileUrl(media);
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        urls.Add(url);
+                        _loggingService.AddLog("SUCCESS", $"Added URL: {url}");
+                    }
+                }
+
+                if (urls.Count == 0)
+                {
+                    _loggingService.AddLog("ERROR", "No valid URLs generated from media files!");
+                }
+                else
+                {
+                    _loggingService.AddLog("SUCCESS", $"Generated {urls.Count} URLs for playlist");
                 }
 
                 return urls;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to get media playlist URLs");
+                _loggingService.AddLog("ERROR", $"Failed to get media playlist URLs: {ex.Message}");
                 return new List<string>();
             }
         }
@@ -193,7 +206,7 @@ namespace WicsPlatform.Client.Services
             {
                 if (selectedChannel == null)
                 {
-                    _logger.LogWarning("Selected channel is null");
+                    _loggingService.AddLog("WARN", "Selected channel is null");
                     return new List<ulong>();
                 }
 
@@ -203,18 +216,23 @@ namespace WicsPlatform.Client.Services
                     Expand = "Medium"
                 };
 
-                _logger.LogInformation($"Querying MapChannelMedia with filter: {query.Filter}");
+                _loggingService.AddLog("INFO", $"Querying MapChannelMedia with filter: {query.Filter}");
 
                 var channelMedia = await _wicsService.GetMapChannelMedia(query);
                 var mediaIds = channelMedia.Value.Select(m => m.MediaId).ToList();
 
-                _logger.LogInformation($"Found {mediaIds.Count} media IDs for channel {selectedChannel.Id}");
+                _loggingService.AddLog("INFO", $"Found {mediaIds.Count} media IDs in MapChannelMedia");
+
+                if (mediaIds.Any())
+                {
+                    _loggingService.AddLog("INFO", $"Media IDs: {string.Join(", ", mediaIds)}");
+                }
 
                 return mediaIds;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to get selected media IDs");
+                _loggingService.AddLog("ERROR", $"Failed to get selected media IDs: {ex.Message}");
                 return new List<ulong>();
             }
         }
@@ -253,55 +271,27 @@ namespace WicsPlatform.Client.Services
             {
                 if (string.IsNullOrEmpty(mediaFile.FullPath))
                 {
-                    _logger.LogWarning($"Media file {mediaFile.Id} has empty FullPath");
+                    _loggingService.AddLog("WARN", $"Media file {mediaFile.Id} has empty FullPath");
                     return null;
                 }
 
-                var baseUri = _navigationManager.BaseUri.TrimEnd('/');
-                string finalUrl;
+                string finalUrl = mediaFile.FullPath;
 
-                // FullPath가 이미 전체 경로를 포함하는 경우
-                if (mediaFile.FullPath.StartsWith("http://") || mediaFile.FullPath.StartsWith("https://"))
+                // /media/로 시작하면 /Uploads/로 변경
+                if (finalUrl.StartsWith("/media/"))
                 {
-                    finalUrl = mediaFile.FullPath;
-                }
-                // 절대 경로인 경우 (/로 시작)
-                else if (mediaFile.FullPath.StartsWith("/"))
-                {
-                    // /Uploads/로 시작하면 그대로 사용
-                    if (mediaFile.FullPath.StartsWith("/Uploads/"))
-                    {
-                        finalUrl = $"{baseUri}{mediaFile.FullPath}";
-                    }
-                    else
-                    {
-                        finalUrl = $"{baseUri}/Uploads{mediaFile.FullPath}";
-                    }
-                }
-                // 상대 경로인 경우
-                else
-                {
-                    // Uploads/로 시작하면 /를 추가
-                    if (mediaFile.FullPath.StartsWith("Uploads/"))
-                    {
-                        finalUrl = $"{baseUri}/{mediaFile.FullPath}";
-                    }
-                    // 파일명만 있는 경우
-                    else
-                    {
-                        finalUrl = $"{baseUri}/Uploads/{mediaFile.FullPath}";
-                    }
+                    var fileName = Path.GetFileName(finalUrl);
+                    finalUrl = $"/Uploads/{fileName}";
+                    _loggingService.AddLog("INFO", $"Converted /media/ to /Uploads/: {finalUrl}");
                 }
 
-                _logger.LogInformation($"Generated URL for media {mediaFile.Id} ({mediaFile.FileName}): {finalUrl}");
-                _logger.LogInformation($"  - Original FullPath: {mediaFile.FullPath}");
-                _logger.LogInformation($"  - BaseUri: {baseUri}");
+                _loggingService.AddLog("DEBUG", $"URL for {mediaFile.FileName}: {finalUrl}");
 
                 return finalUrl;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error generating URL for media file {mediaFile.Id}");
+                _loggingService.AddLog("ERROR", $"Error generating URL: {ex.Message}");
                 return null;
             }
         }
