@@ -34,7 +34,8 @@ namespace WicsPlatform.Client.Pages
         [Inject] protected IBroadcastDataService BroadcastDataService { get; set; }
         [Inject] protected MediaStreamingService MediaStreamingService { get; set; }
         [Inject] protected BroadcastRecordingService RecordingService { get; set; }
-        [Inject] protected BroadcastLoggingService LoggingService { get; set; } // 추가
+        [Inject] protected BroadcastLoggingService LoggingService { get; set; }
+        [Inject] protected TtsStreamingService TtsStreamingService { get; set; }
         #endregion
 
         #region Fields & Properties
@@ -94,6 +95,7 @@ namespace WicsPlatform.Client.Pages
         private DotNetObjectReference<ManageBroadCast> _dotNetRef;
         protected BroadcastMonitoringSection monitoringSection;
         protected BroadcastPlaylistSection playlistSection;
+        protected BroadcastTtsSection ttsSection;
 
         // Broadcast 관련
         private List<WicsPlatform.Server.Models.wics.Speaker> _currentOnlineSpeakers;
@@ -274,6 +276,11 @@ namespace WicsPlatform.Client.Pages
                     await SaveSelectedMediaToChannel();
                 }
 
+                if (isTtsEnabled)
+                {
+                    await SaveSelectedTtsToChannel();
+                }
+
                 // 활성화된 소스별 스트리밍 시작
                 if (!await StartEnabledSources())
                 {
@@ -311,10 +318,13 @@ namespace WicsPlatform.Client.Pages
                     return false;
             }
 
-            // TTS 스트리밍 (향후 구현)
+            // TTS 스트리밍 - ★ ttsSection 전달
             if (isTtsEnabled)
             {
-                _logger.LogInformation("TTS streaming will be implemented in future updates");
+                if (!await TtsStreamingService.StartTtsStreaming(
+                    isTtsEnabled, _dotNetRef, selectedChannel,
+                    _preferredSampleRate, _preferredChannels, ttsSection))
+                    return false;
             }
 
             return true;
@@ -325,7 +335,13 @@ namespace WicsPlatform.Client.Pages
             try
             {
                 var selectedMediaIds = await MediaStreamingService.GetSelectedMediaIds(selectedChannel);
-                var selectedTtsIds = await MediaStreamingService.GetSelectedTtsIds(selectedChannel);
+
+                // ★ TTS 섹션에서 직접 가져오기
+                var selectedTtsIds = new List<ulong>();
+                if (ttsSection != null && ttsSection.HasSelectedTts())
+                {
+                    selectedTtsIds = ttsSection.GetSelectedTts().Select(t => t.Id).ToList();
+                }
 
                 var broadcast = new WicsPlatform.Server.Models.wics.Broadcast
                 {
@@ -359,36 +375,39 @@ namespace WicsPlatform.Client.Pages
         {
             try
             {
-                if (_currentOnlineSpeakers == null || !_currentOnlineSpeakers.Any())
-                    return;
+                if (selectedChannel == null) return;
 
                 var query = new Radzen.Query
                 {
-                    Filter = $"ChannelId eq {selectedChannel.Id} and OngoingYn eq 'Y'",
-                    OrderBy = "CreatedAt desc"
+                    Filter = $"ChannelId eq {selectedChannel.Id} and OngoingYn eq 'Y'"
                 };
 
-                var broadcasts = await WicsService.GetBroadcasts(query);
+                var result = await WicsService.GetBroadcasts(query);
 
-                foreach (var broadcast in broadcasts.Value)
+                foreach (var broadcast in result.Value)
                 {
-                    var broadcastSpeakerIds = broadcast.SpeakerIds;
-                    var currentSpeakerIds = _currentOnlineSpeakers.Select(s => s.Id).ToList();
-
-                    if (broadcastSpeakerIds.Any(id => currentSpeakerIds.Contains(id)))
+                    var updateData = new
                     {
-                        broadcast.OngoingYn = "N";
-                        broadcast.UpdatedAt = DateTime.Now;
-                        await WicsService.UpdateBroadcast(broadcast.Id, broadcast);
+                        OngoingYn = "N",
+                        UpdatedAt = DateTime.Now
+                    };
 
-                        _logger.LogInformation($"Broadcast record updated to stopped for channel {broadcast.ChannelId}, " +
-                                              $"speaker_id_list: '{broadcast.SpeakerIdList}'");
+                    // OData URL 형식 수정: Id={broadcast.Id} 형식 사용
+                    var response = await Http.PatchAsJsonAsync($"odata/wics/Broadcasts(Id={broadcast.Id})", updateData);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation($"Successfully updated broadcast {broadcast.Id} to stopped");
+                    }
+                    else
+                    {
+                        _logger.LogError($"Failed to update broadcast {broadcast.Id}: {response.StatusCode}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to update broadcast records to stopped");
+                _logger.LogError(ex, "Failed to update broadcast records");
             }
         }
 
@@ -817,14 +836,34 @@ namespace WicsPlatform.Client.Pages
             await ProcessAudioData(base64Data, isMediaEnabled);
         }
 
+        // TTS 오디오 캡처 핸들러 추가
+        [JSInvokable]
+        public async Task OnTtsAudioCaptured(string base64Data)
+        {
+            await ProcessAudioData(base64Data, isTtsEnabled);
+        }
+
         // 통합된 오디오 처리 메서드
         private async Task ProcessAudioData(string base64Data, bool isSourceEnabled)
         {
-            if (!isSourceEnabled || string.IsNullOrWhiteSpace(base64Data)) return;
+            if (!isSourceEnabled || string.IsNullOrWhiteSpace(base64Data))
+            {
+                _logger.LogWarning($"ProcessAudioData skipped - Enabled: {isSourceEnabled}, Data: {!string.IsNullOrWhiteSpace(base64Data)}");
+                return;
+            }
 
             try
             {
                 byte[] data = Convert.FromBase64String(base64Data);
+
+                // 어떤 소스에서 온 데이터인지 로그
+                string source = "Unknown";
+                if (isSourceEnabled == isMicEnabled && isMicEnabled) source = "Mic";
+                else if (isSourceEnabled == isMediaEnabled && isMediaEnabled) source = "Media";
+                else if (isSourceEnabled == isTtsEnabled && isTtsEnabled) source = "TTS";
+
+                _logger.LogInformation($"ProcessAudioData from {source} - Size: {data.Length} bytes");
+                LoggingService.AddLog("DEBUG", $"{source} 데이터 수신: {data.Length} bytes");
 
                 UpdateAudioStatistics(data);
                 RecordingService.AddAudioData(data);
@@ -833,7 +872,14 @@ namespace WicsPlatform.Client.Pages
                     await monitoringSection.OnAudioCaptured(data);
 
                 if (!string.IsNullOrEmpty(currentBroadcastId))
+                {
                     await WebSocketService.SendAudioDataAsync(currentBroadcastId, data);
+                    _logger.LogDebug($"Sent {source} audio data to WebSocket: {data.Length} bytes");
+                }
+                else
+                {
+                    _logger.LogWarning("currentBroadcastId is null or empty - cannot send to WebSocket");
+                }
 
                 if (_currentLoopbackSetting && _speakerModule != null)
                     await _speakerModule.InvokeVoidAsync("feed", base64Data);
@@ -873,6 +919,36 @@ namespace WicsPlatform.Client.Pages
             double rms = Math.Sqrt(sum / sampleCount);
             return Math.Min(100, rms * 100);
         }
+
+        // TTS 플레이리스트 종료 핸들러 추가
+        [JSInvokable]
+        public async Task OnTtsPlaylistEnded()
+        {
+            _logger.LogInformation("TTS playlist ended - attempting to restart");
+
+            LoggingService.AddLog("INFO", "TTS 재생 완료");
+
+            // 루프 재생 설정 확인
+            var shouldLoop = true;  // 나중에 UI에서 설정 가능하도록
+
+            if (shouldLoop && isTtsEnabled && isBroadcasting)
+            {
+                LoggingService.AddLog("INFO", "TTS 루프 재생 시작");
+                var success = await TtsStreamingService.RestartTts(ttsSection, isTtsEnabled, isBroadcasting);
+
+                if (!success)
+                {
+                    LoggingService.AddLog("WARN", "TTS 재시작 실패");
+                }
+            }
+            else
+            {
+                LoggingService.AddLog("INFO", "TTS 재생 종료");
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
 
         [JSInvokable]
         public Task ShowMicHelp()
@@ -1126,6 +1202,7 @@ namespace WicsPlatform.Client.Pages
             _broadcastTimer?.Dispose();
             _broadcastTimer = null;
 
+            // 방송 레코드 업데이트 (ongoing_yn = 'N')
             await UpdateBroadcastRecordsToStopped();
 
             if (!string.IsNullOrEmpty(currentBroadcastId))
@@ -1162,7 +1239,7 @@ namespace WicsPlatform.Client.Pages
 
             if (isTtsEnabled)
             {
-                _logger.LogInformation("TTS streaming stop will be implemented in future updates");
+                await TtsStreamingService.StopTtsStreaming();
             }
         }
 
@@ -1182,35 +1259,105 @@ namespace WicsPlatform.Client.Pages
 
                 // 선택된 미디어 가져오기
                 var selectedMedia = playlistSection.GetSelectedMedia();
+                var selectedMediaIds = selectedMedia?.Select(m => m.Id).ToHashSet() ?? new HashSet<ulong>();
 
-                if (selectedMedia == null || !selectedMedia.Any())
+                LoggingService.AddLog("INFO", $"미디어 매핑 동기화 시작 - 선택된 미디어: {selectedMediaIds.Count}개");
+
+                // 기존 map_channel_media 테이블 데이터 조회
+                var query = new Radzen.Query
                 {
-                    LoggingService.AddLog("WARN", "선택된 미디어가 없습니다.");
-                    return;
-                }
+                    Filter = $"ChannelId eq {selectedChannel.Id}"
+                };
+                var existingMappings = await WicsService.GetMapChannelMedia(query);
+                var existingMediaIds = existingMappings.Value
+                    .Where(m => m.DeleteYn != "Y")
+                    .Select(m => m.MediaId)
+                    .ToHashSet();
 
-                LoggingService.AddLog("INFO", $"선택된 미디어 {selectedMedia.Count()}개를 채널에 매핑 중...");
-
-                // 1. 기존 매핑 소프트 삭제
-                await SoftDeleteExistingChannelMediaMappings();
-
-                // 2. 새 매핑 추가
-                foreach (var media in selectedMedia)
+                // 1. 신규 추가: 선택됨 BUT DB에 없음
+                var toAdd = selectedMediaIds.Except(existingMediaIds);
+                foreach (var mediaId in toAdd)
                 {
-                    var mapping = new WicsPlatform.Server.Models.wics.MapChannelMedium
+                    var media = selectedMedia.FirstOrDefault(m => m.Id == mediaId);
+                    if (media != null)
                     {
-                        ChannelId = selectedChannel.Id,
-                        MediaId = media.Id,
-                        DeleteYn = "N",
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now
-                    };
+                        var mapping = new WicsPlatform.Server.Models.wics.MapChannelMedium
+                        {
+                            ChannelId = selectedChannel.Id,
+                            MediaId = mediaId,
+                            DeleteYn = "N",
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        };
 
-                    await WicsService.CreateMapChannelMedium(mapping);
-                    LoggingService.AddLog("SUCCESS", $"미디어 매핑 완료: {media.FileName}");
+                        await WicsService.CreateMapChannelMedium(mapping);
+                        LoggingService.AddLog("SUCCESS", $"신규 미디어 추가: {media.FileName} (ID: {mediaId})");
+                    }
                 }
 
-                LoggingService.AddLog("SUCCESS", $"{selectedMedia.Count()}개 미디어가 채널에 매핑되었습니다.");
+                // 2. 소프트 삭제: DB에 있음 BUT 선택 안됨
+                var toDelete = existingMediaIds.Except(selectedMediaIds);
+                foreach (var mediaId in toDelete)
+                {
+                    var mapping = existingMappings.Value.FirstOrDefault(m => m.MediaId == mediaId && m.DeleteYn != "Y");
+                    if (mapping != null)
+                    {
+                        var updateData = new
+                        {
+                            DeleteYn = "Y",
+                            UpdatedAt = DateTime.Now
+                        };
+
+                        // HTTP PATCH 직접 호출
+                        var response = await Http.PatchAsJsonAsync($"odata/wics/MapChannelMedia(Id={mapping.Id})", updateData);
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            LoggingService.AddLog("INFO", $"미디어 제거: MediaID {mediaId} (delete_yn=Y)");
+                        }
+                        else
+                        {
+                            LoggingService.AddLog("ERROR", $"미디어 제거 실패: MediaID {mediaId}, Status: {response.StatusCode}");
+                        }
+                    }
+                }
+
+                // 3. 유지: 양쪽 모두 있음 (처리 없음)
+                var unchanged = selectedMediaIds.Intersect(existingMediaIds);
+                if (unchanged.Any())
+                {
+                    LoggingService.AddLog("INFO", $"변경 없음: {unchanged.Count()}개 미디어 유지");
+                }
+
+                // 4. 이미 delete_yn='Y'인 항목 중 다시 선택된 경우 복구
+                foreach (var mediaId in selectedMediaIds)
+                {
+                    var deletedMapping = existingMappings.Value.FirstOrDefault(m => m.MediaId == mediaId && m.DeleteYn == "Y");
+                    if (deletedMapping != null)
+                    {
+                        var updateData = new
+                        {
+                            DeleteYn = "N",
+                            UpdatedAt = DateTime.Now
+                        };
+
+                        // HTTP PATCH 직접 호출
+                        var response = await Http.PatchAsJsonAsync($"odata/wics/MapChannelMedia(Id={deletedMapping.Id})", updateData);
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            var media = selectedMedia.FirstOrDefault(m => m.Id == mediaId);
+                            LoggingService.AddLog("SUCCESS", $"미디어 복구: {media?.FileName ?? $"ID {mediaId}"} (delete_yn=N)");
+                        }
+                        else
+                        {
+                            LoggingService.AddLog("ERROR", $"미디어 복구 실패: MediaID {mediaId}, Status: {response.StatusCode}");
+                        }
+                    }
+                }
+
+                LoggingService.AddLog("SUCCESS",
+                    $"미디어 매핑 동기화 완료 - 추가: {toAdd.Count()}개, 제거: {toDelete.Count()}개, 유지: {unchanged.Count()}개");
             }
             catch (Exception ex)
             {
@@ -1219,81 +1366,89 @@ namespace WicsPlatform.Client.Pages
             }
         }
 
-        private async Task SoftDeleteExistingChannelMediaMappings()
+        private async Task SaveSelectedTtsToChannel()
         {
             try
             {
+                if (selectedChannel == null) return;
+
+                if (ttsSection == null)
+                {
+                    _logger.LogInformation("TTS 섹션이 초기화되지 않았습니다.");
+                    LoggingService.AddLog("WARN", "TTS 섹션이 초기화되지 않았습니다.");
+                    return;
+                }
+
+                // 선택된 TTS 가져오기
+                var selectedTts = ttsSection.GetSelectedTts();
+                var selectedTtsIds = selectedTts?.Select(t => t.Id).ToHashSet() ?? new HashSet<ulong>();
+
+                LoggingService.AddLog("INFO", $"TTS 매핑 동기화 시작 - 선택된 TTS: {selectedTtsIds.Count}개");
+
+                // 기존 map_channel_tts 테이블 데이터 조회
                 var query = new Radzen.Query
                 {
-                    Filter = $"ChannelId eq {selectedChannel.Id} and DeleteYn eq 'N'"
+                    Filter = $"ChannelId eq {selectedChannel.Id}"
                 };
+                var existingMappings = await WicsService.GetMapChannelTts(query);
+                var existingTtsIds = existingMappings.Value
+                    .Where(m => m.DeleteYn != "Y")
+                    .Select(m => m.TtsId)
+                    .ToHashSet();
 
-                var existingMappings = await WicsService.GetMapChannelMedia(query);
-
-                if (!existingMappings.Value.Any())
+                // 1. 신규 추가: 선택됨 BUT DB에 없음
+                var toAdd = selectedTtsIds.Except(existingTtsIds);
+                foreach (var ttsId in toAdd)
                 {
-                    _logger.LogInformation("제거할 기존 미디어 매핑이 없습니다.");
-                    return;
-                }
-
-                _logger.LogInformation($"기존 미디어 매핑 {existingMappings.Value.Count()}개를 제거 중...");
-
-                foreach (var mapping in existingMappings.Value)
-                {
-                    mapping.DeleteYn = "Y";
-                    mapping.UpdatedAt = DateTime.Now;
-                    await WicsService.UpdateMapChannelMedium(mapping.Id, mapping);
-                }
-
-                _logger.LogInformation($"Soft deleted {existingMappings.Value.Count()} existing media mappings for channel {selectedChannel.Id}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to soft delete existing channel media mappings");
-                throw;
-            }
-        }
-
-        private async Task AddNewChannelMediaMappings()
-        {
-            try
-            {
-                // BroadcastPlaylistSection에서 선택된 미디어 직접 가져오기
-                var selectedMedia = playlistSection.GetSelectedMedia();
-
-                if (selectedMedia == null || !selectedMedia.Any())
-                {
-                    _logger.LogWarning("선택된 미디어가 없습니다.");
-                    return;
-                }
-
-                _logger.LogInformation($"선택된 미디어 {selectedMedia.Count()}개를 채널에 매핑 중...");
-
-                var addedCount = 0;
-                foreach (var media in selectedMedia)
-                {
-                    var mapping = new WicsPlatform.Server.Models.wics.MapChannelMedium
+                    var tts = selectedTts.FirstOrDefault(t => t.Id == ttsId);
+                    if (tts != null)
                     {
-                        ChannelId = selectedChannel.Id,
-                        MediaId = media.Id,
-                        DeleteYn = "N",
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now
-                    };
+                        var mapping = new WicsPlatform.Server.Models.wics.MapChannelTt
+                        {
+                            ChannelId = selectedChannel.Id,
+                            TtsId = ttsId,
+                            DeleteYn = "N",
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        };
 
-                    await WicsService.CreateMapChannelMedium(mapping);
-                    addedCount++;
-                    _logger.LogInformation($"미디어 매핑 [{addedCount}/{selectedMedia.Count()}]: {media.FileName}");
+                        await WicsService.CreateMapChannelTt(mapping);
+                        LoggingService.AddLog("SUCCESS", $"신규 TTS 추가: {tts.Name} (ID: {ttsId})");
+                    }
                 }
 
-                _logger.LogInformation($"Added {addedCount} new media mappings for channel {selectedChannel.Id}");
+                // 2. 소프트 삭제: DB에 있음 BUT 선택 안됨
+                var toDelete = existingTtsIds.Except(selectedTtsIds);
+                foreach (var ttsId in toDelete)
+                {
+                    var mapping = existingMappings.Value.FirstOrDefault(m => m.TtsId == ttsId && m.DeleteYn != "Y");
+                    if (mapping != null)
+                    {
+                        var updateData = new
+                        {
+                            DeleteYn = "Y",
+                            UpdatedAt = DateTime.Now
+                        };
+
+                        var response = await Http.PatchAsJsonAsync($"odata/wics/MapChannelTts(Id={mapping.Id})", updateData);
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            LoggingService.AddLog("INFO", $"TTS 제거: TtsID {ttsId} (delete_yn=Y)");
+                        }
+                    }
+                }
+
+                LoggingService.AddLog("SUCCESS",
+                    $"TTS 매핑 동기화 완료 - 추가: {toAdd.Count()}개, 제거: {toDelete.Count()}개");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to add new channel media mappings");
-                throw;
+                LoggingService.AddLog("ERROR", $"TTS 매핑 실패: {ex.Message}");
+                _logger.LogError(ex, "Failed to save selected TTS to channel");
             }
         }
+
 
         private void LogBroadcastStatistics(BroadcastStoppedEventArgs args)
         {

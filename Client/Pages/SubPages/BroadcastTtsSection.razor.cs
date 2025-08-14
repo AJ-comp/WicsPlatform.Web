@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -21,21 +21,19 @@ namespace WicsPlatform.Client.Pages.SubPages
         /* ────────────────────── [DI] ─────────────────────────────── */
         [Inject] protected NotificationService NotificationService { get; set; }
         [Inject] protected wicsService WicsService { get; set; }
-        [Inject] protected IJSRuntime JSRuntime { get; set; }   // ★ JSInterop 주입
+        [Inject] protected IJSRuntime JSRuntime { get; set; }
         [Inject] protected DialogService DialogService { get; set; }
-        [Inject] protected HttpClient Http { get; set; }        // ★ HttpClient 주입 추가
+        [Inject] protected HttpClient Http { get; set; }
 
         /* ────────────────────── [State] ──────────────────────────── */
         private IEnumerable<WicsPlatform.Server.Models.wics.Tt> ttsList = new List<WicsPlatform.Server.Models.wics.Tt>();
-        private WicsPlatform.Server.Models.wics.MapChannelTt currentChannelTts = null;
-        private ulong? selectedTtsId = null;
+        private WicsPlatform.Server.Models.wics.Tt selectedTts = null;
+        private ulong? selectedTtsId = null;  // ★ 추가된 변수
         private bool isLoadingTts = false;
-        private bool isProcessingSelection = false;
         private ulong? playingTtsId = null;   // 현재 재생 중인 TTS
 
-        // 채널‑TTS 매핑 캐시
-        private static readonly Dictionary<ulong, WicsPlatform.Server.Models.wics.MapChannelTt> channelTtsCache
-            = new();
+        // ★ 변경: 미디어처럼 선택된 TTS를 메모리에 저장
+        private List<WicsPlatform.Server.Models.wics.Tt> _selectedTtsList = new List<WicsPlatform.Server.Models.wics.Tt>();
 
         // ★ 중복 로딩 방지를 위한 변수들
         private ulong? _lastLoadedChannelId = null;
@@ -117,35 +115,32 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             try
             {
-                isProcessingSelection = true;
-
-                if (channelTtsCache.TryGetValue(channelId, out var cached))
-                {
-                    currentChannelTts = cached;
-                    selectedTtsId = cached?.TtsId;
-                    return;
-                }
-
                 isLoadingTts = true;
 
                 var query = new Radzen.Query
                 {
-                    Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)",
-                    Expand = "Tt",
-                    Top = 1
+                    Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)"
                 };
 
                 var result = await WicsService.GetMapChannelTts(query);
-                currentChannelTts = result.Value.AsODataEnumerable().FirstOrDefault();
+                var mapping = result.Value.AsODataEnumerable().FirstOrDefault();
 
-                if (currentChannelTts != null)
+                if (mapping != null)
                 {
-                    channelTtsCache[channelId] = currentChannelTts;
-                    selectedTtsId = currentChannelTts.TtsId;
+                    // 매핑된 TTS를 찾아서 선택
+                    selectedTts = ttsList.FirstOrDefault(t => t.Id == mapping.TtsId);
+                    if (selectedTts != null)
+                    {
+                        selectedTtsId = selectedTts.Id;  // ★ selectedTtsId도 설정
+                        _selectedTtsList.Clear();
+                        _selectedTtsList.Add(selectedTts);
+                    }
                 }
                 else
                 {
-                    selectedTtsId = null;
+                    selectedTts = null;
+                    selectedTtsId = null;  // ★ selectedTtsId도 null로 설정
+                    _selectedTtsList.Clear();
                 }
             }
             catch (Exception ex)
@@ -155,87 +150,56 @@ namespace WicsPlatform.Client.Pages.SubPages
             finally
             {
                 isLoadingTts = false;
-                isProcessingSelection = false;
             }
         }
 
         /* ────────────────────── [선택 변경] ──────────────────────── */
         private async Task OnRadioButtonListChanged()
         {
-            if (selectedTtsId.HasValue)
+            if (selectedTtsId.HasValue)  // ★ selectedTtsId 사용
             {
-                await OnTtsSelectionChanged(selectedTtsId.Value);
-            }
-        }
-
-        private async Task OnTtsSelectionChanged(ulong ttsId)
-        {
-            if (Channel == null || isProcessingSelection)
-                return;
-
-            try
-            {
-                isProcessingSelection = true;
-
-                // 기존 매핑 삭제
-                if (currentChannelTts != null)
+                selectedTts = ttsList.FirstOrDefault(t => t.Id == selectedTtsId.Value);  // ★ selectedTtsId로 selectedTts 찾기
+                if (selectedTts != null)
                 {
-                    await WicsService.DeleteMapChannelTt(currentChannelTts.Id);
-                    channelTtsCache.Remove(Channel.Id);
+                    _selectedTtsList.Clear();
+                    _selectedTtsList.Add(selectedTts);
                 }
-
-                // 새 매핑 추가
-                var newMap = new WicsPlatform.Server.Models.wics.MapChannelTt
-                {
-                    ChannelId = Channel.Id,
-                    TtsId = ttsId,
-                    DeleteYn = "N",
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now
-                };
-
-                currentChannelTts = await WicsService.CreateMapChannelTt(newMap);
-                channelTtsCache[Channel.Id] = currentChannelTts;
-
-                NotifySuccess("TTS가 선택되었습니다.");
-                StateHasChanged();
             }
-            catch (Exception ex)
+            else
             {
-                NotifyError("TTS 선택 처리 중 오류가 발생했습니다", ex);
+                selectedTts = null;
+                _selectedTtsList.Clear();
             }
-            finally
-            {
-                isProcessingSelection = false;
-            }
+
+            await InvokeAsync(StateHasChanged);
         }
 
         private async Task ClearTtsSelection()
         {
-            if (Channel == null || currentChannelTts == null)
-                return;
+            selectedTts = null;
+            selectedTtsId = null;  // ★ selectedTtsId도 clear
+            _selectedTtsList.Clear();
 
-            try
-            {
-                isProcessingSelection = true;
+            NotifyInfo("TTS 선택이 해제되었습니다.");
+            await InvokeAsync(StateHasChanged);
+        }
 
-                await WicsService.DeleteMapChannelTt(currentChannelTts.Id);
-                channelTtsCache.Remove(Channel.Id);
+        /* ────────────────────── [Public Methods - 미디어와 동일한 인터페이스] ────────────────────── */
 
-                currentChannelTts = null;
-                selectedTtsId = null;
+        /// <summary>
+        /// 선택된 TTS 목록 가져오기 (미디어의 GetSelectedMedia와 동일)
+        /// </summary>
+        public IEnumerable<WicsPlatform.Server.Models.wics.Tt> GetSelectedTts()
+        {
+            return _selectedTtsList.AsEnumerable();
+        }
 
-                NotifyInfo("TTS 선택이 해제되었습니다.");
-                StateHasChanged();
-            }
-            catch (Exception ex)
-            {
-                NotifyError("TTS 선택 해제 중 오류가 발생했습니다", ex);
-            }
-            finally
-            {
-                isProcessingSelection = false;
-            }
+        /// <summary>
+        /// 선택된 TTS가 있는지 확인
+        /// </summary>
+        public bool HasSelectedTts()
+        {
+            return _selectedTtsList.Any();
         }
 
         /* ────────────────────── [재생 / 중지] ────────────────────── */
@@ -349,7 +313,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             try
             {
                 // 삭제할 TTS가 현재 선택된 TTS인 경우 처리
-                if (selectedTtsId == tts.Id)
+                if (selectedTts?.Id == tts.Id || selectedTtsId == tts.Id)  // ★ selectedTtsId도 체크
                 {
                     await ClearTtsSelection();
                 }

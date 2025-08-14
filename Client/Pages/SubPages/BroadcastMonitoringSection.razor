@@ -106,13 +106,13 @@
                         </RadzenColumn>
                         <RadzenColumn Size="6" SizeMD="3">
                             <div class="text-center">
-                                <RadzenText TextStyle="TextStyle.H6" class="mb-1">@TotalDataSize KB</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H6" class="mb-1">@TotalDataSize.ToString("F2") KB</RadzenText>
                                 <RadzenText TextStyle="TextStyle.Caption" class="text-muted">총 데이터량</RadzenText>
                             </div>
                         </RadzenColumn>
                         <RadzenColumn Size="6" SizeMD="3">
                             <div class="text-center">
-                                <RadzenText TextStyle="TextStyle.H6" class="mb-1">@AverageBitrate kbps</RadzenText>
+                                <RadzenText TextStyle="TextStyle.H6" class="mb-1">@AverageBitrate.ToString("F5") kbps</RadzenText>
                                 <RadzenText TextStyle="TextStyle.Caption" class="text-muted">평균 비트레이트</RadzenText>
                             </div>
                         </RadzenColumn>
@@ -153,11 +153,11 @@
                     </RadzenText>
                     <div class="broadcast-log"
                          style="height: 200px; overflow-y: auto;
-                                    border-radius: var(--rz-border-radius);
-                                    padding: 1rem; font-family: monospace; font-size: 0.875rem;
-                                    background-color: var(--rz-base-background-color);
-                                    border: 1px solid var(--rz-border-color);
-                                    color: var(--rz-text-color);">
+                                        border-radius: var(--rz-border-radius);
+                                        padding: 1rem; font-family: monospace; font-size: 0.875rem;
+                                        background-color: var(--rz-base-background-color);
+                                        border: 1px solid var(--rz-border-color);
+                                        color: var(--rz-text-color);">
                         @foreach (var log in broadcastLogs.TakeLast(50).Reverse())
                         {
                             <div class="log-entry" style="margin-bottom: 0.25rem; color: @GetLogColor(log.Level);">
