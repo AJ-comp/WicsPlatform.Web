@@ -102,9 +102,9 @@ namespace WicsPlatform.Client.Services
                 // URL 배열을 object[]로 변환하여 전달
                 var urlArray = mediaUrls.ToArray();
 
-                // JavaScript에서 미디어 파일 로드 및 스트리밍 시작
+                // 미디어는 OnMediaAudioCaptured로 전송 (기존 그대로)
                 var streamSuccess = await _mediaStreamerModule.InvokeAsync<bool>(
-                    "loadAndStreamMediaPlaylist", (object)urlArray); // object로 캐스팅
+                    "loadAndStreamMediaPlaylist", (object)mediaUrls.ToArray());
 
                 if (!streamSuccess)
                 {

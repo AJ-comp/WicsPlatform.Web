@@ -13,6 +13,7 @@
     <PackageReference Include="Mythosia.Azure" Version="1.2.0" />
     <PackageReference Include="Radzen.Blazor" Version="*" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.17" />
+    <PackageReference Include="System.Speech" Version="9.0.8" />
     <ProjectReference Include="..\Client\WicsPlatform.Client.csproj" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.17" />
