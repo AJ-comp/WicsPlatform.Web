@@ -7,7 +7,7 @@ using System.Speech.Synthesis;  // NuGet: System.Speech 설치 필요
 namespace WicsPlatform.Server.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/tts")]
     public class TtsApiController : ControllerBase
     {
         private readonly IWebHostEnvironment _env;

@@ -261,41 +261,100 @@ namespace WicsPlatform.Client.Pages
                     return;
 
                 _currentOnlineSpeakers = onlineSpeakers;
-
                 var onlineGroups = GetOnlineGroups(onlineSpeakers);
+
+                // ===== 1단계: 모든 사전 준비 작업 =====
+                _logger.LogInformation("1단계: 사전 준비 작업 시작");
+
+                // 1-1. 미디어 매핑 저장
+                if (isMediaEnabled)
+                {
+                    LoggingService.AddLog("INFO", "미디어 매핑 저장 중...");
+                    await SaveSelectedMediaToChannel();
+                }
+
+                // 1-2. TTS 매핑 저장 및 음성 파일 생성
+                if (isTtsEnabled)
+                {
+                    LoggingService.AddLog("INFO", "TTS 준비 시작...");
+                    await SaveSelectedTtsToChannel();
+
+                    // ★ TTS 음성 파일 미리 생성
+                    var ttsReady = await PrepareTtsAudioFiles();
+                    if (!ttsReady)
+                    {
+                        NotifyError("TTS 준비 실패", new Exception("TTS 음성 파일 생성에 실패했습니다."));
+                        return;
+                    }
+                    LoggingService.AddLog("SUCCESS", "TTS 음성 파일 준비 완료");
+                }
+
+                // 1-3. 오디오 모듈 초기화
+                if (!await InitializeAudioModules())
+                    return;
+
+                // ===== 2단계: WebSocket 연결 (모든 준비 완료 후) =====
+                _logger.LogInformation("2단계: WebSocket 연결 시작");
+                LoggingService.AddLog("INFO", "WebSocket 연결 중...");
 
                 if (!await InitializeWebSocketBroadcast(onlineGroups))
                     return;
 
-                if (!await InitializeAudioModules())
-                    return;
+                // ===== 3단계: 즉시 스트리밍 시작 =====
+                _logger.LogInformation("3단계: 스트리밍 시작");
 
-                // 선택된 미디어를 채널에 매핑 (방송 시작 전에 저장)
-                if (isMediaEnabled)
-                {
-                    await SaveSelectedMediaToChannel();
-                }
-
-                if (isTtsEnabled)
-                {
-                    await SaveSelectedTtsToChannel();
-                }
-
-                // 활성화된 소스별 스트리밍 시작
                 if (!await StartEnabledSources())
                 {
                     await CleanupFailedBroadcast();
                     return;
                 }
 
+                // ===== 4단계: 방송 상태 초기화 및 기록 =====
                 InitializeBroadcastState();
                 await CreateBroadcastRecords(onlineSpeakers);
                 NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
+
                 await InvokeAsync(StateHasChanged);
             }
             catch (Exception ex)
             {
                 await HandleBroadcastError(ex);
+            }
+        }
+
+        // ★ 새로운 메서드: TTS 음성 파일 사전 생성
+        private async Task<bool> PrepareTtsAudioFiles()
+        {
+            try
+            {
+                if (ttsSection == null || !ttsSection.HasSelectedTts())
+                {
+                    _logger.LogWarning("선택된 TTS가 없습니다.");
+                    return true; // TTS가 없는 것은 에러가 아님
+                }
+
+                var selectedTts = ttsSection.GetSelectedTts();
+                LoggingService.AddLog("INFO", $"TTS {selectedTts.Count()}개 음성 파일 생성 중...");
+
+                // TtsStreamingService에 사전 생성 요청
+                var prepared = await TtsStreamingService.PreGenerateTtsAudioFiles(
+                    selectedTts.ToList(),
+                    selectedChannel);
+
+                if (!prepared)
+                {
+                    LoggingService.AddLog("ERROR", "TTS 음성 파일 생성 실패");
+                    return false;
+                }
+
+                LoggingService.AddLog("SUCCESS", "모든 TTS 음성 파일 생성 완료");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "TTS 준비 중 오류");
+                LoggingService.AddLog("ERROR", $"TTS 준비 실패: {ex.Message}");
+                return false;
             }
         }
 
