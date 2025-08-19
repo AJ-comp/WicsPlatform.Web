@@ -297,6 +297,16 @@ namespace WicsPlatform.Client.Pages
                     LoggingService.AddLog("INFO", "미디어 URL 준비 중...");
                     await SaveSelectedMediaToChannel();
                     mediaUrls = await MediaStreamingService.GetMediaPlaylistUrls(selectedChannel);
+
+                    // 🔴 디버그 로그 추가
+                    LoggingService.AddLog("DEBUG", $"mediaUrls 개수: {mediaUrls?.Count ?? 0}");
+                    if (mediaUrls != null && mediaUrls.Any())
+                    {
+                        foreach (var url in mediaUrls)
+                        {
+                            LoggingService.AddLog("DEBUG", $"Media URL: {url}");
+                        }
+                    }
                 }
 
                 if (isTtsEnabled)
@@ -344,15 +354,28 @@ namespace WicsPlatform.Client.Pages
                     LoggingService.AddLog("SUCCESS", "마이크 활성화 완료");
                 }
 
-                if (isMediaEnabled && mediaUrls.Any())
+                // 🔴 수정된 부분: mediaUrls를 object로 캐스팅
+                if (isMediaEnabled && mediaUrls != null && mediaUrls.Any())
                 {
-                    await _mixerModule.InvokeVoidAsync("loadMediaPlaylist", mediaUrls.ToArray());
+                    LoggingService.AddLog("DEBUG", $"loadMediaPlaylist 호출 전 - URLs: {string.Join(", ", mediaUrls)}");
+
+                    // 🔴 중요: object[]로 변환하여 전달
+                    var urlArray = mediaUrls.ToArray();
+                    await _mixerModule.InvokeVoidAsync("loadMediaPlaylist", (object)urlArray);
+
                     LoggingService.AddLog("SUCCESS", $"미디어 플레이리스트 로드 완료 ({mediaUrls.Count}개)");
                 }
-
-                if (isTtsEnabled && ttsUrls.Any())
+                else
                 {
-                    await _mixerModule.InvokeVoidAsync("loadTtsPlaylist", ttsUrls.ToArray());
+                    LoggingService.AddLog("WARN", "미디어 URL이 없거나 미디어가 비활성화됨");
+                }
+
+                if (isTtsEnabled && ttsUrls != null && ttsUrls.Any())
+                {
+                    // 🔴 TTS도 동일하게 수정
+                    var ttsArray = ttsUrls.ToArray();
+                    await _mixerModule.InvokeVoidAsync("loadTtsPlaylist", (object)ttsArray);
+
                     LoggingService.AddLog("SUCCESS", $"TTS 플레이리스트 로드 완료 ({ttsUrls.Count}개)");
                 }
 
@@ -908,16 +931,16 @@ namespace WicsPlatform.Client.Pages
         {
             if (string.IsNullOrWhiteSpace(base64Data))
             {
-                _logger.LogWarning("OnMixedAudioCaptured: 빈 데이터 수신");
-                return;
+                return;  // 로그 제거
             }
 
             try
             {
                 byte[] data = Convert.FromBase64String(base64Data);
 
-                _logger.LogDebug($"믹싱된 오디오 수신: {data.Length} bytes");
-                LoggingService.AddLog("DEBUG", $"믹싱 데이터 수신: {data.Length} bytes");
+                // 로그 제거 - 너무 자주 호출됨
+                // _logger.LogDebug($"믹싱된 오디오 수신: {data.Length} bytes");
+                // LoggingService.AddLog("DEBUG", $"믹싱 데이터 수신: {data.Length} bytes");
 
                 UpdateAudioStatistics(data);
                 RecordingService.AddAudioData(data);
@@ -928,17 +951,15 @@ namespace WicsPlatform.Client.Pages
                 if (!string.IsNullOrEmpty(currentBroadcastId))
                 {
                     await WebSocketService.SendAudioDataAsync(currentBroadcastId, data);
-                    _logger.LogDebug($"믹싱된 오디오 WebSocket 전송: {data.Length} bytes");
-                }
-                else
-                {
-                    _logger.LogWarning("currentBroadcastId가 null - WebSocket 전송 불가");
+                    // 로그 제거
+                    // _logger.LogDebug($"믹싱된 오디오 WebSocket 전송: {data.Length} bytes");
                 }
 
                 if (_currentLoopbackSetting && _speakerModule != null)
                     await _speakerModule.InvokeVoidAsync("feed", base64Data);
 
-                if (totalDataPackets % 10 == 0)
+                // 100번에 한 번만 UI 업데이트
+                if (totalDataPackets % 100 == 0)
                 {
                     await InvokeAsync(StateHasChanged);
                 }
