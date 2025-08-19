@@ -78,6 +78,11 @@ namespace WicsPlatform.Client.Pages
         protected bool isMediaEnabled = false;
         protected bool isTtsEnabled = false;
 
+        // 볼륨 설정 (추가된 필드)
+        protected int micVolume = 50;
+        protected int mediaVolume = 50;
+        protected int ttsVolume = 50;
+
         // 테스트 방송 상태
         protected bool isTestBroadcasting = false;
         protected string testBroadcastId = null;
@@ -91,6 +96,7 @@ namespace WicsPlatform.Client.Pages
 
         // JS Interop - 믹서 모듈로 변경
         private IJSObjectReference _mixerModule;
+        private IJSObjectReference _jsModule; // 추가된 필드 (호환성 유지)
         private IJSObjectReference _speakerModule;
         private DotNetObjectReference<ManageBroadCast> _dotNetRef;
         protected BroadcastMonitoringSection monitoringSection;
@@ -154,6 +160,17 @@ namespace WicsPlatform.Client.Pages
             await LoadInitialData();
         }
 
+        protected override async Task OnParametersSetAsync()
+        {
+            // 채널의 볼륨 설정 로드
+            if (selectedChannel != null)
+            {
+                micVolume = (int)(selectedChannel.MicVolume * 100);
+                mediaVolume = (int)(selectedChannel.MediaVolume * 100);
+                ttsVolume = (int)(selectedChannel.TtsVolume * 100);
+            }
+        }
+
         public void Dispose()
         {
             UnsubscribeFromWebSocketEvents();
@@ -200,6 +217,11 @@ namespace WicsPlatform.Client.Pages
 
             if (channel != null)
             {
+                // 볼륨 설정 로드
+                micVolume = (int)(channel.MicVolume * 100);
+                mediaVolume = (int)(channel.MediaVolume * 100);
+                ttsVolume = (int)(channel.TtsVolume * 100);
+
                 var channelSampleRate = (int)(channel.SamplingRate > 0 ? channel.SamplingRate : 48000);
                 var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
                 _preferredSampleRate = FindClosestSampleRate(channelSampleRate, supportedSampleRates);
@@ -290,7 +312,7 @@ namespace WicsPlatform.Client.Pages
                     }
 
                     ttsUrls = TtsStreamingService.HasPreparedAudio
-                        ? TtsStreamingService._preparedAudioUrls
+                        ? TtsStreamingService.GetPreparedAudioUrls()
                         : new List<string>();
 
                     LoggingService.AddLog("SUCCESS", "TTS 음성 파일 준비 완료");
@@ -338,6 +360,9 @@ namespace WicsPlatform.Client.Pages
                 InitializeBroadcastState();
                 await CreateBroadcastRecords(onlineSpeakers);
                 NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
+
+                // _jsModule 참조 설정 (호환성)
+                _jsModule = _mixerModule;
 
                 await InvokeAsync(StateHasChanged);
             }
@@ -1009,6 +1034,11 @@ namespace WicsPlatform.Client.Pages
 
                     if (selectedChannel != null)
                     {
+                        // 볼륨 설정 재로드
+                        micVolume = (int)(selectedChannel.MicVolume * 100);
+                        mediaVolume = (int)(selectedChannel.MediaVolume * 100);
+                        ttsVolume = (int)(selectedChannel.TtsVolume * 100);
+
                         var channelSampleRate = (int)(selectedChannel.SamplingRate > 0 ? selectedChannel.SamplingRate : 48000);
                         var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
                         _preferredSampleRate = FindClosestSampleRate(channelSampleRate, supportedSampleRates);
@@ -1161,6 +1191,7 @@ namespace WicsPlatform.Client.Pages
                 finally
                 {
                     _mixerModule = null;
+                    _jsModule = null; // 참조 해제
                 }
             }
 

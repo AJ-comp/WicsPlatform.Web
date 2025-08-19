@@ -405,6 +405,60 @@ class AudioMixer {
         console.log(`[audiomixer.js] 볼륨 설정 - 마이크: ${mic}, 미디어: ${media}, TTS: ${tts}`);
     }
 
+    // ========== 추가된 메서드들 ==========
+
+    // 일시정지
+    pause() {
+        if (!this.isRecording) return false;
+
+        console.log('[audiomixer.js] 일시정지');
+
+        // 녹음 일시정지
+        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.mediaRecorder.pause();
+        }
+
+        // 모든 오디오 엘리먼트 일시정지
+        this.activeAudioElements.forEach(audio => {
+            if (!audio.paused) {
+                audio.pause();
+            }
+        });
+
+        return true;
+    }
+
+    // 재개
+    resume() {
+        if (!this.isRecording) return false;
+
+        console.log('[audiomixer.js] 재개');
+
+        // 녹음 재개
+        if (this.mediaRecorder && this.mediaRecorder.state === 'paused') {
+            this.mediaRecorder.resume();
+        }
+
+        // 모든 오디오 엘리먼트 재개
+        this.activeAudioElements.forEach(audio => {
+            if (audio.paused) {
+                audio.play().catch(err => {
+                    console.error('[audiomixer.js] 재생 재개 실패:', err);
+                });
+            }
+        });
+
+        return true;
+    }
+
+    // 정지 (dispose 호출)
+    stop() {
+        console.log('[audiomixer.js] 정지');
+        return this.dispose();
+    }
+
+    // ========== 추가 끝 ==========
+
     // 전체 정리
     async dispose() {
         console.log('[audiomixer.js] 믹서 정리 시작');
@@ -529,6 +583,31 @@ export function setVolumes(mic, media, tts) {
         mixerInstance.setVolumes(mic, media, tts);
     }
 }
+
+// ========== 추가된 export 함수들 ==========
+
+export function pause() {
+    if (mixerInstance) {
+        return mixerInstance.pause();
+    }
+    return false;
+}
+
+export function resume() {
+    if (mixerInstance) {
+        return mixerInstance.resume();
+    }
+    return false;
+}
+
+export function stop() {
+    if (mixerInstance) {
+        return mixerInstance.stop();
+    }
+    return false;
+}
+
+// ========== 추가 끝 ==========
 
 export async function dispose() {
     if (mixerInstance) {

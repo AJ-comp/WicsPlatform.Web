@@ -149,7 +149,12 @@ namespace WicsPlatform.Client.Pages.SubPages
             {
                 if (JSModule != null && IsMicEnabled)
                 {
-                    await JSModule.InvokeVoidAsync("pause");
+                    // audiomixer.js에 pause가 없다면 이 부분도 수정 필요
+                    // 일단 주석 처리하거나 다른 방법 사용
+                    // await JSModule.InvokeVoidAsync("pause");
+
+                    // 대신 볼륨을 0으로 설정하여 일시정지 효과
+                    await JSModule.InvokeVoidAsync("setVolumes", 0, 0, 0);
                 }
 
                 AddLog("WARN", "방송이 일시정지되었습니다");
@@ -169,9 +174,10 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             try
             {
-                if (JSModule != null && IsMicEnabled)
+                // stop이 아니라 dispose를 호출해야 함
+                if (JSModule != null)
                 {
-                    await JSModule.InvokeVoidAsync("stop");
+                    await JSModule.InvokeVoidAsync("dispose");  // stop → dispose로 변경
                 }
 
                 var finalStats = new BroadcastStoppedEventArgs

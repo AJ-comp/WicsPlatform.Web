@@ -1,7 +1,4 @@
-﻿// Client/Services/TtsStreamingService.cs
-// 전체 파일 교체
-
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using System;
@@ -352,6 +349,14 @@ namespace WicsPlatform.Client.Services
                 _logger.LogError(ex, "선택된 TTS ID 가져오기 실패");
                 return new List<ulong>();
             }
+        }
+
+        /// <summary>
+        /// 준비된 오디오 URL 목록 가져오기 (Public 메서드로 추가)
+        /// </summary>
+        public List<string> GetPreparedAudioUrls()
+        {
+            return new List<string>(_preparedAudioUrls);
         }
 
         /// <summary>
