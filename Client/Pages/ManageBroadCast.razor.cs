@@ -1184,40 +1184,83 @@ namespace WicsPlatform.Client.Pages
         #region Helper Methods
         private async Task HandleBroadcastStopped()
         {
-            isBroadcasting = false;
-            monitoringPanelCollapsed = false;
-            _broadcastTimer?.Dispose();
-            _broadcastTimer = null;
-
-            await UpdateBroadcastRecordsToStopped();
-
-            if (!string.IsNullOrEmpty(currentBroadcastId))
+            try
             {
-                await WebSocketService.StopBroadcastAsync(currentBroadcastId);
+                isBroadcasting = false;
+                monitoringPanelCollapsed = false;
+
+                // 타이머 정리
+                _broadcastTimer?.Dispose();
+                _broadcastTimer = null;
+
+                // DB 업데이트 (비동기로 처리)
+                _ = Task.Run(async () => await UpdateBroadcastRecordsToStopped());
+
+                // WebSocket 정리
+                if (!string.IsNullOrEmpty(currentBroadcastId))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await WebSocketService.StopBroadcastAsync(currentBroadcastId);
+                    });
+                    currentBroadcastId = null;
+                }
+
+                // 믹서 정리 (타임아웃 설정)
+                if (_mixerModule != null)
+                {
+                    try
+                    {
+                        var disposeTask = _mixerModule.InvokeVoidAsync("dispose").AsTask();
+                        var timeoutTask = Task.Delay(3000); // 3초 타임아웃
+
+                        var completedTask = await Task.WhenAny(disposeTask, timeoutTask);
+
+                        if (completedTask == timeoutTask)
+                        {
+                            _logger.LogWarning("Mixer dispose timeout");
+                        }
+
+                        // DisposeAsync도 타임아웃 설정
+                        var moduleDisposeTask = _mixerModule.DisposeAsync().AsTask();
+                        timeoutTask = Task.Delay(2000);
+
+                        completedTask = await Task.WhenAny(moduleDisposeTask, timeoutTask);
+
+                        if (completedTask == timeoutTask)
+                        {
+                            _logger.LogWarning("Mixer module dispose timeout");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to dispose mixer module");
+                    }
+                    finally
+                    {
+                        _mixerModule = null;
+                        _jsModule = null;
+                    }
+                }
+
+                _currentOnlineSpeakers = null;
+                _currentLoopbackSetting = false;
+
+                // UI 업데이트
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "HandleBroadcastStopped error");
+
+                // 최소한의 정리는 보장
+                isBroadcasting = false;
+                _mixerModule = null;
+                _jsModule = null;
                 currentBroadcastId = null;
-            }
 
-            // 믹서 정리
-            if (_mixerModule != null)
-            {
-                try
-                {
-                    await _mixerModule.InvokeVoidAsync("dispose");
-                    await _mixerModule.DisposeAsync();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to dispose mixer module");
-                }
-                finally
-                {
-                    _mixerModule = null;
-                    _jsModule = null; // 참조 해제
-                }
+                await InvokeAsync(StateHasChanged);
             }
-
-            _currentOnlineSpeakers = null;
-            _currentLoopbackSetting = false;
         }
 
         private async Task SaveSelectedMediaToChannel()
