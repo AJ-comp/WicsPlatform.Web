@@ -1,33 +1,17 @@
 ﻿// Server/wwwroot/js/audiomixer.js
-console.log('[audiomixer.js] 모듈 로드됨 v4.2 - WebSocket 데이터 전송 수정');
+console.log('[audiomixer.js] 모듈 로드됨 v5.0 - 마이크 전용 버전');
 
 class AudioMixer {
     constructor() {
         this.audioContext = null;
-        this.merger = null;
-        this.destination = null;
         this.mediaRecorder = null;
         this.dotNetRef = null;
 
-        // Gain 노드들
+        // 마이크 전용
         this.micGain = null;
-        this.mediaGain = null;
-        this.ttsGain = null;
-
-        // 마이크
         this.micStream = null;
         this.micSource = null;
-
-        // 단일 Audio 객체 (재사용)
-        this.sharedAudioElement = null;
-        this.sharedSourceNode = null;
-        this.currentPlayingType = null; // 'media' or 'tts'
-
-        // 플레이리스트
-        this.mediaPlaylist = [];
-        this.ttsPlaylist = [];
-        this.currentMediaIndex = 0;
-        this.currentTtsIndex = 0;
+        this.destination = null;
 
         // 상태
         this.isActive = false;
@@ -46,7 +30,7 @@ class AudioMixer {
     }
 
     async initialize(dotNetRef, config = {}) {
-        console.log('[audiomixer.js] 초기화 시작');
+        console.log('[audiomixer.js] 초기화 시작 (마이크 전용)');
 
         try {
             this.dotNetRef = dotNetRef;
@@ -62,53 +46,26 @@ class AudioMixer {
                 await this.audioContext.resume();
             }
 
-            // 노드 생성
-            this.merger = this.audioContext.createChannelMerger(this.config.channels);
+            // 마이크 Gain 노드만 생성
+            this.micGain = this.audioContext.createGain();
+            this.micGain.gain.value = config.micVolume || 1.0;
+
+            // Destination
             this.destination = this.audioContext.createMediaStreamDestination();
 
-            // Gain 노드
-            this.micGain = this.audioContext.createGain();
-            this.mediaGain = this.audioContext.createGain();
-            this.ttsGain = this.audioContext.createGain();
-
-            this.micGain.gain.value = config.micVolume || 1.0;
-            this.mediaGain.gain.value = config.mediaVolume || 1.0;
-            this.ttsGain.gain.value = config.ttsVolume || 1.0;
-
-            // 연결
-            this.micGain.connect(this.merger);
-            this.mediaGain.connect(this.merger);
-            this.ttsGain.connect(this.merger);
-            this.merger.connect(this.destination);
-
-            // 단일 Audio 엘리먼트 생성
-            this.createSharedAudioElement();
+            // 마이크만 destination에 직접 연결
+            this.micGain.connect(this.destination);
 
             // MediaRecorder
             this.setupMediaRecorder();
 
-            console.log('[audiomixer.js] 초기화 완료');
+            console.log('[audiomixer.js] 초기화 완료 (마이크 전용)');
             return true;
 
         } catch (error) {
             console.error('[audiomixer.js] 초기화 실패:', error);
             this.isActive = false;
             return false;
-        }
-    }
-
-    createSharedAudioElement() {
-        if (this.sharedAudioElement) return;
-
-        this.sharedAudioElement = new Audio();
-        this.sharedAudioElement.crossOrigin = 'anonymous';
-        this.sharedAudioElement.preload = 'auto';
-
-        // 소스 노드 생성 (한번만!)
-        try {
-            this.sharedSourceNode = this.audioContext.createMediaElementSource(this.sharedAudioElement);
-        } catch (error) {
-            console.error('[audiomixer.js] 소스 노드 생성 실패:', error);
         }
     }
 
@@ -127,11 +84,11 @@ class AudioMixer {
 
                 if (event.data && event.data.size > 0) {
                     chunks.push(event.data);
-                    console.log(`[audiomixer.js] 오디오 청크 수신: ${event.data.size} bytes`);
+                    console.log(`[audiomixer.js] 마이크 오디오 청크 수신: ${event.data.size} bytes`);
                 }
             };
 
-            // 주기적으로 전송 - setInterval을 인스턴스에 저장
+            // 주기적으로 전송
             this.sendInterval = setInterval(async () => {
                 if (chunks.length > 0 && self.dotNetRef && !self.isDisposing) {
                     console.log(`[audiomixer.js] 청크 전송 시작: ${chunks.length}개`);
@@ -173,7 +130,6 @@ class AudioMixer {
 
     startRecording() {
         if (this.mediaRecorder && this.mediaRecorder.state === 'inactive' && !this.isDisposing) {
-            // timeslice 옵션 추가
             this.mediaRecorder.start(this.config.timeslice);
             console.log('[audiomixer.js] 녹음 시작 (timeslice:', this.config.timeslice, 'ms)');
         }
@@ -230,160 +186,21 @@ class AudioMixer {
         }
     }
 
+    // 미디어/TTS 관련 메서드는 아무것도 하지 않도록 stub 처리
     async loadMediaPlaylist(urls) {
-        if (!this.isActive || this.isDisposing) return false;
-
-        if (!Array.isArray(urls)) {
-            urls = typeof urls === 'object' ? Object.values(urls) : [];
-        }
-
-        if (urls.length === 0) return false;
-
-        this.stopCurrentPlayback();
-
-        this.mediaPlaylist = urls;
-        this.currentMediaIndex = 0;
-        this.currentPlayingType = 'media';
-
-        if (this.sharedSourceNode) {
-            try {
-                this.sharedSourceNode.disconnect();
-                this.sharedSourceNode.connect(this.mediaGain);
-            } catch (e) { }
-        }
-
-        console.log(`[audiomixer.js] ${urls.length}개 미디어 로드`);
-        return await this.playNext();
+        console.log('[audiomixer.js] loadMediaPlaylist 호출됨 - 무시됨 (마이크 전용 모드)');
+        return true;
     }
 
     async loadTtsPlaylist(urls) {
-        if (!this.isActive || this.isDisposing) return false;
-
-        if (!Array.isArray(urls) || urls.length === 0) return false;
-
-        this.stopCurrentPlayback();
-
-        this.ttsPlaylist = urls;
-        this.currentTtsIndex = 0;
-        this.currentPlayingType = 'tts';
-
-        if (this.sharedSourceNode) {
-            try {
-                this.sharedSourceNode.disconnect();
-                this.sharedSourceNode.connect(this.ttsGain);
-            } catch (e) { }
-        }
-
-        return await this.playNext();
-    }
-
-    async playNext() {
-        if (!this.isActive || this.isDisposing) return false;
-
-        const playlist = this.currentPlayingType === 'media' ? this.mediaPlaylist : this.ttsPlaylist;
-        const currentIndex = this.currentPlayingType === 'media' ? this.currentMediaIndex : this.currentTtsIndex;
-
-        if (currentIndex >= playlist.length) {
-            // 루프
-            if (this.currentPlayingType === 'media') {
-                this.currentMediaIndex = 0;
-            } else {
-                this.currentTtsIndex = 0;
-            }
-
-            if (playlist.length > 0 && this.isActive) {
-                return await this.playNext();
-            }
-            return false;
-        }
-
-        const url = playlist[currentIndex];
-        console.log(`[audiomixer.js] 재생: ${currentIndex + 1}/${playlist.length}`);
-
-        try {
-            const audio = this.sharedAudioElement;
-
-            // 이전 이벤트 제거
-            audio.onended = null;
-            audio.onerror = null;
-
-            // 새 URL 설정
-            audio.src = url;
-
-            // 이벤트 설정
-            audio.onended = () => {
-                if (!this.isActive || this.isDisposing) return;
-
-                if (this.currentPlayingType === 'media') {
-                    this.currentMediaIndex++;
-                } else {
-                    this.currentTtsIndex++;
-                }
-                this.playNext();
-            };
-
-            audio.onerror = () => {
-                console.error('[audiomixer.js] 재생 오류:', url);
-                if (!this.isActive || this.isDisposing) return;
-
-                if (this.currentPlayingType === 'media') {
-                    this.currentMediaIndex++;
-                } else {
-                    this.currentTtsIndex++;
-                }
-                this.playNext();
-            };
-
-            // 재생
-            await audio.play();
-            return true;
-
-        } catch (error) {
-            console.error('[audiomixer.js] 재생 실패:', error);
-
-            if (this.currentPlayingType === 'media') {
-                this.currentMediaIndex++;
-            } else {
-                this.currentTtsIndex++;
-            }
-
-            if (this.isActive && !this.isDisposing) {
-                return await this.playNext();
-            }
-            return false;
-        }
-    }
-
-    stopCurrentPlayback() {
-        if (this.sharedAudioElement) {
-            try {
-                // 이벤트 리스너 먼저 제거
-                this.sharedAudioElement.onended = null;
-                this.sharedAudioElement.onerror = null;
-
-                // 재생 중지
-                if (!this.sharedAudioElement.paused) {
-                    this.sharedAudioElement.pause();
-                }
-
-                // 위치 초기화
-                this.sharedAudioElement.currentTime = 0;
-
-                // 소스 제거
-                this.sharedAudioElement.src = '';
-
-                // 메모리 정리
-                this.sharedAudioElement.load();
-            } catch (e) {
-                console.warn('[audiomixer.js] stopCurrentPlayback 오류:', e);
-            }
-        }
+        console.log('[audiomixer.js] loadTtsPlaylist 호출됨 - 무시됨 (마이크 전용 모드)');
+        return true;
     }
 
     setVolumes(mic, media, tts) {
+        // 마이크 볼륨만 적용
         if (this.micGain) this.micGain.gain.value = mic;
-        if (this.mediaGain) this.mediaGain.gain.value = media;
-        if (this.ttsGain) this.ttsGain.gain.value = tts;
+        // media, tts 볼륨은 무시
     }
 
     async dispose() {
@@ -405,66 +222,24 @@ class AudioMixer {
                 this.dataRequestInterval = null;
             }
 
-            // 1. 재생 중지
-            this.stopCurrentPlayback();
-
-            // 2. 녹음 중지
+            // 녹음 중지
             this.stopRecording();
 
-            // 3. 마이크 중지
+            // 마이크 중지
             this.disableMic();
 
-            // 4. 모든 노드 연결 해제
-            if (this.sharedSourceNode) {
+            // Gain 노드 정리
+            if (this.micGain) {
                 try {
-                    this.sharedSourceNode.disconnect();
-                    this.sharedSourceNode = null;
-                } catch (e) {
-                    console.warn('[audiomixer.js] 소스 노드 연결 해제 오류:', e);
-                }
-            }
-
-            // 5. Audio 엘리먼트 완전 정리
-            if (this.sharedAudioElement) {
-                try {
-                    this.sharedAudioElement.onended = null;
-                    this.sharedAudioElement.onerror = null;
-                    this.sharedAudioElement.pause();
-                    this.sharedAudioElement.currentTime = 0;
-                    this.sharedAudioElement.src = '';
-                    this.sharedAudioElement.load();
-                    this.sharedAudioElement = null;
-                } catch (e) {
-                    console.warn('[audiomixer.js] Audio 엘리먼트 정리 오류:', e);
-                }
-            }
-
-            // 6. Gain 노드 정리
-            try {
-                if (this.micGain) {
                     this.micGain.disconnect();
-                    this.micGain = null;
-                }
-                if (this.mediaGain) {
-                    this.mediaGain.disconnect();
-                    this.mediaGain = null;
-                }
-                if (this.ttsGain) {
-                    this.ttsGain.disconnect();
-                    this.ttsGain = null;
-                }
-                if (this.merger) {
-                    this.merger.disconnect();
-                    this.merger = null;
-                }
-            } catch (e) {
-                console.warn('[audiomixer.js] 노드 연결 해제 오류:', e);
+                } catch (e) { }
+                this.micGain = null;
             }
 
-            // 7. MediaRecorder 정리
+            // MediaRecorder 정리
             this.mediaRecorder = null;
 
-            // 8. AudioContext 닫기 (타임아웃 추가)
+            // AudioContext 닫기
             if (this.audioContext) {
                 try {
                     const closePromise = this.audioContext.close();
@@ -484,15 +259,9 @@ class AudioMixer {
                 }
             }
 
-            // 9. 참조 제거
+            // 참조 제거
             this.dotNetRef = null;
             this.destination = null;
-
-            // 10. 플레이리스트 초기화
-            this.mediaPlaylist = [];
-            this.ttsPlaylist = [];
-            this.currentMediaIndex = 0;
-            this.currentTtsIndex = 0;
 
             console.log('[audiomixer.js] dispose 완료');
         } catch (error) {
@@ -525,6 +294,7 @@ export async function enableMic() {
     return mixerInstance ? await mixerInstance.enableMic() : false;
 }
 
+// 미디어/TTS 메서드는 유지하되 아무 동작도 하지 않음 (호출 호환성 유지)
 export async function loadMediaPlaylist(urls) {
     return mixerInstance ? await mixerInstance.loadMediaPlaylist(urls) : false;
 }

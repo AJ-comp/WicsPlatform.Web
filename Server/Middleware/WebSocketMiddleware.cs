@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
@@ -127,6 +127,12 @@ namespace WicsPlatform.Server.Middleware
                         case "audio":
                             await HandleAudioDataAsync(webSocket, root);
                             break;
+                        case "media_play":
+                            await HandleMediaPlayAsync(webSocket, root);
+                            break;
+                        case "media_stop":
+                            await HandleMediaStopAsync(webSocket, root);
+                            break;
                     }
                 }
             }
@@ -145,8 +151,11 @@ namespace WicsPlatform.Server.Middleware
                     .Select(e => e.GetUInt64())
                     .ToList();
 
-                // ⭐ DB에서 온라인 스피커 정보를 미리 로드
+                // DB에서 온라인 스피커, 미디어, TTS 정보를 한번에 로드
                 List<SpeakerInfo> onlineSpeakers;
+                List<MediaInfo> selectedMedia;
+                List<TtsInfo> selectedTts;
+
                 using (var scope = _serviceScopeFactory.CreateScope())
                 {
                     var context = scope.ServiceProvider.GetRequiredService<wicsContext>();
@@ -162,15 +171,49 @@ namespace WicsPlatform.Server.Middleware
                         select new SpeakerInfo
                         {
                             Id = s.Id,
-                            Ip = s.VpnUseYn == "Y" ? s.VpnIp : s.Ip,  // ⭐ VPN 사용 여부에 따라 IP 선택
+                            Ip = s.VpnUseYn == "Y" ? s.VpnIp : s.Ip,  // VPN 사용 여부에 따라 IP 선택
                             Name = s.Name,
                             ChannelId = channelId,
-                            UseVpn = s.VpnUseYn == "Y"  // ⭐ VPN 사용 여부 정보도 저장 (디버깅용)
+                            UseVpn = s.VpnUseYn == "Y"  // VPN 사용 여부 정보도 저장 (디버깅용)
                         }
                     ).Distinct().ToListAsync();
+
+                    // 채널에 선택된 미디어 리스트 조회
+                    selectedMedia = await (
+                        from mcm in context.MapChannelMedia
+                        join m in context.Media on mcm.MediaId equals m.Id
+                        where mcm.ChannelId == channelId
+                              && mcm.DeleteYn != "Y"
+                              && m.DeleteYn != "Y"
+                        orderby mcm.Id
+                        select new MediaInfo
+                        {
+                            Id = m.Id,
+                            FileName = m.FileName,
+                            FullPath = m.FullPath
+                        }
+                    ).ToListAsync();
+
+                    // 채널에 선택된 TTS 리스트 조회
+                    selectedTts = await (
+                        from mct in context.MapChannelTts
+                        join t in context.Tts on mct.TtsId equals t.Id
+                        where mct.ChannelId == channelId
+                              && mct.DeleteYn != "Y"
+                              && t.DeleteYn != "Y"
+                        orderby mct.Id
+                        select new TtsInfo
+                        {
+                            Id = t.Id,
+                            Name = t.Name,
+                            Content = t.Content
+                        }
+                    ).ToListAsync();
                 }
 
                 _logger.LogInformation($"Broadcast {broadcastId} - Found {onlineSpeakers.Count} online speakers for channel {channelId}");
+                _logger.LogInformation($"  - 선택된 미디어: {selectedMedia.Count}개");
+                _logger.LogInformation($"  - 선택된 TTS: {selectedTts.Count}개");
 
                 // VPN 사용 스피커 로그 (디버깅용)
                 var vpnSpeakers = onlineSpeakers.Where(s => s.UseVpn).ToList();
@@ -187,7 +230,9 @@ namespace WicsPlatform.Server.Middleware
                     StartTime = DateTime.UtcNow,
                     SelectedGroupIds = selectedGroupIds,
                     WebSocket = webSocket,
-                    OnlineSpeakers = onlineSpeakers  // ⭐ 스피커 정보 저장
+                    OnlineSpeakers = onlineSpeakers,
+                    SelectedMedia = selectedMedia,
+                    SelectedTts = selectedTts
                 };
 
                 _broadcastSessions[broadcastId] = session;
@@ -199,6 +244,8 @@ namespace WicsPlatform.Server.Middleware
                     broadcastId = broadcastId,
                     channelId = channelId,
                     onlineSpeakerCount = onlineSpeakers.Count,
+                    selectedMediaCount = selectedMedia.Count,
+                    selectedTtsCount = selectedTts.Count,
                     status = "ok"
                 };
 
@@ -235,7 +282,7 @@ namespace WicsPlatform.Server.Middleware
                         var audioData = Convert.FromBase64String(base64Data);
                         session.TotalBytes += audioData.Length;
 
-                        // ⭐ UDP로 스피커에 오디오 전송 (DB 조회 없이 메모리에서 직접)
+                        // UDP로 스피커에 오디오 전송 (DB 조회 없이 메모리에서 직접)
                         if (session.OnlineSpeakers?.Any() == true)
                         {
                             await _udpService.SendAudioToSpeakers(session.OnlineSpeakers, audioData);
@@ -261,6 +308,54 @@ namespace WicsPlatform.Server.Middleware
             }
         }
 
+        private async Task HandleMediaPlayAsync(WebSocket webSocket, JsonElement root)
+        {
+            if (root.TryGetProperty("broadcastId", out var broadcastIdElement))
+            {
+                var broadcastId = broadcastIdElement.GetString();
+
+                if (_broadcastSessions.TryGetValue(broadcastId, out var session))
+                {
+                    // TODO: 실제 미디어 재생 로직 구현
+                    _logger.LogInformation($"Media play requested for broadcast: {broadcastId}");
+                    _logger.LogInformation($"Available media files: {session.SelectedMedia?.Count ?? 0}");
+
+                    // 응답 전송
+                    var response = new
+                    {
+                        type = "media_play_started",
+                        broadcastId = broadcastId,
+                        mediaCount = session.SelectedMedia?.Count ?? 0
+                    };
+
+                    await SendMessageAsync(webSocket, JsonSerializer.Serialize(response));
+                }
+            }
+        }
+
+        private async Task HandleMediaStopAsync(WebSocket webSocket, JsonElement root)
+        {
+            if (root.TryGetProperty("broadcastId", out var broadcastIdElement))
+            {
+                var broadcastId = broadcastIdElement.GetString();
+
+                if (_broadcastSessions.TryGetValue(broadcastId, out var session))
+                {
+                    // TODO: 실제 미디어 정지 로직 구현
+                    _logger.LogInformation($"Media stop requested for broadcast: {broadcastId}");
+
+                    // 응답 전송
+                    var response = new
+                    {
+                        type = "media_stopped",
+                        broadcastId = broadcastId
+                    };
+
+                    await SendMessageAsync(webSocket, JsonSerializer.Serialize(response));
+                }
+            }
+        }
+
         private async Task SendMessageAsync(WebSocket webSocket, string message)
         {
             if (webSocket.State == WebSocketState.Open)
@@ -280,7 +375,23 @@ namespace WicsPlatform.Server.Middleware
             public long PacketCount { get; set; }
             public long TotalBytes { get; set; }
             public WebSocket WebSocket { get; set; }
-            public List<SpeakerInfo> OnlineSpeakers { get; set; }  // ⭐ 온라인 스피커 정보
+            public List<SpeakerInfo> OnlineSpeakers { get; set; }  // 온라인 스피커 정보
+            public List<MediaInfo> SelectedMedia { get; set; }     // 선택된 미디어 정보
+            public List<TtsInfo> SelectedTts { get; set; }         // 선택된 TTS 정보
+        }
+
+        public class MediaInfo
+        {
+            public ulong Id { get; set; }
+            public string FileName { get; set; }
+            public string FullPath { get; set; }
+        }
+
+        public class TtsInfo
+        {
+            public ulong Id { get; set; }
+            public string Name { get; set; }
+            public string Content { get; set; }
         }
     }
 }

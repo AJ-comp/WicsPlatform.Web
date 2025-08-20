@@ -32,10 +32,8 @@ namespace WicsPlatform.Client.Pages
         [Inject] protected BroadcastWebSocketService WebSocketService { get; set; }
         [Inject] protected ILogger<ManageBroadCast> _logger { get; set; }
         [Inject] protected IBroadcastDataService BroadcastDataService { get; set; }
-        [Inject] protected MediaStreamingService MediaStreamingService { get; set; }
         [Inject] protected BroadcastRecordingService RecordingService { get; set; }
         [Inject] protected BroadcastLoggingService LoggingService { get; set; }
-        [Inject] protected TtsStreamingService TtsStreamingService { get; set; }
         #endregion
 
         #region Fields & Properties
@@ -73,12 +71,12 @@ namespace WicsPlatform.Client.Pages
         protected int sampleRate = 44100;
         private System.Threading.Timer _broadcastTimer;
 
-        // 방송 소스 선택
+        // 방송 소스 선택 (UI 표시용 유지)
         protected bool isMicEnabled = true;
         protected bool isMediaEnabled = false;
         protected bool isTtsEnabled = false;
 
-        // 볼륨 설정 (추가된 필드)
+        // 볼륨 설정 (설정 저장용 유지)
         protected int micVolume = 50;
         protected int mediaVolume = 50;
         protected int ttsVolume = 50;
@@ -94,9 +92,9 @@ namespace WicsPlatform.Client.Pages
         protected string recordingDuration => RecordingService.RecordingDuration;
         protected double recordingDataSize => RecordingService.RecordingDataSize;
 
-        // JS Interop - 믹서 모듈로 변경
+        // JS Interop - 믹서 모듈
         private IJSObjectReference _mixerModule;
-        private IJSObjectReference _jsModule; // 추가된 필드 (호환성 유지)
+        private IJSObjectReference _jsModule; // 호환성 유지
         private IJSObjectReference _speakerModule;
         private DotNetObjectReference<ManageBroadCast> _dotNetRef;
         protected BroadcastMonitoringSection monitoringSection;
@@ -268,7 +266,7 @@ namespace WicsPlatform.Client.Pages
         }
         #endregion
 
-        #region Broadcast Control - 믹싱 방식으로 수정
+        #region Broadcast Control - 마이크 전용으로 수정
         protected async Task StartBroadcast()
         {
             _logger.LogInformation("StartBroadcast 메서드 호출됨");
@@ -285,50 +283,22 @@ namespace WicsPlatform.Client.Pages
                 _currentOnlineSpeakers = onlineSpeakers;
                 var onlineGroups = GetOnlineGroups(onlineSpeakers);
 
-                // 1단계: 사전 준비 작업
-                _logger.LogInformation("1단계: 사전 준비 작업 시작");
-
-                // 미디어 및 TTS URL 준비
-                List<string> mediaUrls = new List<string>();
-                List<string> ttsUrls = new List<string>();
+                // 1단계: DB에 선택사항 저장 (UI 기록용)
+                _logger.LogInformation("1단계: DB 저장 작업");
 
                 if (isMediaEnabled)
                 {
-                    LoggingService.AddLog("INFO", "미디어 URL 준비 중...");
+                    LoggingService.AddLog("INFO", "미디어 선택사항 DB 저장");
                     await SaveSelectedMediaToChannel();
-                    mediaUrls = await MediaStreamingService.GetMediaPlaylistUrls(selectedChannel);
-
-                    // 🔴 디버그 로그 추가
-                    LoggingService.AddLog("DEBUG", $"mediaUrls 개수: {mediaUrls?.Count ?? 0}");
-                    if (mediaUrls != null && mediaUrls.Any())
-                    {
-                        foreach (var url in mediaUrls)
-                        {
-                            LoggingService.AddLog("DEBUG", $"Media URL: {url}");
-                        }
-                    }
                 }
 
                 if (isTtsEnabled)
                 {
-                    LoggingService.AddLog("INFO", "TTS 준비 시작...");
+                    LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
                     await SaveSelectedTtsToChannel();
-
-                    var ttsReady = await PrepareTtsAudioFiles();
-                    if (!ttsReady)
-                    {
-                        NotifyError("TTS 준비 실패", new Exception("TTS 음성 파일 생성에 실패했습니다."));
-                        return;
-                    }
-
-                    ttsUrls = TtsStreamingService.HasPreparedAudio
-                        ? TtsStreamingService.GetPreparedAudioUrls()
-                        : new List<string>();
-
-                    LoggingService.AddLog("SUCCESS", "TTS 음성 파일 준비 완료");
                 }
 
-                // 2단계: 오디오 믹서 초기화
+                // 2단계: 오디오 믹서 초기화 (마이크 전용)
                 if (!await InitializeAudioMixer())
                     return;
 
@@ -339,8 +309,8 @@ namespace WicsPlatform.Client.Pages
                 if (!await InitializeWebSocketBroadcast(onlineGroups))
                     return;
 
-                // 4단계: 믹서에서 각 소스 시작
-                _logger.LogInformation("4단계: 오디오 소스 시작");
+                // 4단계: 마이크만 시작
+                _logger.LogInformation("4단계: 마이크 활성화");
 
                 if (isMicEnabled)
                 {
@@ -352,31 +322,6 @@ namespace WicsPlatform.Client.Pages
                         return;
                     }
                     LoggingService.AddLog("SUCCESS", "마이크 활성화 완료");
-                }
-
-                // 🔴 수정된 부분: mediaUrls를 object로 캐스팅
-                if (isMediaEnabled && mediaUrls != null && mediaUrls.Any())
-                {
-                    LoggingService.AddLog("DEBUG", $"loadMediaPlaylist 호출 전 - URLs: {string.Join(", ", mediaUrls)}");
-
-                    // 🔴 중요: object[]로 변환하여 전달
-                    var urlArray = mediaUrls.ToArray();
-                    await _mixerModule.InvokeVoidAsync("loadMediaPlaylist", (object)urlArray);
-
-                    LoggingService.AddLog("SUCCESS", $"미디어 플레이리스트 로드 완료 ({mediaUrls.Count}개)");
-                }
-                else
-                {
-                    LoggingService.AddLog("WARN", "미디어 URL이 없거나 미디어가 비활성화됨");
-                }
-
-                if (isTtsEnabled && ttsUrls != null && ttsUrls.Any())
-                {
-                    // 🔴 TTS도 동일하게 수정
-                    var ttsArray = ttsUrls.ToArray();
-                    await _mixerModule.InvokeVoidAsync("loadTtsPlaylist", (object)ttsArray);
-
-                    LoggingService.AddLog("SUCCESS", $"TTS 플레이리스트 로드 완료 ({ttsUrls.Count}개)");
                 }
 
                 // 5단계: 방송 상태 초기화 및 기록
@@ -392,40 +337,6 @@ namespace WicsPlatform.Client.Pages
             catch (Exception ex)
             {
                 await HandleBroadcastError(ex);
-            }
-        }
-
-        private async Task<bool> PrepareTtsAudioFiles()
-        {
-            try
-            {
-                if (ttsSection == null || !ttsSection.HasSelectedTts())
-                {
-                    _logger.LogWarning("선택된 TTS가 없습니다.");
-                    return true;
-                }
-
-                var selectedTts = ttsSection.GetSelectedTts();
-                LoggingService.AddLog("INFO", $"TTS {selectedTts.Count()}개 음성 파일 생성 중...");
-
-                var prepared = await TtsStreamingService.PreGenerateTtsAudioFiles(
-                    selectedTts.ToList(),
-                    selectedChannel);
-
-                if (!prepared)
-                {
-                    LoggingService.AddLog("ERROR", "TTS 음성 파일 생성 실패");
-                    return false;
-                }
-
-                LoggingService.AddLog("SUCCESS", "모든 TTS 음성 파일 생성 완료");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "TTS 준비 중 오류");
-                LoggingService.AddLog("ERROR", $"TTS 준비 실패: {ex.Message}");
-                return false;
             }
         }
 
@@ -456,7 +367,7 @@ namespace WicsPlatform.Client.Pages
                 }
 
                 _logger.LogInformation($"오디오 믹서 초기화 완료 - SampleRate: {_preferredSampleRate}Hz, Channels: {_preferredChannels}");
-                LoggingService.AddLog("SUCCESS", "오디오 믹서 초기화 완료");
+                LoggingService.AddLog("SUCCESS", "오디오 믹서 초기화 완료 (마이크 전용)");
 
                 if (_currentLoopbackSetting && _speakerModule == null)
                 {
@@ -478,10 +389,16 @@ namespace WicsPlatform.Client.Pages
         {
             try
             {
-                var selectedMediaIds = await MediaStreamingService.GetSelectedMediaIds(selectedChannel);
+                // 미디어/TTS ID는 UI에서 선택된 것들을 그대로 저장 (기록용)
+                var selectedMediaIds = new List<ulong>();
+                if (playlistSection != null && isMediaEnabled)
+                {
+                    var selectedMedia = playlistSection.GetSelectedMedia();
+                    selectedMediaIds = selectedMedia.Select(m => m.Id).ToList();
+                }
 
                 var selectedTtsIds = new List<ulong>();
-                if (ttsSection != null && ttsSection.HasSelectedTts())
+                if (ttsSection != null && isTtsEnabled && ttsSection.HasSelectedTts())
                 {
                     selectedTtsIds = ttsSection.GetSelectedTts().Select(t => t.Id).ToList();
                 }
@@ -661,8 +578,8 @@ namespace WicsPlatform.Client.Pages
         {
             var enabledSources = new List<string>();
             if (isMicEnabled) enabledSources.Add("마이크");
-            if (isMediaEnabled) enabledSources.Add("미디어");
-            if (isTtsEnabled) enabledSources.Add("TTS");
+            if (isMediaEnabled) enabledSources.Add("미디어(UI만)");
+            if (isTtsEnabled) enabledSources.Add("TTS(UI만)");
 
             var sourcesText = string.Join(", ", enabledSources);
 
@@ -925,22 +842,18 @@ namespace WicsPlatform.Client.Pages
         }
         #endregion
 
-        #region Audio Processing - 믹싱된 오디오만 처리
+        #region Audio Processing - 마이크 데이터만 처리
         [JSInvokable]
         public async Task OnMixedAudioCaptured(string base64Data)
         {
             if (string.IsNullOrWhiteSpace(base64Data))
             {
-                return;  // 로그 제거
+                return;
             }
 
             try
             {
                 byte[] data = Convert.FromBase64String(base64Data);
-
-                // 로그 제거 - 너무 자주 호출됨
-                // _logger.LogDebug($"믹싱된 오디오 수신: {data.Length} bytes");
-                // LoggingService.AddLog("DEBUG", $"믹싱 데이터 수신: {data.Length} bytes");
 
                 UpdateAudioStatistics(data);
                 RecordingService.AddAudioData(data);
@@ -951,8 +864,6 @@ namespace WicsPlatform.Client.Pages
                 if (!string.IsNullOrEmpty(currentBroadcastId))
                 {
                     await WebSocketService.SendAudioDataAsync(currentBroadcastId, data);
-                    // 로그 제거
-                    // _logger.LogDebug($"믹싱된 오디오 WebSocket 전송: {data.Length} bytes");
                 }
 
                 if (_currentLoopbackSetting && _speakerModule != null)
@@ -993,22 +904,6 @@ namespace WicsPlatform.Client.Pages
 
             double rms = Math.Sqrt(sum / sampleCount);
             return Math.Min(100, rms * 100);
-        }
-
-        [JSInvokable]
-        public async Task OnMediaPlaylistEnded()
-        {
-            _logger.LogInformation("Media playlist ended");
-            LoggingService.AddLog("INFO", "미디어 플레이리스트 재생 완료");
-            await InvokeAsync(StateHasChanged);
-        }
-
-        [JSInvokable]
-        public async Task OnTtsPlaylistEnded()
-        {
-            _logger.LogInformation("TTS playlist ended");
-            LoggingService.AddLog("INFO", "TTS 재생 완료");
-            await InvokeAsync(StateHasChanged);
         }
 
         [JSInvokable]
@@ -1069,7 +964,7 @@ namespace WicsPlatform.Client.Pages
             }
             else if (isBroadcasting && _mixerModule != null)
             {
-                // 방송 중이면 실시간으로 볼륨 업데이트
+                // 방송 중이면 실시간으로 볼륨 업데이트 (마이크만 적용됨)
                 await _mixerModule.InvokeVoidAsync("setVolumes",
                     micVolume / 100.0,
                     mediaVolume / 100.0,

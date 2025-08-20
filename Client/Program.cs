@@ -15,8 +15,6 @@ builder.Services.AddRadzenCookieThemeService(options =>
 builder.Services.AddTransient(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddScoped<WicsPlatform.Client.wicsService>();
 builder.Services.AddScoped<BroadcastWebSocketService>();
-builder.Services.AddScoped<MediaStreamingService>();
-builder.Services.AddScoped<TtsStreamingService>();
 builder.Services.AddScoped<BroadcastRecordingService>();
 builder.Services.AddScoped<BroadcastLoggingService>();
 builder.Services.AddScoped<IBroadcastDataService, BroadcastDataService>();
