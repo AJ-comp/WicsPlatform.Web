@@ -1,17 +1,20 @@
-﻿using System;
+﻿using Concentus.Enums;
+using Concentus.Structs;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Linq;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
+using WicsPlatform.Server.Audio;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Services;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace WicsPlatform.Server.Middleware
 {
@@ -22,6 +25,8 @@ namespace WicsPlatform.Server.Middleware
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IUdpBroadcastService _udpService;
         private static readonly ConcurrentDictionary<string, BroadcastSession> _broadcastSessions = new();
+
+        private readonly ushort MaxBuffer = 10000; // 최대 패킷 크기
 
         public WebSocketMiddleware(
             RequestDelegate next,
@@ -62,7 +67,7 @@ namespace WicsPlatform.Server.Middleware
 
             _logger.LogInformation($"WebSocket connected: {connectionId} for channel: {channelId}");
 
-            var buffer = new ArraySegment<byte>(new byte[4096]);
+            var buffer = new ArraySegment<byte>(new byte[MaxBuffer]);
             var cancellationToken = context.RequestAborted;
 
             try
@@ -99,7 +104,8 @@ namespace WicsPlatform.Server.Middleware
                 {
                     if (_broadcastSessions.TryRemove(broadcastId, out var session))
                     {
-                        _logger.LogInformation($"Removed broadcast session: {broadcastId}");
+                        session.Dispose();  // OpusCodec 정리
+                        _logger.LogInformation($"Removed broadcast session and cleaned up OpusCodec: {broadcastId}");
                     }
                 }
             }
@@ -232,7 +238,10 @@ namespace WicsPlatform.Server.Middleware
                     WebSocket = webSocket,
                     OnlineSpeakers = onlineSpeakers,
                     SelectedMedia = selectedMedia,
-                    SelectedTts = selectedTts
+                    SelectedTts = selectedTts,
+
+                    // ✨ OpusCodec 초기화
+                    Opus = new OpusCodec(48000, 1, 32000)  // 48kHz, 모노, 32kbps
                 };
 
                 _broadcastSessions[broadcastId] = session;
@@ -268,43 +277,41 @@ namespace WicsPlatform.Server.Middleware
 
         private async Task HandleAudioDataAsync(WebSocket webSocket, JsonElement root)
         {
-            if (root.TryGetProperty("broadcastId", out var broadcastIdElement))
+            if (!root.TryGetProperty("broadcastId", out var broadcastIdElement)) return;
+            var broadcastId = broadcastIdElement.GetString();
+            if (!_broadcastSessions.TryGetValue(broadcastId, out var session)) return;
+
+            session.PacketCount++;
+
+            if (!root.TryGetProperty("data", out var dataElement)) return;
+
+            var base64Data = dataElement.GetString();
+            var pcmData = Convert.FromBase64String(base64Data);
+            session.TotalBytes += pcmData.Length;
+
+            if (session.OnlineSpeakers?.Any() != true) return;
+
+            try
             {
-                var broadcastId = broadcastIdElement.GetString();
+                // ✨ Opus 압축 (한 줄!)
+                var compressed = session.Opus.Encode(pcmData);
+                session.CompressedBytes += compressed.Length;
 
-                if (_broadcastSessions.TryGetValue(broadcastId, out var session))
+                // UDP로 압축된 데이터 전송
+                await _udpService.SendAudioToSpeakers(session.OnlineSpeakers, compressed);
+
+                // 디버깅 로그 (처음 5개 패킷만)
+                if (session.PacketCount <= 5)
                 {
-                    session.PacketCount++;
-
-                    if (root.TryGetProperty("data", out var dataElement))
-                    {
-                        var base64Data = dataElement.GetString();
-                        var audioData = Convert.FromBase64String(base64Data);
-                        session.TotalBytes += audioData.Length;
-
-                        // UDP로 스피커에 오디오 전송 (DB 조회 없이 메모리에서 직접)
-                        if (session.OnlineSpeakers?.Any() == true)
-                        {
-                            await _udpService.SendAudioToSpeakers(session.OnlineSpeakers, audioData);
-                        }
-                    }
-
-                    // 주기적으로 상태 업데이트 전송 (10번째 패킷마다)
-                    if (session.PacketCount % 10 == 0)
-                    {
-                        var status = new
-                        {
-                            type = "status",
-                            broadcastId = broadcastId,
-                            packetCount = session.PacketCount,
-                            totalBytes = session.TotalBytes,
-                            durationSeconds = (DateTime.UtcNow - session.StartTime).TotalSeconds,
-                            speakersActive = session.OnlineSpeakers?.Count ?? 0
-                        };
-
-                        await SendMessageAsync(webSocket, JsonSerializer.Serialize(status));
-                    }
+                    var compressionRatio = 100 - (compressed.Length * 100 / pcmData.Length);
+                    _logger.LogDebug($"Packet #{session.PacketCount}: PCM {pcmData.Length} → Opus {compressed.Length} bytes ({compressionRatio}% 압축)");
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Opus encoding failed for broadcast {broadcastId}");
+                // 실패 시 원본 전송 (폴백)
+                await _udpService.SendAudioToSpeakers(session.OnlineSpeakers, pcmData);
             }
         }
 
@@ -374,10 +381,21 @@ namespace WicsPlatform.Server.Middleware
             public List<ulong> SelectedGroupIds { get; set; }
             public long PacketCount { get; set; }
             public long TotalBytes { get; set; }
+            public long CompressedBytes { get; set; }  // 압축된 바이트 추적
             public WebSocket WebSocket { get; set; }
-            public List<SpeakerInfo> OnlineSpeakers { get; set; }  // 온라인 스피커 정보
-            public List<MediaInfo> SelectedMedia { get; set; }     // 선택된 미디어 정보
-            public List<TtsInfo> SelectedTts { get; set; }         // 선택된 TTS 정보
+            public List<SpeakerInfo> OnlineSpeakers { get; set; }
+            public List<MediaInfo> SelectedMedia { get; set; }
+            public List<TtsInfo> SelectedTts { get; set; }
+
+            // OpusCodec 인스턴스 추가
+            public OpusCodec Opus { get; set; }
+
+            // 정리 메서드
+            public void Dispose()
+            {
+                Opus?.Dispose();
+                Opus = null;
+            }
         }
 
         public class MediaInfo

@@ -1,36 +1,35 @@
 ﻿// Server/wwwroot/js/audiomixer.js
-console.log('[audiomixer.js] 모듈 로드됨 v5.0 - 마이크 전용 버전');
+console.log('[audiomixer.js] 모듈 로드됨 v6.0 - PCM 직접 전송 버전');
 
 class AudioMixer {
     constructor() {
         this.audioContext = null;
-        this.mediaRecorder = null;
         this.dotNetRef = null;
 
-        // 마이크 전용
+        // 마이크 관련
         this.micGain = null;
         this.micStream = null;
         this.micSource = null;
-        this.destination = null;
+        this.scriptProcessor = null;
 
         // 상태
         this.isActive = false;
         this.isDisposing = false;
 
-        // Interval 저장
+        // PCM 버퍼
+        this.pcmBuffer = [];
         this.sendInterval = null;
-        this.dataRequestInterval = null;
 
         this.config = {
             sampleRate: 48000,
-            channels: 2,
-            timeslice: 100,
-            bitrate: 128000
+            channels: 1,  // 모노로 변경 (대역폭 절감)
+            bufferSize: 4096,  // ScriptProcessor 버퍼 크기
+            sendIntervalMs: 60  // 60ms마다 전송 (Opus 최적)
         };
     }
 
     async initialize(dotNetRef, config = {}) {
-        console.log('[audiomixer.js] 초기화 시작 (마이크 전용)');
+        console.log('[audiomixer.js] PCM 캡처 초기화 시작');
 
         try {
             this.dotNetRef = dotNetRef;
@@ -46,20 +45,47 @@ class AudioMixer {
                 await this.audioContext.resume();
             }
 
-            // 마이크 Gain 노드만 생성
+            // 마이크 Gain 노드 생성
             this.micGain = this.audioContext.createGain();
             this.micGain.gain.value = config.micVolume || 1.0;
 
-            // Destination
-            this.destination = this.audioContext.createMediaStreamDestination();
+            // ScriptProcessorNode 생성 (PCM 데이터 캡처용)
+            this.scriptProcessor = this.audioContext.createScriptProcessor(
+                this.config.bufferSize,
+                this.config.channels,
+                this.config.channels
+            );
 
-            // 마이크만 destination에 직접 연결
-            this.micGain.connect(this.destination);
+            // PCM 데이터 처리
+            this.scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
+                if (!this.isActive || this.isDisposing) return;
 
-            // MediaRecorder
-            this.setupMediaRecorder();
+                const inputBuffer = audioProcessingEvent.inputBuffer;
+                const channelData = inputBuffer.getChannelData(0); // 모노 채널
 
-            console.log('[audiomixer.js] 초기화 완료 (마이크 전용)');
+                // Float32 → Int16 변환
+                const pcm16 = new Int16Array(channelData.length);
+                for (let i = 0; i < channelData.length; i++) {
+                    // Float32 (-1.0 ~ 1.0) → Int16 (-32768 ~ 32767)
+                    const sample = Math.max(-1, Math.min(1, channelData[i]));
+                    pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                }
+
+                // 버퍼에 추가
+                this.pcmBuffer.push(pcm16);
+            };
+
+            // 마이크 → Gain → ScriptProcessor 연결
+            // ScriptProcessor는 destination에 연결해야 작동함
+            this.micGain.connect(this.scriptProcessor);
+            this.scriptProcessor.connect(this.audioContext.destination);
+
+            // 50ms마다 PCM 데이터 전송
+            this.setupPCMSender();
+
+            console.log('[audiomixer.js] PCM 캡처 초기화 완료');
+            console.log(`[audiomixer.js] 설정: ${this.config.sampleRate}Hz, ${this.config.channels}ch, ${this.config.sendIntervalMs}ms 간격`);
+
             return true;
 
         } catch (error) {
@@ -69,83 +95,61 @@ class AudioMixer {
         }
     }
 
-    setupMediaRecorder() {
-        try {
-            this.mediaRecorder = new MediaRecorder(this.destination.stream, {
-                mimeType: 'audio/webm',
-                audioBitsPerSecond: this.config.bitrate
-            });
+    setupPCMSender() {
+        const samplesPerInterval = (this.config.sampleRate * this.config.sendIntervalMs) / 1000;
+        console.log(`[audiomixer.js] ${this.config.sendIntervalMs}ms당 샘플 수: ${samplesPerInterval}`);
 
-            let chunks = [];
-            const self = this; // this 컨텍스트 보존
+        this.sendInterval = setInterval(async () => {
+            if (!this.isActive || this.isDisposing || !this.dotNetRef) return;
+            if (this.pcmBuffer.length === 0) return;
 
-            this.mediaRecorder.ondataavailable = async (event) => {
-                if (self.isDisposing || !self.isActive) return;
-
-                if (event.data && event.data.size > 0) {
-                    chunks.push(event.data);
-                    console.log(`[audiomixer.js] 마이크 오디오 청크 수신: ${event.data.size} bytes`);
-                }
-            };
-
-            // 주기적으로 전송
-            this.sendInterval = setInterval(async () => {
-                if (chunks.length > 0 && self.dotNetRef && !self.isDisposing) {
-                    console.log(`[audiomixer.js] 청크 전송 시작: ${chunks.length}개`);
-
-                    const blob = new Blob(chunks, { type: 'audio/webm' });
-                    chunks = []; // 즉시 비우기
-
-                    try {
-                        const buffer = await blob.arrayBuffer();
-                        const bytes = new Uint8Array(buffer);
-                        let base64 = '';
-
-                        // 32KB씩 나누어 인코딩
-                        for (let i = 0; i < bytes.length; i += 32768) {
-                            base64 += btoa(String.fromCharCode(...bytes.slice(i, i + 32768)));
-                        }
-
-                        console.log(`[audiomixer.js] C#으로 전송: ${base64.length} 문자`);
-                        await self.dotNetRef.invokeMethodAsync('OnMixedAudioCaptured', base64);
-                    } catch (e) {
-                        console.error('[audiomixer.js] 데이터 전송 오류:', e);
-                    }
-                }
-            }, this.config.timeslice);
-
-            // MediaRecorder에 주기적으로 데이터 요청
-            this.dataRequestInterval = setInterval(() => {
-                if (this.mediaRecorder &&
-                    this.mediaRecorder.state === 'recording' &&
-                    !this.isDisposing) {
-                    this.mediaRecorder.requestData();
-                }
-            }, this.config.timeslice);
-
-        } catch (error) {
-            console.error('[audiomixer.js] MediaRecorder 설정 실패:', error);
-        }
-    }
-
-    startRecording() {
-        if (this.mediaRecorder && this.mediaRecorder.state === 'inactive' && !this.isDisposing) {
-            this.mediaRecorder.start(this.config.timeslice);
-            console.log('[audiomixer.js] 녹음 시작 (timeslice:', this.config.timeslice, 'ms)');
-        }
-    }
-
-    stopRecording() {
-        if (this.mediaRecorder) {
             try {
-                if (this.mediaRecorder.state === 'recording') {
-                    this.mediaRecorder.requestData();
-                    this.mediaRecorder.stop();
+                // 버퍼에서 PCM 데이터 수집
+                let totalSamples = 0;
+                for (const chunk of this.pcmBuffer) {
+                    totalSamples += chunk.length;
                 }
-            } catch (e) {
-                console.warn('[audiomixer.js] MediaRecorder 중지 오류:', e);
+
+                // 모든 청크를 하나의 배열로 합침
+                const combinedPCM = new Int16Array(totalSamples);
+                let offset = 0;
+                for (const chunk of this.pcmBuffer) {
+                    combinedPCM.set(chunk, offset);
+                    offset += chunk.length;
+                }
+
+                // 버퍼 비우기
+                this.pcmBuffer = [];
+
+                // 50ms 분량만 전송 (나머지는 다음 번에)
+                const samplesToSend = Math.min(combinedPCM.length, samplesPerInterval);
+                const pcmToSend = combinedPCM.slice(0, samplesToSend);
+
+                // 남은 데이터는 다시 버퍼에 넣기
+                if (combinedPCM.length > samplesToSend) {
+                    this.pcmBuffer.push(combinedPCM.slice(samplesToSend));
+                }
+
+                // Int16Array → Uint8Array 변환 (byte 배열)
+                const byteArray = new Uint8Array(pcmToSend.buffer, pcmToSend.byteOffset, pcmToSend.byteLength);
+
+                // Base64 인코딩
+                let base64 = '';
+                const chunkSize = 32768;
+                for (let i = 0; i < byteArray.length; i += chunkSize) {
+                    const chunk = byteArray.slice(i, Math.min(i + chunkSize, byteArray.length));
+                    base64 += btoa(String.fromCharCode(...chunk));
+                }
+
+                console.log(`[audiomixer.js] PCM 전송: ${pcmToSend.length} samples (${byteArray.length} bytes)`);
+
+                // C#으로 전송
+                await this.dotNetRef.invokeMethodAsync('OnMixedAudioCaptured', base64);
+
+            } catch (error) {
+                console.error('[audiomixer.js] PCM 전송 오류:', error);
             }
-        }
+        }, this.config.sendIntervalMs);
     }
 
     async enableMic() {
@@ -184,23 +188,34 @@ class AudioMixer {
             });
             this.micStream = null;
         }
+
+        console.log('[audiomixer.js] 마이크 비활성화');
     }
 
-    // 미디어/TTS 관련 메서드는 아무것도 하지 않도록 stub 처리
+    // 호환성을 위한 stub 메서드들
+    startRecording() {
+        console.log('[audiomixer.js] startRecording 호출 - PCM 모드에서는 자동 시작');
+    }
+
+    stopRecording() {
+        console.log('[audiomixer.js] stopRecording 호출 - PCM 모드에서는 자동 중지');
+    }
+
     async loadMediaPlaylist(urls) {
-        console.log('[audiomixer.js] loadMediaPlaylist 호출됨 - 무시됨 (마이크 전용 모드)');
+        console.log('[audiomixer.js] loadMediaPlaylist 호출 - 무시됨');
         return true;
     }
 
     async loadTtsPlaylist(urls) {
-        console.log('[audiomixer.js] loadTtsPlaylist 호출됨 - 무시됨 (마이크 전용 모드)');
+        console.log('[audiomixer.js] loadTtsPlaylist 호출 - 무시됨');
         return true;
     }
 
     setVolumes(mic, media, tts) {
-        // 마이크 볼륨만 적용
-        if (this.micGain) this.micGain.gain.value = mic;
-        // media, tts 볼륨은 무시
+        if (this.micGain) {
+            this.micGain.gain.value = mic;
+            console.log(`[audiomixer.js] 마이크 볼륨 설정: ${mic}`);
+        }
     }
 
     async dispose() {
@@ -217,18 +232,17 @@ class AudioMixer {
                 this.sendInterval = null;
             }
 
-            if (this.dataRequestInterval) {
-                clearInterval(this.dataRequestInterval);
-                this.dataRequestInterval = null;
-            }
-
-            // 녹음 중지
-            this.stopRecording();
-
             // 마이크 중지
             this.disableMic();
 
-            // Gain 노드 정리
+            // 오디오 노드 정리
+            if (this.scriptProcessor) {
+                try {
+                    this.scriptProcessor.disconnect();
+                } catch (e) { }
+                this.scriptProcessor = null;
+            }
+
             if (this.micGain) {
                 try {
                     this.micGain.disconnect();
@@ -236,21 +250,10 @@ class AudioMixer {
                 this.micGain = null;
             }
 
-            // MediaRecorder 정리
-            this.mediaRecorder = null;
-
             // AudioContext 닫기
             if (this.audioContext) {
                 try {
-                    const closePromise = this.audioContext.close();
-                    const timeoutPromise = new Promise((resolve) => {
-                        setTimeout(() => {
-                            console.warn('[audiomixer.js] AudioContext close 타임아웃');
-                            resolve();
-                        }, 2000);
-                    });
-
-                    await Promise.race([closePromise, timeoutPromise]);
+                    await this.audioContext.close();
                     console.log('[audiomixer.js] AudioContext 닫기 완료');
                 } catch (e) {
                     console.warn('[audiomixer.js] AudioContext 닫기 오류:', e);
@@ -261,7 +264,7 @@ class AudioMixer {
 
             // 참조 제거
             this.dotNetRef = null;
-            this.destination = null;
+            this.pcmBuffer = [];
 
             console.log('[audiomixer.js] dispose 완료');
         } catch (error) {
@@ -283,9 +286,7 @@ export async function createMixer(dotNetRef, config) {
     mixerInstance = new AudioMixer();
     const success = await mixerInstance.initialize(dotNetRef, config);
 
-    if (success) {
-        mixerInstance.startRecording();
-    }
+    // PCM 모드에서는 자동으로 시작됨
 
     return success;
 }
@@ -294,7 +295,6 @@ export async function enableMic() {
     return mixerInstance ? await mixerInstance.enableMic() : false;
 }
 
-// 미디어/TTS 메서드는 유지하되 아무 동작도 하지 않음 (호출 호환성 유지)
 export async function loadMediaPlaylist(urls) {
     return mixerInstance ? await mixerInstance.loadMediaPlaylist(urls) : false;
 }
@@ -319,6 +319,14 @@ export async function dispose() {
 // 디버그
 window.mixerDebug = {
     getInstance: () => mixerInstance,
+    getBufferStatus: () => {
+        if (!mixerInstance) return 'No instance';
+        return {
+            bufferLength: mixerInstance.pcmBuffer.length,
+            isActive: mixerInstance.isActive,
+            sampleRate: mixerInstance.config.sampleRate
+        };
+    },
     forceKill: async () => {
         if (mixerInstance) {
             mixerInstance.isActive = false;
