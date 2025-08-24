@@ -346,7 +346,7 @@ namespace WicsPlatform.Client.Pages
                     sampleRate = _preferredSampleRate,
                     channels = _preferredChannels,
                     bitrate = _preferredBitrate,
-                    timeslice = 50,
+                    timeslice = 60,
                     micVolume = micVolume / 100.0,
                     mediaVolume = mediaVolume / 100.0,
                     ttsVolume = ttsVolume / 100.0

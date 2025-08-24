@@ -1,63 +1,62 @@
-// ──────────────────────────────────────────────
-// speaker.js – 수신한 Base64 WebM/Opus 청크를 즉시 재생
-//   • mic.js → C# → speaker.js 로 데이터 흐름
-//   • MediaSource + SourceBuffer 스트리밍 방식
-//   • mic.js 수정 없음
-// ──────────────────────────────────────────────
-console.log('[speaker.js] 모듈 로드됨');
+﻿// Server/wwwroot/js/speaker.js - PCM 버전
+console.log('[speaker.js] PCM 재생 모듈 로드됨');
 
-const MIME_TYPE = 'audio/webm;codecs=opus';
-let mediaSource = null;
-let sourceBuffer = null;
-let queue = [];          // 아직 append 못한 청크들
+let audioContext = null;
+let nextStartTime = 0;
 
-/* 초기화 : C#이 첫 호출 전에 반드시 init() 호출 */
 export function init() {
-    if (mediaSource) return;      // 이미 초기화됨
+    if (audioContext) return;
 
-    mediaSource = new MediaSource();
-    const audio = new Audio();
-    audio.src = URL.createObjectURL(mediaSource);
-    audio.autoplay = true;        // 자동 재생
-    audio.volume = 0.25;        // 하울링 방지 (필요시 조절)
-    audio.play().catch(e => console.warn('[speaker.js] 오토플레이 차단:', e));
-
-    mediaSource.addEventListener('sourceopen', () => {
-        sourceBuffer = mediaSource.addSourceBuffer(MIME_TYPE);
-        sourceBuffer.mode = 'sequence';      // 순차 append
-        sourceBuffer.addEventListener('updateend', flushQueue);
-        console.log('[speaker.js] SourceBuffer 준비 완료');
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: 16000  // C#에서 사용하는 샘플레이트와 일치
     });
+
+    nextStartTime = audioContext.currentTime;
+    console.log('[speaker.js] AudioContext 초기화 완료');
 }
 
-/* C# → JS : Base64 문자열 전달 */
 export function feed(base64) {
-    if (!sourceBuffer) {
-        queue.push(base64);
-        return;
-    }
-    if (sourceBuffer.updating || queue.length) {
-        queue.push(base64);
-        return;
-    }
-    appendBase64(base64);
-}
+    if (!audioContext) init();
 
-/* 내부 큐 처리 */
-function flushQueue() {
-    if (queue.length && !sourceBuffer.updating) {
-        appendBase64(queue.shift());
-    }
-}
-
-/* Base64 → Uint8Array → SourceBuffer */
-function appendBase64(base64) {
     try {
-        const bin = atob(base64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        sourceBuffer.appendBuffer(bytes);
+        // Base64 → Uint8Array
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        // Opus 디코딩이 필요하면 여기서 처리
+        // 현재는 PCM 데이터라고 가정
+
+        // Int16 PCM → Float32
+        const int16Array = new Int16Array(bytes.buffer);
+        const float32Array = new Float32Array(int16Array.length);
+        for (let i = 0; i < int16Array.length; i++) {
+            float32Array[i] = int16Array[i] / 32768.0;
+        }
+
+        // AudioBuffer 생성
+        const audioBuffer = audioContext.createBuffer(
+            1, // 모노
+            float32Array.length,
+            16000 // 16kHz
+        );
+        audioBuffer.getChannelData(0).set(float32Array);
+
+        // 스케줄링하여 끊김 없이 재생
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+
+        const now = audioContext.currentTime;
+        const startTime = Math.max(now, nextStartTime);
+        source.start(startTime);
+
+        // 다음 재생 시작 시간 계산
+        nextStartTime = startTime + audioBuffer.duration;
+
     } catch (e) {
-        console.error('[speaker.js] append 실패:', e);
+        console.error('[speaker.js] 재생 오류:', e);
     }
 }
