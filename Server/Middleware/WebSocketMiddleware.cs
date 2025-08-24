@@ -14,6 +14,7 @@ namespace WicsPlatform.Server.Middleware
         private readonly ILogger<WebSocketMiddleware> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IUdpBroadcastService _udpService;
+        private readonly IMediaBroadcastService mediaBroadcastService;
         private static readonly ConcurrentDictionary<string, BroadcastSession> _broadcastSessions = new();
 
         private readonly ushort MaxBuffer = 10000; // 최대 패킷 크기
@@ -22,12 +23,14 @@ namespace WicsPlatform.Server.Middleware
             RequestDelegate next,
             ILogger<WebSocketMiddleware> logger,
             IServiceScopeFactory serviceScopeFactory,
-            IUdpBroadcastService udpService)
+            IUdpBroadcastService udpService,
+            IMediaBroadcastService mediaBroadcastService)
         {
             _next = next;
             _logger = logger;
             _serviceScopeFactory = serviceScopeFactory;
             _udpService = udpService;
+            this.mediaBroadcastService = mediaBroadcastService;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -291,49 +294,111 @@ namespace WicsPlatform.Server.Middleware
 
         private async Task HandleMediaPlayAsync(WebSocket webSocket, JsonElement root)
         {
-            if (root.TryGetProperty("broadcastId", out var broadcastIdElement))
+            try
             {
+                if (!root.TryGetProperty("broadcastId", out var broadcastIdElement))
+                {
+                    // 기존 SendMessageAsync 사용
+                    var errorResponse = new
+                    {
+                        type = "error",
+                        message = "Missing broadcastId"
+                    };
+                    await SendMessageAsync(webSocket, JsonSerializer.Serialize(errorResponse));
+                    return;
+                }
+
                 var broadcastId = broadcastIdElement.GetString();
 
-                if (_broadcastSessions.TryGetValue(broadcastId, out var session))
+                if (!_broadcastSessions.TryGetValue(broadcastId, out var session))
                 {
-                    // TODO: 실제 미디어 재생 로직 구현
-                    _logger.LogInformation($"Media play requested for broadcast: {broadcastId}");
-                    _logger.LogInformation($"Available media files: {session.SelectedMedia?.Count ?? 0}");
-
-                    // 응답 전송
-                    var response = new
+                    // 기존 SendMessageAsync 사용
+                    var errorResponse = new
                     {
-                        type = "media_play_started",
-                        broadcastId = broadcastId,
-                        mediaCount = session.SelectedMedia?.Count ?? 0
+                        type = "error",
+                        message = "Session not found"
                     };
-
-                    await SendMessageAsync(webSocket, JsonSerializer.Serialize(response));
+                    await SendMessageAsync(webSocket, JsonSerializer.Serialize(errorResponse));
+                    return;
                 }
+
+                // MediaBroadcastService에 직접 전달
+                var result = await mediaBroadcastService.HandlePlayRequestAsync(
+                    broadcastId,
+                    root,
+                    session.SelectedMedia,
+                    session.OnlineSpeakers,
+                    session.ChannelId
+                );
+
+                // 응답 전송 (기존 SendMessageAsync 사용)
+                var response = new
+                {
+                    type = "media_play_started",
+                    broadcastId,
+                    sessionId = result.SessionId,
+                    success = result.Success,
+                    message = result.Message,
+                    mediaFiles = result.MediaFiles
+                };
+
+                await SendMessageAsync(webSocket, JsonSerializer.Serialize(response));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in HandleMediaPlayAsync");
+
+                // 에러 응답도 기존 SendMessageAsync 사용
+                var errorResponse = new
+                {
+                    type = "error",
+                    message = ex.Message
+                };
+                await SendMessageAsync(webSocket, JsonSerializer.Serialize(errorResponse));
             }
         }
 
         private async Task HandleMediaStopAsync(WebSocket webSocket, JsonElement root)
         {
-            if (root.TryGetProperty("broadcastId", out var broadcastIdElement))
+            try
             {
+                if (!root.TryGetProperty("broadcastId", out var broadcastIdElement))
+                {
+                    // 기존 SendMessageAsync 사용
+                    var errorResponse = new
+                    {
+                        type = "error",
+                        message = "Missing broadcastId"
+                    };
+                    await SendMessageAsync(webSocket, JsonSerializer.Serialize(errorResponse));
+                    return;
+                }
+
                 var broadcastId = broadcastIdElement.GetString();
 
-                if (_broadcastSessions.TryGetValue(broadcastId, out var session))
+                // MediaBroadcastService에 위임
+                var success = await mediaBroadcastService.StopMediaByBroadcastIdAsync(broadcastId);
+
+                var response = new
                 {
-                    // TODO: 실제 미디어 정지 로직 구현
-                    _logger.LogInformation($"Media stop requested for broadcast: {broadcastId}");
+                    type = "media_stopped",
+                    broadcastId = broadcastId,
+                    success = success
+                };
 
-                    // 응답 전송
-                    var response = new
-                    {
-                        type = "media_stopped",
-                        broadcastId = broadcastId
-                    };
+                await SendMessageAsync(webSocket, JsonSerializer.Serialize(response));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in HandleMediaStopAsync");
 
-                    await SendMessageAsync(webSocket, JsonSerializer.Serialize(response));
-                }
+                // 에러 응답도 기존 SendMessageAsync 사용
+                var errorResponse = new
+                {
+                    type = "error",
+                    message = ex.Message
+                };
+                await SendMessageAsync(webSocket, JsonSerializer.Serialize(errorResponse));
             }
         }
 

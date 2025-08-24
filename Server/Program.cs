@@ -57,6 +57,7 @@ builder.Services.AddRadzenCookieThemeService(options =>
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<WicsPlatform.Server.wicsService>();
 builder.Services.AddSingleton<IUdpBroadcastService, UdpBroadcastService>();
+builder.Services.AddSingleton<IMediaBroadcastService, MediaBroadcastService>();
 RegisterDBContext(builder);
 builder.Services.AddControllers().AddOData(opt =>
 {
