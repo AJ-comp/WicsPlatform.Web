@@ -3,6 +3,7 @@ using ManagedBass.Mix;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using WicsPlatform.Server.Contracts;
+using WicsPlatform.Shared;  // MicConfig 사용
 
 namespace WicsPlatform.Server.Services
 {
@@ -24,7 +25,10 @@ namespace WicsPlatform.Server.Services
             public Timer OutputTimer { get; set; }
             public bool IsActive { get; set; }
 
-            // 볼륨 설정
+            // MicConfig 사용 (마이크 설정)
+            public MicConfig MicConfig { get; set; }
+
+            // 볼륨 설정 (별도 관리)
             public float MicVolume { get; set; } = 1.0f;
             public float MediaVolume { get; set; } = 0.7f;
             public float TtsVolume { get; set; } = 0.8f;
@@ -44,14 +48,17 @@ namespace WicsPlatform.Server.Services
         {
             try
             {
-                if (!Bass.Init(-1, 48000, DeviceInitFlags.Mono))
+                // MicConfig 기본값으로 BASS 초기화
+                var micConfig = new MicConfig();  // 16000Hz, 1채널
+
+                if (!Bass.Init(-1, micConfig.SampleRate, DeviceInitFlags.Mono))
                 {
                     _logger.LogWarning($"Failed to initialize BASS: {Bass.LastError}");
                 }
                 else
                 {
                     _bassInitialized = true;
-                    _logger.LogInformation("BASS initialized for Audio Mixing Service");
+                    _logger.LogInformation($"BASS initialized with MicConfig: {micConfig.SampleRate}Hz");
                 }
             }
             catch (Exception ex)
@@ -74,20 +81,27 @@ namespace WicsPlatform.Server.Services
                 await StopMixer(broadcastId);
             }
 
+            // MicConfig 생성 (항상 같은 설정)
+            var micConfig = new MicConfig();  // 16000Hz, 1채널
+
             var session = new MixerSession
             {
                 BroadcastId = broadcastId,
                 Speakers = speakers,
-                IsActive = true
+                IsActive = true,
+                MicConfig = micConfig
             };
 
             try
             {
-                // 1. 메인 믹서 생성 (48kHz, 모노)
+                // MicConfig 설정 사용 (모노 고정)
+                var flags = BassFlags.Decode | BassFlags.Float | BassFlags.MixerNonStop | BassFlags.Mono;
+
+                // 1. 메인 믹서 생성 (MicConfig 설정 사용)
                 session.MixerStream = BassMix.CreateMixerStream(
-                    48000,
-                    1,
-                    BassFlags.Decode | BassFlags.Float | BassFlags.MixerNonStop
+                    micConfig.SampleRate,  // 16000Hz
+                    micConfig.Channels,    // 1 (모노)
+                    flags
                 );
 
                 if (session.MixerStream == 0)
@@ -98,8 +112,8 @@ namespace WicsPlatform.Server.Services
 
                 // 2. 마이크용 Push 스트림 생성
                 session.MicPushStream = Bass.CreateStream(
-                    48000,
-                    1,
+                    micConfig.SampleRate,  // 16000Hz
+                    micConfig.Channels,    // 1 (모노)
                     BassFlags.Float | BassFlags.Decode,
                     StreamProcedureType.Push
                 );
@@ -126,17 +140,19 @@ namespace WicsPlatform.Server.Services
                 // 4. 초기 볼륨 설정
                 Bass.ChannelSetAttribute(session.MicPushStream, ChannelAttribute.Volume, session.MicVolume);
 
-                // 5. 출력 타이머 시작 (60ms마다)
+                // 5. 출력 타이머 시작 (MicConfig.TimesliceMs 사용)
                 session.OutputTimer = new Timer(
                     async _ => await ProcessMixedOutput(broadcastId),
                     null,
                     TimeSpan.Zero,
-                    TimeSpan.FromMilliseconds(60)
+                    TimeSpan.FromMilliseconds(micConfig.TimesliceMs)  // 60ms
                 );
 
                 _sessions[broadcastId] = session;
 
-                _logger.LogInformation($"Audio mixer initialized for broadcast: {broadcastId}");
+                _logger.LogInformation($"Audio mixer initialized for broadcast: {broadcastId} " +
+                    $"(MicConfig: {micConfig.SampleRate}Hz, {micConfig.Channels}ch, {micConfig.TimesliceMs}ms)");
+
                 return true;
             }
             catch (Exception ex)
@@ -186,6 +202,51 @@ namespace WicsPlatform.Server.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error adding microphone data");
+            }
+        }
+
+        private async Task ProcessMixedOutput(string broadcastId)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
+                return;
+
+            try
+            {
+                // MicConfig에서 샘플 수 계산 (60ms @ 16000Hz = 960 샘플)
+                var samplesPerOutput = session.MicConfig.GetSamplesPerTimeslice();
+                var floatBuffer = new float[samplesPerOutput * session.MicConfig.Channels];
+
+                // 믹서에서 데이터 읽기
+                var bytesRead = Bass.ChannelGetData(
+                    session.MixerStream,
+                    floatBuffer,
+                    (int)DataFlags.Float | (floatBuffer.Length * 4)
+                );
+
+                if (bytesRead <= 0)
+                    return;
+
+                var samplesRead = bytesRead / 4;
+
+                // Float → Int16 PCM 변환
+                var pcm16 = new byte[samplesRead * 2];
+                for (int i = 0; i < samplesRead; i++)
+                {
+                    // 마스터 볼륨 적용
+                    var sample = floatBuffer[i] * session.MasterVolume;
+                    sample = Math.Max(-1.0f, Math.Min(1.0f, sample));
+                    var int16Sample = (short)(sample * 32767);
+
+                    pcm16[i * 2] = (byte)(int16Sample & 0xFF);
+                    pcm16[i * 2 + 1] = (byte)(int16Sample >> 8);
+                }
+
+                // UDP로 전송
+                await _udpService.SendAudioToSpeakers(session.Speakers, pcm16);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing mixed output for broadcast: {broadcastId}");
             }
         }
 
@@ -302,51 +363,6 @@ namespace WicsPlatform.Server.Services
             {
                 Bass.ChannelSetAttribute(targetStream, ChannelAttribute.Volume, volume);
                 _logger.LogDebug($"Volume set for {source}: {volume:F2}");
-            }
-        }
-
-        private async Task ProcessMixedOutput(string broadcastId)
-        {
-            if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
-                return;
-
-            try
-            {
-                // 60ms 분량의 샘플 (48kHz * 0.06 = 2880 샘플)
-                const int samplesPerOutput = 2880;
-                var floatBuffer = new float[samplesPerOutput];
-
-                // 믹서에서 데이터 읽기
-                var bytesRead = Bass.ChannelGetData(
-                    session.MixerStream,
-                    floatBuffer,
-                    (int)DataFlags.Float | (samplesPerOutput * 4)
-                );
-
-                if (bytesRead <= 0)
-                    return;
-
-                var samplesRead = bytesRead / 4;
-
-                // Float → Int16 PCM 변환
-                var pcm16 = new byte[samplesRead * 2];
-                for (int i = 0; i < samplesRead; i++)
-                {
-                    // 마스터 볼륨 적용
-                    var sample = floatBuffer[i] * session.MasterVolume;
-                    sample = Math.Max(-1.0f, Math.Min(1.0f, sample));
-                    var int16Sample = (short)(sample * 32767);
-
-                    pcm16[i * 2] = (byte)(int16Sample & 0xFF);
-                    pcm16[i * 2 + 1] = (byte)(int16Sample >> 8);
-                }
-
-                // UDP로 전송
-                await _udpService.SendAudioToSpeakers(session.Speakers, pcm16);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error processing mixed output for broadcast: {broadcastId}");
             }
         }
 

@@ -7,6 +7,7 @@ using WicsPlatform.Client.Dialogs;
 using WicsPlatform.Client.Pages.SubPages;
 using WicsPlatform.Client.Services;
 using WicsPlatform.Client.Services.Interfaces;
+using WicsPlatform.Shared;
 
 namespace WicsPlatform.Client.Pages
 {
@@ -98,6 +99,8 @@ namespace WicsPlatform.Client.Pages
         // Broadcast 관련
         private List<WicsPlatform.Server.Models.wics.Speaker> _currentOnlineSpeakers;
         private bool _currentLoopbackSetting = false;
+
+        private MicConfig _micConfig = new MicConfig();
         #endregion
 
         #region Audio Configuration
@@ -209,11 +212,12 @@ namespace WicsPlatform.Client.Pages
 
             if (channel != null)
             {
-                // 볼륨 설정 로드
+                // 볼륨 설정 로드 (기존 그대로)
                 micVolume = (int)(channel.MicVolume * 100);
                 mediaVolume = (int)(channel.MediaVolume * 100);
                 ttsVolume = (int)(channel.TtsVolume * 100);
 
+                // UI 바인딩용 - 채널 설정 (마이크와 무관)
                 var channelSampleRate = (int)(channel.SamplingRate > 0 ? channel.SamplingRate : 48000);
                 var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
                 _preferredSampleRate = FindClosestSampleRate(channelSampleRate, supportedSampleRates);
@@ -224,7 +228,9 @@ namespace WicsPlatform.Client.Pages
                 }
 
                 _preferredChannels = channel.Channel1 == "mono" ? 1 : 2;
-                _logger.LogInformation($"Channel selected: {channel.Name}, SampleRate: {_preferredSampleRate}Hz, Channels: {_preferredChannels}");
+
+                _logger.LogInformation($"Channel selected: {channel.Name}, Channel Settings: {_preferredSampleRate}Hz, {_preferredChannels}ch");
+                _logger.LogInformation($"Mic Config (fixed): {_micConfig.SampleRate}Hz, {_micConfig.Channels}ch");
             }
 
             await InvokeAsync(StateHasChanged);
@@ -341,18 +347,30 @@ namespace WicsPlatform.Client.Pages
                 _dotNetRef = DotNetObjectReference.Create(this);
                 _mixerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/audiomixer.js");
 
-                var config = new
+                // MicConfig를 JavaScript 설정으로 변환 (마이크 전용)
+                var jsConfig = _micConfig.ToJavaScriptConfig();
+
+                // Dictionary로 변환하여 볼륨만 추가
+                var configWithVolume = new Dictionary<string, object>
                 {
-                    sampleRate = _preferredSampleRate,
-                    channels = _preferredChannels,
-                    bitrate = _preferredBitrate,
-                    timeslice = 60,
-                    micVolume = micVolume / 100.0,
-                    mediaVolume = mediaVolume / 100.0,
-                    ttsVolume = ttsVolume / 100.0
+                    // MicConfig 설정 (마이크용)
+                    { "sampleRate", _micConfig.SampleRate },
+                    { "channels", _micConfig.Channels },
+                    { "timeslice", _micConfig.TimesliceMs },
+                    { "bitrate", _micConfig.Bitrate },
+                    { "echoCancellation", _micConfig.EchoCancellation },
+                    { "noiseSuppression", _micConfig.NoiseSuppression },
+                    { "autoGainControl", _micConfig.AutoGainControl },
+                    { "localPlayback", _micConfig.LocalPlayback },
+                    { "samplesPerSend", _micConfig.GetSamplesPerTimeslice() },
+                    
+                    // 볼륨 설정 (MicConfig와 별도)
+                    { "micVolume", micVolume / 100.0 },
+                    { "mediaVolume", mediaVolume / 100.0 },
+                    { "ttsVolume", ttsVolume / 100.0 }
                 };
 
-                var success = await _mixerModule.InvokeAsync<bool>("createMixer", _dotNetRef, config);
+                var success = await _mixerModule.InvokeAsync<bool>("createMixer", _dotNetRef, configWithVolume);
 
                 if (!success)
                 {
@@ -360,8 +378,8 @@ namespace WicsPlatform.Client.Pages
                     return false;
                 }
 
-                _logger.LogInformation($"오디오 믹서 초기화 완료 - SampleRate: {_preferredSampleRate}Hz, Channels: {_preferredChannels}");
-                LoggingService.AddLog("SUCCESS", "오디오 믹서 초기화 완료 (마이크 전용)");
+                _logger.LogInformation($"오디오 믹서 초기화 완료 - Mic: {_micConfig.SampleRate}Hz/{_micConfig.Channels}ch, Timeslice: {_micConfig.TimesliceMs}ms");
+                LoggingService.AddLog("SUCCESS", $"마이크 초기화 완료 ({_micConfig.SampleRate}Hz/모노)");
 
                 if (_currentLoopbackSetting && _speakerModule == null)
                 {

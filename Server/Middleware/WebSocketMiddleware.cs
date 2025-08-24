@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using WicsPlatform.Audio;
 using WicsPlatform.Server.Contracts;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Services;
@@ -12,6 +13,7 @@ namespace WicsPlatform.Server.Middleware
     public partial class WebSocketMiddleware
     {
         private readonly RequestDelegate next;
+        private readonly OpusCodec opusCodec;
         private readonly ILogger<WebSocketMiddleware> logger;
         private readonly IServiceScopeFactory serviceScopeFactory;
         private readonly IUdpBroadcastService udpService;
@@ -23,6 +25,7 @@ namespace WicsPlatform.Server.Middleware
 
         public WebSocketMiddleware(
             RequestDelegate next,
+            OpusCodec opusCodec,
             ILogger<WebSocketMiddleware> logger,
             IServiceScopeFactory serviceScopeFactory,
             IUdpBroadcastService udpService,
@@ -30,6 +33,7 @@ namespace WicsPlatform.Server.Middleware
             IAudioMixingService audioMixingService)
         {
             this.next = next;
+            this.opusCodec = opusCodec;
             this.logger = logger;
             this.serviceScopeFactory = serviceScopeFactory;
             this.udpService = udpService;
@@ -164,12 +168,11 @@ namespace WicsPlatform.Server.Middleware
             {
                 // UDP로 압축된 데이터 전송
                 await udpService.SendAudioToSpeakers(session.OnlineSpeakers, opusData);
-//                await audioMixingService.AddMicrophoneData(broadcastId, opusData);
+//                await audioMixingService.AddMicrophoneData(broadcastId, opusCodec.Decode(opusData));
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, $"Opus encoding failed for broadcast {broadcastId}");
-//                await _udpService.SendAudioToSpeakers(session.OnlineSpeakers, opusData);
             }
         }
 

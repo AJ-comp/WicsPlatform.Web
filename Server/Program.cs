@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.OData.ModelBuilder;
 using Radzen;
+using WicsPlatform.Audio;
 using WicsPlatform.Server.Components;
 using WicsPlatform.Server.Contracts;
 using WicsPlatform.Server.Data;
@@ -60,6 +61,7 @@ builder.Services.AddScoped<WicsPlatform.Server.wicsService>();
 builder.Services.AddSingleton<IAudioMixingService, AudioMixingService>();
 builder.Services.AddSingleton<IUdpBroadcastService, UdpBroadcastService>();
 builder.Services.AddSingleton<IMediaBroadcastService, MediaBroadcastService>();
+builder.Services.AddSingleton<OpusCodec>(provider => new OpusCodec(48000, 1, 32000));
 RegisterDBContext(builder);
 builder.Services.AddControllers().AddOData(opt =>
 {
