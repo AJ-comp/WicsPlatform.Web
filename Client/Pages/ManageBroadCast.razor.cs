@@ -1,18 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using Microsoft.AspNetCore.Components;
 using Radzen;
-using Radzen.Blazor;
-using System.Net.Http;
 using System.Net.Http.Json;
+using WicsPlatform.Audio;
 using WicsPlatform.Client.Dialogs;
 using WicsPlatform.Client.Pages.SubPages;
 using WicsPlatform.Client.Services;
-using Microsoft.Extensions.Logging;
-using System.Threading;
 using WicsPlatform.Client.Services.Interfaces;
 
 namespace WicsPlatform.Client.Pages
@@ -34,6 +27,7 @@ namespace WicsPlatform.Client.Pages
         [Inject] protected IBroadcastDataService BroadcastDataService { get; set; }
         [Inject] protected BroadcastRecordingService RecordingService { get; set; }
         [Inject] protected BroadcastLoggingService LoggingService { get; set; }
+        [Inject] protected OpusCodec OpusCodec { get; set; }
         #endregion
 
         #region Fields & Properties
@@ -855,15 +849,16 @@ namespace WicsPlatform.Client.Pages
             {
                 byte[] data = Convert.FromBase64String(base64Data);
 
-                UpdateAudioStatistics(data);
-                RecordingService.AddAudioData(data);
+                var opusData = OpusCodec.Encode(data);
+                UpdateAudioStatistics(opusData);
+                RecordingService.AddAudioData(opusData);
 
                 if (monitoringSection != null)
-                    await monitoringSection.OnAudioCaptured(data);
+                    await monitoringSection.OnAudioCaptured(opusData);
 
                 if (!string.IsNullOrEmpty(currentBroadcastId))
                 {
-                    await WebSocketService.SendAudioDataAsync(currentBroadcastId, data);
+                    await WebSocketService.SendAudioDataAsync(currentBroadcastId, opusData);
                 }
 
                 if (_currentLoopbackSetting && _speakerModule != null)

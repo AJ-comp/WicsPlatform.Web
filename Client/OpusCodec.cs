@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
 
-namespace WicsPlatform.Server.Audio
+namespace WicsPlatform.Audio
 {
     /// <summary>
     /// Opus 압축/해제를 간단하게 처리하는 클래스

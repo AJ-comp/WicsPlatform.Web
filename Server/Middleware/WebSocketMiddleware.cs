@@ -1,18 +1,8 @@
-﻿using Concentus.Enums;
-using Concentus.Structs;
-using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using System;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using WicsPlatform.Server.Audio;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Services;
 
@@ -104,7 +94,6 @@ namespace WicsPlatform.Server.Middleware
                 {
                     if (_broadcastSessions.TryRemove(broadcastId, out var session))
                     {
-                        session.Dispose();  // OpusCodec 정리
                         _logger.LogInformation($"Removed broadcast session and cleaned up OpusCodec: {broadcastId}");
                     }
                 }
@@ -239,9 +228,6 @@ namespace WicsPlatform.Server.Middleware
                     OnlineSpeakers = onlineSpeakers,
                     SelectedMedia = selectedMedia,
                     SelectedTts = selectedTts,
-
-                    // ✨ OpusCodec 초기화
-                    Opus = new OpusCodec(48000, 1, 32000)  // 48kHz, 모노, 32kbps
                 };
 
                 _broadcastSessions[broadcastId] = session;
@@ -286,32 +272,20 @@ namespace WicsPlatform.Server.Middleware
             if (!root.TryGetProperty("data", out var dataElement)) return;
 
             var base64Data = dataElement.GetString();
-            var pcmData = Convert.FromBase64String(base64Data);
-            session.TotalBytes += pcmData.Length;
+            var opusData = Convert.FromBase64String(base64Data);
+            session.TotalBytes += opusData.Length;
 
             if (session.OnlineSpeakers?.Any() != true) return;
 
             try
             {
-                // ✨ Opus 압축 (한 줄!)
-                var compressed = session.Opus.Encode(pcmData);
-                session.CompressedBytes += compressed.Length;
-
                 // UDP로 압축된 데이터 전송
-                await _udpService.SendAudioToSpeakers(session.OnlineSpeakers, compressed);
-
-                // 디버깅 로그 (처음 5개 패킷만)
-                if (session.PacketCount <= 5)
-                {
-                    var compressionRatio = 100 - (compressed.Length * 100 / pcmData.Length);
-                    _logger.LogDebug($"Packet #{session.PacketCount}: PCM {pcmData.Length} → Opus {compressed.Length} bytes ({compressionRatio}% 압축)");
-                }
+                await _udpService.SendAudioToSpeakers(session.OnlineSpeakers, opusData);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Opus encoding failed for broadcast {broadcastId}");
-                // 실패 시 원본 전송 (폴백)
-                await _udpService.SendAudioToSpeakers(session.OnlineSpeakers, pcmData);
+//                await _udpService.SendAudioToSpeakers(session.OnlineSpeakers, opusData);
             }
         }
 
@@ -381,21 +355,10 @@ namespace WicsPlatform.Server.Middleware
             public List<ulong> SelectedGroupIds { get; set; }
             public long PacketCount { get; set; }
             public long TotalBytes { get; set; }
-            public long CompressedBytes { get; set; }  // 압축된 바이트 추적
             public WebSocket WebSocket { get; set; }
             public List<SpeakerInfo> OnlineSpeakers { get; set; }
             public List<MediaInfo> SelectedMedia { get; set; }
             public List<TtsInfo> SelectedTts { get; set; }
-
-            // OpusCodec 인스턴스 추가
-            public OpusCodec Opus { get; set; }
-
-            // 정리 메서드
-            public void Dispose()
-            {
-                Opus?.Dispose();
-                Opus = null;
-            }
         }
 
         public class MediaInfo

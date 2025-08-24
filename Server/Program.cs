@@ -1,16 +1,15 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OData;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.OData.ModelBuilder;
 using Radzen;
 using WicsPlatform.Server.Components;
 using WicsPlatform.Server.Data;
-using WicsPlatform.Server.Middleware;
 using WicsPlatform.Server.Models;
 using WicsPlatform.Server.Services;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.AspNetCore.StaticFiles;
 
 static void RegisterDBContext(WebApplicationBuilder builder)
 {
