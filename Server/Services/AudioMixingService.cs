@@ -1,0 +1,412 @@
+﻿using ManagedBass;
+using ManagedBass.Mix;
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using WicsPlatform.Server.Contracts;
+
+namespace WicsPlatform.Server.Services
+{
+    public class AudioMixingService : IAudioMixingService, IDisposable
+    {
+        private readonly ILogger<AudioMixingService> _logger;
+        private readonly IUdpBroadcastService _udpService;
+        private readonly ConcurrentDictionary<string, MixerSession> _sessions = new();
+        private bool _bassInitialized = false;
+
+        private class MixerSession
+        {
+            public string BroadcastId { get; set; }
+            public int MixerStream { get; set; }
+            public int MicPushStream { get; set; }
+            public int MediaStream { get; set; }
+            public int TtsStream { get; set; }
+            public List<SpeakerInfo> Speakers { get; set; }
+            public Timer OutputTimer { get; set; }
+            public bool IsActive { get; set; }
+
+            // 볼륨 설정
+            public float MicVolume { get; set; } = 1.0f;
+            public float MediaVolume { get; set; } = 0.7f;
+            public float TtsVolume { get; set; } = 0.8f;
+            public float MasterVolume { get; set; } = 1.0f;
+        }
+
+        public AudioMixingService(
+            ILogger<AudioMixingService> logger,
+            IUdpBroadcastService udpService)
+        {
+            _logger = logger;
+            _udpService = udpService;
+            InitializeBass();
+        }
+
+        private void InitializeBass()
+        {
+            try
+            {
+                if (!Bass.Init(-1, 48000, DeviceInitFlags.Mono))
+                {
+                    _logger.LogWarning($"Failed to initialize BASS: {Bass.LastError}");
+                }
+                else
+                {
+                    _bassInitialized = true;
+                    _logger.LogInformation("BASS initialized for Audio Mixing Service");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initializing BASS");
+            }
+        }
+
+        public async Task<bool> InitializeMixer(string broadcastId, List<SpeakerInfo> speakers)
+        {
+            if (!_bassInitialized)
+            {
+                _logger.LogError("BASS not initialized");
+                return false;
+            }
+
+            // 기존 세션이 있으면 정리
+            if (_sessions.ContainsKey(broadcastId))
+            {
+                await StopMixer(broadcastId);
+            }
+
+            var session = new MixerSession
+            {
+                BroadcastId = broadcastId,
+                Speakers = speakers,
+                IsActive = true
+            };
+
+            try
+            {
+                // 1. 메인 믹서 생성 (48kHz, 모노)
+                session.MixerStream = BassMix.CreateMixerStream(
+                    48000,
+                    1,
+                    BassFlags.Decode | BassFlags.Float | BassFlags.MixerNonStop
+                );
+
+                if (session.MixerStream == 0)
+                {
+                    _logger.LogError($"Failed to create mixer: {Bass.LastError}");
+                    return false;
+                }
+
+                // 2. 마이크용 Push 스트림 생성
+                session.MicPushStream = Bass.CreateStream(
+                    48000,
+                    1,
+                    BassFlags.Float | BassFlags.Decode,
+                    StreamProcedureType.Push
+                );
+
+                if (session.MicPushStream == 0)
+                {
+                    _logger.LogError($"Failed to create mic push stream: {Bass.LastError}");
+                    Bass.StreamFree(session.MixerStream);
+                    return false;
+                }
+
+                // 3. Push 스트림을 믹서에 연결
+                if (!BassMix.MixerAddChannel(
+                    session.MixerStream,
+                    session.MicPushStream,
+                    BassFlags.MixerChanNoRampin | BassFlags.MixerChanDownMix))
+                {
+                    _logger.LogError($"Failed to add mic stream to mixer: {Bass.LastError}");
+                    Bass.StreamFree(session.MixerStream);
+                    Bass.StreamFree(session.MicPushStream);
+                    return false;
+                }
+
+                // 4. 초기 볼륨 설정
+                Bass.ChannelSetAttribute(session.MicPushStream, ChannelAttribute.Volume, session.MicVolume);
+
+                // 5. 출력 타이머 시작 (60ms마다)
+                session.OutputTimer = new Timer(
+                    async _ => await ProcessMixedOutput(broadcastId),
+                    null,
+                    TimeSpan.Zero,
+                    TimeSpan.FromMilliseconds(60)
+                );
+
+                _sessions[broadcastId] = session;
+
+                _logger.LogInformation($"Audio mixer initialized for broadcast: {broadcastId}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to initialize mixer for broadcast: {broadcastId}");
+
+                // 정리
+                if (session.MixerStream != 0) Bass.StreamFree(session.MixerStream);
+                if (session.MicPushStream != 0) Bass.StreamFree(session.MicPushStream);
+
+                return false;
+            }
+        }
+
+        public async Task AddMicrophoneData(string broadcastId, byte[] pcmData)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
+            {
+                _logger.LogWarning($"No active mixer session for broadcast: {broadcastId}");
+                return;
+            }
+
+            try
+            {
+                // PCM Int16 → Float 변환
+                var samples = pcmData.Length / 2;
+                var floatData = new float[samples];
+
+                for (int i = 0; i < samples; i++)
+                {
+                    var int16Sample = BitConverter.ToInt16(pcmData, i * 2);
+                    floatData[i] = int16Sample / 32768f;
+                }
+
+                // Push 스트림에 데이터 추가
+                var result = Bass.StreamPutData(
+                    session.MicPushStream,
+                    floatData,
+                    floatData.Length * 4
+                );
+
+                if (result == -1)
+                {
+                    _logger.LogWarning($"Failed to push mic data: {Bass.LastError}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding microphone data");
+            }
+        }
+
+        public async Task AddMediaStream(string broadcastId, string mediaPath)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
+            {
+                _logger.LogWarning($"No active mixer session for broadcast: {broadcastId}");
+                return;
+            }
+
+            try
+            {
+                // 기존 미디어 스트림 정리
+                if (session.MediaStream != 0)
+                {
+                    BassMix.MixerRemoveChannel(session.MediaStream);
+                    Bass.StreamFree(session.MediaStream);
+                    session.MediaStream = 0;
+                }
+
+                // 새 미디어 스트림 생성
+                var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", mediaPath.TrimStart('/'));
+
+                if (!File.Exists(fullPath))
+                {
+                    _logger.LogError($"Media file not found: {fullPath}");
+                    return;
+                }
+
+                session.MediaStream = Bass.CreateStream(
+                    fullPath,
+                    0, 0,
+                    BassFlags.Decode | BassFlags.Float
+                );
+
+                if (session.MediaStream == 0)
+                {
+                    _logger.LogError($"Failed to create media stream: {Bass.LastError}");
+                    return;
+                }
+
+                // 믹서에 추가
+                if (!BassMix.MixerAddChannel(
+                    session.MixerStream,
+                    session.MediaStream,
+                    BassFlags.MixerChanNoRampin))
+                {
+                    _logger.LogError($"Failed to add media to mixer: {Bass.LastError}");
+                    Bass.StreamFree(session.MediaStream);
+                    session.MediaStream = 0;
+                    return;
+                }
+
+                // 볼륨 설정
+                Bass.ChannelSetAttribute(session.MediaStream, ChannelAttribute.Volume, session.MediaVolume);
+
+                _logger.LogInformation($"Media stream added to mixer: {Path.GetFileName(mediaPath)}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error adding media stream: {mediaPath}");
+            }
+        }
+
+        public async Task RemoveMediaStream(string broadcastId)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session))
+                return;
+
+            if (session.MediaStream != 0)
+            {
+                BassMix.MixerRemoveChannel(session.MediaStream);
+                Bass.StreamFree(session.MediaStream);
+                session.MediaStream = 0;
+
+                _logger.LogInformation($"Media stream removed from mixer for broadcast: {broadcastId}");
+            }
+        }
+
+        public async Task SetVolume(string broadcastId, AudioSource source, float volume)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session))
+                return;
+
+            volume = Math.Max(0, Math.Min(1, volume)); // 0-1 범위로 제한
+
+            int targetStream = 0;
+
+            switch (source)
+            {
+                case AudioSource.Microphone:
+                    session.MicVolume = volume;
+                    targetStream = session.MicPushStream;
+                    break;
+
+                case AudioSource.Media:
+                    session.MediaVolume = volume;
+                    targetStream = session.MediaStream;
+                    break;
+
+                case AudioSource.TTS:
+                    session.TtsVolume = volume;
+                    targetStream = session.TtsStream;
+                    break;
+
+                case AudioSource.Master:
+                    session.MasterVolume = volume;
+                    targetStream = session.MixerStream;
+                    break;
+            }
+
+            if (targetStream != 0)
+            {
+                Bass.ChannelSetAttribute(targetStream, ChannelAttribute.Volume, volume);
+                _logger.LogDebug($"Volume set for {source}: {volume:F2}");
+            }
+        }
+
+        private async Task ProcessMixedOutput(string broadcastId)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
+                return;
+
+            try
+            {
+                // 60ms 분량의 샘플 (48kHz * 0.06 = 2880 샘플)
+                const int samplesPerOutput = 2880;
+                var floatBuffer = new float[samplesPerOutput];
+
+                // 믹서에서 데이터 읽기
+                var bytesRead = Bass.ChannelGetData(
+                    session.MixerStream,
+                    floatBuffer,
+                    (int)DataFlags.Float | (samplesPerOutput * 4)
+                );
+
+                if (bytesRead <= 0)
+                    return;
+
+                var samplesRead = bytesRead / 4;
+
+                // Float → Int16 PCM 변환
+                var pcm16 = new byte[samplesRead * 2];
+                for (int i = 0; i < samplesRead; i++)
+                {
+                    // 마스터 볼륨 적용
+                    var sample = floatBuffer[i] * session.MasterVolume;
+                    sample = Math.Max(-1.0f, Math.Min(1.0f, sample));
+                    var int16Sample = (short)(sample * 32767);
+
+                    pcm16[i * 2] = (byte)(int16Sample & 0xFF);
+                    pcm16[i * 2 + 1] = (byte)(int16Sample >> 8);
+                }
+
+                // UDP로 전송
+                await _udpService.SendAudioToSpeakers(session.Speakers, pcm16);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing mixed output for broadcast: {broadcastId}");
+            }
+        }
+
+        public async Task<bool> StopMixer(string broadcastId)
+        {
+            if (_sessions.TryRemove(broadcastId, out var session))
+            {
+                session.IsActive = false;
+
+                // 타이머 정지
+                session.OutputTimer?.Dispose();
+
+                // 스트림 정리
+                if (session.MediaStream != 0)
+                {
+                    BassMix.MixerRemoveChannel(session.MediaStream);
+                    Bass.StreamFree(session.MediaStream);
+                }
+
+                if (session.TtsStream != 0)
+                {
+                    BassMix.MixerRemoveChannel(session.TtsStream);
+                    Bass.StreamFree(session.TtsStream);
+                }
+
+                if (session.MicPushStream != 0)
+                {
+                    Bass.StreamFree(session.MicPushStream);
+                }
+
+                if (session.MixerStream != 0)
+                {
+                    Bass.StreamFree(session.MixerStream);
+                }
+
+                _logger.LogInformation($"Audio mixer stopped for broadcast: {broadcastId}");
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool IsMixerActive(string broadcastId)
+        {
+            return _sessions.TryGetValue(broadcastId, out var session) && session.IsActive;
+        }
+
+        public void Dispose()
+        {
+            // 모든 믹서 세션 정리
+            var tasks = _sessions.Keys.Select(id => StopMixer(id)).ToArray();
+            Task.WaitAll(tasks);
+
+            _sessions.Clear();
+
+            if (_bassInitialized)
+            {
+                Bass.Free();
+                _logger.LogInformation("BASS freed in AudioMixingService");
+            }
+        }
+    }
+}

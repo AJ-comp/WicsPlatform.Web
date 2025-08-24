@@ -1,8 +1,9 @@
 ﻿using System.Text.Json;
 using WicsPlatform.Server.Middleware;
+using WicsPlatform.Server.Services;
 using static WicsPlatform.Server.Middleware.WebSocketMiddleware;
 
-namespace WicsPlatform.Server.Services
+namespace WicsPlatform.Server.Contracts
 {
     public interface IMediaBroadcastService
     {

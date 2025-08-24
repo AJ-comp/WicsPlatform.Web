@@ -1,31 +1,29 @@
 ﻿using ManagedBass;
 using ManagedBass.Mix;
-using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Concurrent;
-using System.IO;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using WicsPlatform.Server.Middleware;
+using WicsPlatform.Server.Contracts;
 using static WicsPlatform.Server.Middleware.WebSocketMiddleware;
 
 namespace WicsPlatform.Server.Services
 {
     public class MediaBroadcastService : IMediaBroadcastService, IDisposable
     {
-        private readonly ILogger<MediaBroadcastService> _logger;
-        private readonly IUdpBroadcastService _udpService;
+        private readonly ILogger<MediaBroadcastService> logger;
+        private readonly IUdpBroadcastService udpService;
+        private readonly IAudioMixingService audioMixingService;
         private readonly ConcurrentDictionary<string, MediaSession> _sessions = new();
         private readonly ConcurrentDictionary<string, string> _broadcastToMediaSession = new();
         private bool _bassInitialized = false;
 
         public MediaBroadcastService(
             ILogger<MediaBroadcastService> logger,
-            IUdpBroadcastService udpService)
+            IUdpBroadcastService udpService,
+            IAudioMixingService audioMixingService)
         {
-            _logger = logger;
-            _udpService = udpService;
+            this.logger = logger;
+            this.udpService = udpService;
+            this.audioMixingService = audioMixingService;
             InitializeBass();
         }
 
@@ -36,21 +34,21 @@ namespace WicsPlatform.Server.Services
                 // Bass 초기화 (디바이스 -1은 "no sound" 디바이스)
                 if (!Bass.Init(-1, 48000, DeviceInitFlags.Mono))
                 {
-                    _logger.LogWarning($"Failed to initialize BASS: {Bass.LastError}");
+                    logger.LogWarning($"Failed to initialize BASS: {Bass.LastError}");
                 }
                 else
                 {
                     _bassInitialized = true;
-                    _logger.LogInformation("BASS initialized successfully");
+                    logger.LogInformation("BASS initialized successfully");
 
                     // 버전 정보 로깅
                     var version = Bass.Version;
-                    _logger.LogInformation($"BASS Version: {version}");
+                    logger.LogInformation($"BASS Version: {version}");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error initializing BASS");
+                logger.LogError(ex, "Error initializing BASS");
             }
         }
 
@@ -63,7 +61,7 @@ namespace WicsPlatform.Server.Services
         {
             try
             {
-                _logger.LogInformation($"Processing media play request for broadcast: {broadcastId}");
+                logger.LogInformation($"Processing media play request for broadcast: {broadcastId}");
 
                 // 1. 요청된 미디어 ID 파싱
                 var requestedMediaIds = ParseMediaIds(requestData);
@@ -80,29 +78,50 @@ namespace WicsPlatform.Server.Services
                     };
                 }
 
-                // 3. 이전 세션 정지
+                // 3. 이전 세션 정지 (필요한 경우)
                 await StopPreviousSessionIfExists(broadcastId);
 
-                // 4. 새 세션 시작
+                // 4. 새 세션 ID 생성
                 var sessionId = Guid.NewGuid().ToString();
-                var result = await StartMediaSession(
-                    sessionId,
-                    channelId,
-                    mediaToPlay,
-                    onlineSpeakers
-                );
 
-                // 5. 성공 시 매핑 저장
-                if (result.Success)
+                // 5. 믹서에 미디어 추가 (첫 번째 파일부터 시작)
+                var firstMedia = mediaToPlay.First();
+                await audioMixingService.AddMediaStream(broadcastId, firstMedia.FullPath);
+
+                // 6. 세션 정보 저장 (플레이리스트 관리용)
+                var session = new MediaSession
                 {
-                    _broadcastToMediaSession[broadcastId] = result.SessionId;
+                    SessionId = sessionId,
+                    ChannelId = channelId,
+                    ValidatedFiles = mediaToPlay,
+                    Speakers = onlineSpeakers,
+                    StartTime = DateTime.UtcNow,
+                    CancellationTokenSource = new CancellationTokenSource()
+                };
+
+                _sessions[sessionId] = session;
+                _broadcastToMediaSession[broadcastId] = sessionId;
+
+                var result = new MediaPlaybackResult
+                {
+                    SessionId = sessionId,
+                    Success = true,
+                    Message = $"Started playback of {mediaToPlay.Count} files"
+                };
+
+                // 9. 파일 상태 정보 추가
+                foreach (var media in mediaToPlay)
+                {
+                    var fileStatus = await ValidateMediaFile(media);
+                    result.MediaFiles.Add(fileStatus);
                 }
 
+                logger.LogInformation($"Media playback started for broadcast {broadcastId}, session {sessionId}");
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error handling media play request");
+                logger.LogError(ex, $"Error handling media play request for broadcast {broadcastId}");
                 return new MediaPlaybackResult
                 {
                     Success = false,
@@ -157,7 +176,7 @@ namespace WicsPlatform.Server.Services
                     }
                     session.BassStreams.Clear();
 
-                    _logger.LogInformation($"Stopped previous session {previousSessionId}");
+                    logger.LogInformation($"Stopped previous session {previousSessionId}");
                 }
             }
         }
@@ -219,7 +238,7 @@ namespace WicsPlatform.Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error starting media session");
+                logger.LogError(ex, "Error starting media session");
                 result.Message = ex.Message;
             }
 
@@ -261,18 +280,18 @@ namespace WicsPlatform.Server.Services
                     Bass.StreamFree(stream);
                     status.Status = "opened";
 
-                    _logger.LogInformation($"Validated media file: {media.FileName}, Duration: {status.Duration}");
+                    logger.LogInformation($"Validated media file: {media.FileName}, Duration: {status.Duration}");
                 }
                 else
                 {
                     status.ErrorMessage = $"BASS error: {Bass.LastError}";
-                    _logger.LogWarning($"Failed to open media file with BASS: {media.FileName}, Error: {Bass.LastError}");
+                    logger.LogWarning($"Failed to open media file with BASS: {media.FileName}, Error: {Bass.LastError}");
                 }
             }
             catch (Exception ex)
             {
                 status.ErrorMessage = ex.Message;
-                _logger.LogError(ex, $"Error validating media file: {media.FileName}");
+                logger.LogError(ex, $"Error validating media file: {media.FileName}");
             }
 
             return status;
@@ -284,29 +303,29 @@ namespace WicsPlatform.Server.Services
 
             try
             {
-                _logger.LogInformation($"Starting playback loop for session {session.SessionId}");
+                logger.LogInformation($"Starting playback loop for session {session.SessionId}");
 
                 foreach (var media in session.ValidatedFiles)
                 {
                     if (cancellationToken.IsCancellationRequested)
                         break;
 
-                    _logger.LogInformation($"Playing: {media.FileName}");
+                    logger.LogInformation($"Playing: {media.FileName}");
                     await PlaySingleFile(media, session, cancellationToken);
 
                     if (!cancellationToken.IsCancellationRequested)
                         await Task.Delay(500, cancellationToken); // 트랙 간 짧은 대기
                 }
 
-                _logger.LogInformation($"Playback completed for session {session.SessionId}");
+                logger.LogInformation($"Playback completed for session {session.SessionId}");
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation($"Playback cancelled for session {session.SessionId}");
+                logger.LogInformation($"Playback cancelled for session {session.SessionId}");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error in playback loop");
+                logger.LogError(ex, $"Error in playback loop");
             }
             finally
             {
@@ -335,7 +354,7 @@ namespace WicsPlatform.Server.Services
 
             if (stream == 0)
             {
-                _logger.LogError($"Failed to create BASS stream for {media.FileName}: {Bass.LastError}");
+                logger.LogError($"Failed to create BASS stream for {media.FileName}: {Bass.LastError}");
                 return;
             }
 
@@ -352,14 +371,14 @@ namespace WicsPlatform.Server.Services
 
                 if (mixerStream == 0)
                 {
-                    _logger.LogError($"Failed to create mixer stream: {Bass.LastError}");
+                    logger.LogError($"Failed to create mixer stream: {Bass.LastError}");
                     return;
                 }
 
                 // 원본 스트림을 믹서에 추가
                 if (!BassMix.MixerAddChannel(mixerStream, stream, BassFlags.MixerChanNoRampin))
                 {
-                    _logger.LogError($"Failed to add channel to mixer: {Bass.LastError}");
+                    logger.LogError($"Failed to add channel to mixer: {Bass.LastError}");
                     Bass.StreamFree(mixerStream);
                     return;
                 }
@@ -372,7 +391,7 @@ namespace WicsPlatform.Server.Services
                 const int samplesPerBuffer = (sampleRate * bufferMs) / 1000; // 2880 samples
                 var floatBuffer = new float[samplesPerBuffer];
 
-                _logger.LogInformation($"Playing {media.FileName} - Buffer: {samplesPerBuffer} samples ({bufferMs}ms)");
+                logger.LogInformation($"Playing {media.FileName} - Buffer: {samplesPerBuffer} samples ({bufferMs}ms)");
 
                 // 재생 루프
                 while (!cancellationToken.IsCancellationRequested)
@@ -385,11 +404,11 @@ namespace WicsPlatform.Server.Services
                         // 파일 끝 또는 에러
                         if (bytesRead == -1)
                         {
-                            _logger.LogInformation($"Reached end of file: {media.FileName}");
+                            logger.LogInformation($"Reached end of file: {media.FileName}");
                         }
                         else
                         {
-                            _logger.LogWarning($"Error reading from stream: {Bass.LastError}");
+                            logger.LogWarning($"Error reading from stream: {Bass.LastError}");
                         }
                         break;
                     }
@@ -409,7 +428,7 @@ namespace WicsPlatform.Server.Services
                     }
 
                     // UDP로 스피커에 전송
-                    await _udpService.SendAudioToSpeakers(session.Speakers, pcm16);
+                    await udpService.SendAudioToSpeakers(session.Speakers, pcm16);
 
                     // 재생 타이밍 동기화
                     await Task.Delay(bufferMs, cancellationToken);
@@ -424,29 +443,45 @@ namespace WicsPlatform.Server.Services
                 session.BassStreams.Remove(stream);
             }
 
-            _logger.LogInformation($"Finished playing: {media.FileName}");
+            logger.LogInformation($"Finished playing: {media.FileName}");
         }
 
         public async Task<bool> StopMediaByBroadcastIdAsync(string broadcastId)
         {
-            if (_broadcastToMediaSession.TryRemove(broadcastId, out var sessionId))
+            try
             {
-                if (_sessions.TryRemove(sessionId, out var session))
+                logger.LogInformation($"Stopping media for broadcast: {broadcastId}");
+
+                // 1. 믹서에서 미디어 스트림 제거
+                await audioMixingService.RemoveMediaStream(broadcastId);
+
+                // 2. 세션 정보 정리
+                if (_broadcastToMediaSession.TryRemove(broadcastId, out var sessionId))
                 {
-                    session.CancellationTokenSource?.Cancel();
-
-                    // BASS 스트림 정리
-                    foreach (var stream in session.BassStreams)
+                    if (_sessions.TryRemove(sessionId, out var session))
                     {
-                        Bass.StreamFree(stream);
-                    }
-                    session.BassStreams.Clear();
+                        // 취소 토큰 발행
+                        session.CancellationTokenSource?.Cancel();
+                        session.CancellationTokenSource?.Dispose();
 
-                    _logger.LogInformation($"Stopped media session {sessionId}");
-                    return true;
+                        // BASS 스트림 정리 (로컬에서 관리하는 경우)
+                        foreach (var stream in session.BassStreams)
+                        {
+                            Bass.StreamFree(stream);
+                        }
+                        session.BassStreams.Clear();
+
+                        logger.LogInformation($"Media session {sessionId} stopped and cleaned up");
+                    }
                 }
+
+                return true;
             }
-            return false;
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"Error stopping media for broadcast {broadcastId}");
+                return false;
+            }
         }
 
         public async Task<MediaPlaybackStatus> GetStatusByBroadcastIdAsync(string broadcastId)
@@ -488,7 +523,7 @@ namespace WicsPlatform.Server.Services
             if (_bassInitialized)
             {
                 Bass.Free();
-                _logger.LogInformation("BASS freed");
+                logger.LogInformation("BASS freed");
             }
         }
 

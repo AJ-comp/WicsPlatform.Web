@@ -7,6 +7,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.OData.ModelBuilder;
 using Radzen;
 using WicsPlatform.Server.Components;
+using WicsPlatform.Server.Contracts;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Models;
 using WicsPlatform.Server.Services;
@@ -56,6 +57,7 @@ builder.Services.AddRadzenCookieThemeService(options =>
 });
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<WicsPlatform.Server.wicsService>();
+builder.Services.AddSingleton<IAudioMixingService, AudioMixingService>();
 builder.Services.AddSingleton<IUdpBroadcastService, UdpBroadcastService>();
 builder.Services.AddSingleton<IMediaBroadcastService, MediaBroadcastService>();
 RegisterDBContext(builder);
