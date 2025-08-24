@@ -18,7 +18,7 @@ builder.Services.AddScoped<WicsPlatform.Client.wicsService>();
 builder.Services.AddScoped<BroadcastWebSocketService>();
 builder.Services.AddScoped<BroadcastRecordingService>();
 builder.Services.AddScoped<BroadcastLoggingService>();
-builder.Services.AddSingleton<OpusCodec>(provider => new OpusCodec(16000, 1, 32000));
+builder.Services.AddSingleton<OpusCodec>(provider => new OpusCodec(48000, 1, 32000));
 builder.Services.AddScoped<IBroadcastDataService, BroadcastDataService>();
 
 builder.Services.AddAuthorizationCore();
