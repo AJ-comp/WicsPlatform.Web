@@ -1,4 +1,4 @@
-using Radzen;
+ï»¿using Radzen;
 using WicsPlatform.Client.Models;
 using WicsPlatform.Client.Services.Interfaces;
 using WicsPlatform.Server.Models.wics;
@@ -35,7 +35,7 @@ namespace WicsPlatform.Client.Services
         {
             if (string.IsNullOrWhiteSpace(channelName))
             {
-                NotifyWarn("ÀÔ·Â ÇÊ¿ä", "Ã¤³Î¸íÀ» ÀÔ·ÂÇØÁÖ¼¼¿ä.");
+                NotifyWarn("ì…ë ¥ í•„ìš”", "ì±„ë„ëª…ì„ ì…ë ¥í•´ì£¼ì„¸ìš”.");
                 return null;
             }
 
@@ -62,12 +62,12 @@ namespace WicsPlatform.Client.Services
                 };
 
                 var createdChannel = await _wicsService.CreateChannel(newChannel);
-                NotifySuccess("»ı¼º ¿Ï·á", $"'{channelName}' Ã¤³ÎÀÌ »ı¼ºµÇ¾ú½À´Ï´Ù.");
+                NotifySuccess("ìƒì„± ì™„ë£Œ", $"'{channelName}' ì±„ë„ì´ ìƒì„±ë˜ì—ˆìŠµë‹ˆë‹¤.");
                 return createdChannel;
             }
             catch (Exception ex)
             {
-                NotifyError("Ã¤³Î »ı¼º", ex);
+                NotifyError("ì±„ë„ ìƒì„±", ex);
                 return null;
             }
         }
@@ -99,12 +99,12 @@ namespace WicsPlatform.Client.Services
                 {
                     channel.UpdatedAt = DateTime.Now;
                     await _wicsService.UpdateChannel(channel.Id, channel);
-                    NotifySuccess("¼³Á¤ ÀúÀå", $"Ã¤³Î '{channel.Name}'ÀÇ ¿Àµğ¿À ¼³Á¤ÀÌ ÀúÀåµÇ¾ú½À´Ï´Ù.");
+                    NotifySuccess("ì„¤ì • ì €ì¥", $"ì±„ë„ '{channel.Name}'ì˜ ì˜¤ë””ì˜¤ ì„¤ì •ì´ ì €ì¥ë˜ì—ˆìŠµë‹ˆë‹¤.");
                     _logger.LogInformation($"Channel {channel.Id} audio settings updated.");
                 }
                 catch (Exception ex)
                 {
-                    NotifyError("¼³Á¤ ÀúÀå", ex);
+                    NotifyError("ì„¤ì • ì €ì¥", ex);
                     _logger.LogError(ex, $"Failed to update channel {channel.Id} audio settings.");
                     return null;
                 }
@@ -139,7 +139,7 @@ namespace WicsPlatform.Client.Services
             }
             catch (Exception ex)
             {
-                NotifyError("Ã¤³Î ¸ñ·Ï ·Îµù", ex);
+                NotifyError("ì±„ë„ ëª©ë¡ ë¡œë”©", ex);
                 return Enumerable.Empty<Channel>();
             }
         }
@@ -156,7 +156,7 @@ namespace WicsPlatform.Client.Services
             }
             catch (Exception ex)
             {
-                NotifyError("½ºÇÇÄ¿ ±×·ì ¸ñ·Ï ·Îµù", ex);
+                NotifyError("ìŠ¤í”¼ì»¤ ê·¸ë£¹ ëª©ë¡ ë¡œë”©", ex);
                 return Enumerable.Empty<Group>();
             }
         }
@@ -175,7 +175,7 @@ namespace WicsPlatform.Client.Services
             }
             catch (Exception ex)
             {
-                NotifyError("½ºÇÇÄ¿ ¸ñ·Ï ·Îµù", ex);
+                NotifyError("ìŠ¤í”¼ì»¤ ëª©ë¡ ë¡œë”©", ex);
                 return Enumerable.Empty<Speaker>();
             }
         }
@@ -193,7 +193,7 @@ namespace WicsPlatform.Client.Services
             }
             catch (Exception ex)
             {
-                NotifyError("¸ÅÇÎ Á¤º¸ ·Îµù", ex);
+                NotifyError("ë§¤í•‘ ì •ë³´ ë¡œë”©", ex);
                 return Enumerable.Empty<MapSpeakerGroup>();
             }
         }
@@ -205,7 +205,7 @@ namespace WicsPlatform.Client.Services
             Notify(NotificationSeverity.Success, summary, detail);
 
         private void NotifyError(string summary, Exception ex) =>
-            Notify(NotificationSeverity.Error, "¿À·ù", $"{summary} Áß ¿À·ù: {ex.Message}");
+            Notify(NotificationSeverity.Error, "ì˜¤ë¥˜", $"{summary} ì¤‘ ì˜¤ë¥˜: {ex.Message}");
 
         private void NotifyWarn(string summary, string detail) =>
             Notify(NotificationSeverity.Warning, summary, detail);

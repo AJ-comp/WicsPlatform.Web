@@ -1,0 +1,236 @@
+﻿@using WicsPlatform.Server.Models.wics
+
+<RadzenCard class="mt-3 collapsible-panel-container">
+    <!-- 클릭 가능한 커스텀 헤더 -->
+    <div @onclick="TogglePanel"
+         style="background-color: var(--rz-sidebar-background-color); padding: 0.75rem 1rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                <RadzenIcon Icon="@GetChannelIcon(Channel?.Type ?? 0)" Style="font-size: 1.25rem; color: var(--rz-primary);" />
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-size: 0.95rem;">
+                    @(Channel?.Name ?? "채널") - 스피커 그룹 관리
+                </RadzenText>
+            </RadzenStack>
+            <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")"
+                        Style="font-size: 1.25rem; transition: transform 0.3s ease;"
+                        class="@(IsCollapsed ? "rotate-icon" : "")" />
+        </RadzenStack>
+    </div>
+
+    <!-- 패널 내용 -->
+    @if (!IsCollapsed)
+    {
+        <div class="panel-content" Style="padding: 1rem;">
+            <RadzenStack Gap="0.75rem">
+                <!-- 스피커 그룹 리스트 -->
+                <RadzenText TextStyle="TextStyle.Body2" class="mb-1" Style="font-weight: 600;">스피커 그룹 선택</RadzenText>
+                @if (isLoadingGroups)
+                {
+                    <div class="text-center py-2">
+                        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
+                                           Style="width: 40%; height: 4px; margin: 0 auto;" />
+                        <RadzenText Text="스피커 그룹을 불러오는 중..." TextStyle="TextStyle.Caption" class="mt-1" />
+                    </div>
+                }
+                else
+                {
+                    <RadzenRow Gap="0.75rem">
+                        @foreach (var group in speakerGroups)
+                        {
+                            <RadzenColumn Size="12" SizeSM="6" SizeMD="4" SizeLG="3">
+                                <RadzenCard class="@($"speaker-group-card {(IsGroupSelected(group.Id) ? "selected" : "")}")"
+                                            Style="cursor: pointer; transition: all 0.3s ease; padding: 0.75rem;"
+                                            @onclick="@(() => ToggleGroupSelection(group.Id))">
+                                    <RadzenStack Gap="0.375rem">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                                            <RadzenIcon Icon="group" Style="font-size: 1.25rem; color: var(--rz-secondary);" />
+                                            <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">
+                                                @group.Name
+                                            </RadzenText>
+                                        </RadzenStack>
+                                        @if (!string.IsNullOrEmpty(group.Description))
+                                        {
+                                            <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.7rem;">
+                                                @group.Description
+                                            </RadzenText>
+                                        }
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true"
+                                                     Text="@($"스피커 {GetSpeakerCountInGroup(group.Id)}개")"
+                                                     Style="font-size: 0.7rem; padding: 2px 8px;" />
+                                    </RadzenStack>
+                                </RadzenCard>
+                            </RadzenColumn>
+                        }
+                    </RadzenRow>
+                }
+
+                <!-- 전체 스피커 리스트 -->
+                <RadzenText TextStyle="TextStyle.Body2" class="mt-3 mb-1" Style="font-weight: 600;">
+                    전체 스피커 목록
+                    @if (selectedGroups.Any())
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true"
+                                     Text="@($"선택된 스피커 {GetSelectedSpeakersCount()}개")" Class="ms-2"
+                                     Style="font-size: 0.7rem; padding: 2px 8px;" />
+                    }
+                </RadzenText>
+
+                @if (isLoadingSpeakers)
+                {
+                    <div class="text-center py-2">
+                        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
+                                           Style="width: 40%; height: 4px; margin: 0 auto;" />
+                        <RadzenText Text="스피커 목록을 불러오는 중..." TextStyle="TextStyle.Caption" class="mt-1" />
+                    </div>
+                }
+                else if (allSpeakers.Any())
+                {
+                    <RadzenDataGrid Data="@allSpeakers"
+                                    TItem="Speaker"
+                                    AllowAlternatingRows="false"
+                                    AllowFiltering="true"
+                                    AllowPaging="true"
+                                    PageSize="10"
+                                    AllowSorting="true"
+                                    ColumnWidth="180px"
+                                    Style="font-size: 0.8rem;">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="Speaker" Width="30px" TextAlign="TextAlign.Center">
+                                <Template Context="speaker">
+                                    <RadzenCheckBox TriState="false" TValue="bool"
+                                                    Value="@IsSpeakerInSelectedGroups(speaker.Id)"
+                                                    Disabled="true"
+                                                    Style="width: 16px; height: 16px;" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="Speaker" Property="Name" Title="스피커명" Width="160px">
+                                <Template Context="speaker">
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                        <RadzenIcon Icon="speaker" Style="font-size: 0.875rem;" />
+                                        <span style="font-size: 0.8rem;">@speaker.Name</span>
+                                    </RadzenStack>
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="Speaker" Property="Ip" Title="IP 주소" Width="120px" />
+                            <RadzenDataGridColumn TItem="Speaker" Property="Model" Title="모델" Width="100px" />
+                            <RadzenDataGridColumn TItem="Speaker" Property="Location" Title="설치 위치" />
+                            <RadzenDataGridColumn TItem="Speaker" Title="그룹" Width="180px">
+                                <Template Context="speaker">
+                                    @{
+                                        var groups = GetSpeakerGroups(speaker.Id);
+                                        if (groups.Any())
+                                        {
+                                            foreach (var groupName in groups)
+                                            {
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Secondary" IsPill="true" Text="@groupName" Class="me-1"
+                                                             Style="font-size: 0.65rem; padding: 1px 6px;" />
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted" style="font-size: 0.75rem;">미지정</span>
+                                        }
+                                    }
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="Speaker" Title="상태" Width="80px" TextAlign="TextAlign.Center">
+                                <Template Context="speaker">
+                                    <RadzenBadge BadgeStyle="@GetSpeakerStatusBadgeStyle(speaker.State)"
+                                                 IsPill="true"
+                                                 Text="@GetSpeakerStatusText(speaker.State)"
+                                                 Style="font-size: 0.65rem; padding: 1px 6px;" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+                else
+                {
+                    <RadzenCard class="text-center py-3" Style="background-color: var(--rz-base-100);">
+                        <RadzenIcon Icon="speaker_notes_off" Style="font-size: 2.5rem; color: var(--rz-text-disabled-color);" />
+                        <RadzenText TextStyle="TextStyle.Body2" class="mt-2 mb-0">
+                            등록된 스피커가 없습니다
+                        </RadzenText>
+                    </RadzenCard>
+                }
+            </RadzenStack>
+        </div>
+    }
+</RadzenCard>
+
+<style>
+    .collapsible-panel-container {
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .panel-content {
+        animation: slideDown 0.3s ease-out;
+        background-color: var(--rz-base-background-color);
+        border-radius: 0 0 var(--rz-border-radius) var(--rz-border-radius);
+        border: 1px solid var(--rz-border-color);
+        border-top: none;
+    }
+
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rotate-icon {
+        transform: rotate(-90deg);
+    }
+
+    /* 스피커 그룹 카드 스타일 */
+    .speaker-group-card {
+        transition: all 0.3s ease;
+        border: 1.5px solid transparent;
+    }
+
+        .speaker-group-card:hover {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .speaker-group-card.selected {
+            border: 1.5px solid var(--rz-secondary);
+            background-color: var(--rz-secondary-lighter);
+        }
+
+    /* 데이터그리드 컴팩트 스타일 */
+    .rz-datatable-data td {
+        padding: 0.375rem 0.5rem !important;
+        font-size: 0.8rem !important;
+    }
+
+    .rz-datatable-thead th {
+        padding: 0.5rem !important;
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+    }
+
+    .rz-paginator {
+        font-size: 0.75rem !important;
+    }
+
+        .rz-paginator .rz-button {
+            height: 28px !important;
+            min-width: 28px !important;
+        }
+
+    /* 다크 테마 지원 */
+    :root[data-theme='dark'] .speaker-group-card:hover {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    :root[data-theme='dark'] .speaker-group-card.selected {
+        background-color: rgba(var(--rz-secondary-rgb), 0.2);
+    }
+</style>

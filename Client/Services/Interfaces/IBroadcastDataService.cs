@@ -1,4 +1,4 @@
-using WicsPlatform.Client.Models;
+﻿using WicsPlatform.Client.Models;
 using WicsPlatform.Server.Models.wics;
 
 namespace WicsPlatform.Client.Services.Interfaces

@@ -39,14 +39,6 @@ namespace WicsPlatform.Client.Pages
         protected bool isLoading = true;
         protected Dictionary<ulong, bool> isChannelBroadcasting = new Dictionary<ulong, bool>();
 
-        // 그룹 및 스피커 관련
-        protected IEnumerable<WicsPlatform.Server.Models.wics.Group> speakerGroups = new List<WicsPlatform.Server.Models.wics.Group>();
-        protected List<ulong> selectedGroups = new List<ulong>();
-        protected bool isLoadingGroups = false;
-        protected IEnumerable<WicsPlatform.Server.Models.wics.Speaker> allSpeakers = new List<WicsPlatform.Server.Models.wics.Speaker>();
-        protected bool isLoadingSpeakers = false;
-        protected IEnumerable<WicsPlatform.Server.Models.wics.MapSpeakerGroup> speakerGroupMappings = new List<WicsPlatform.Server.Models.wics.MapSpeakerGroup>();
-
         // UI 상태
         protected bool speakerGroupPanelCollapsed = false;
         protected bool volumePanelCollapsed = false;
@@ -66,40 +58,35 @@ namespace WicsPlatform.Client.Pages
         protected int sampleRate = 44100;
         private System.Threading.Timer _broadcastTimer;
 
-        // 방송 소스 선택 (UI 표시용 유지)
+        // 방송 소스 선택
         protected bool isMicEnabled = true;
         protected bool isMediaEnabled = false;
         protected bool isTtsEnabled = false;
 
-        // 볼륨 설정 (설정 저장용 유지)
+        // 볼륨 설정
         protected int micVolume = 50;
         protected int mediaVolume = 50;
         protected int ttsVolume = 50;
 
-        // 테스트 방송 상태
-        protected bool isTestBroadcasting = false;
-        protected string testBroadcastId = null;
-        private System.Threading.Timer _testDataTimer;
-        private Random _testRandom = new Random();
-
-        // 녹음 관련 (RecordingService로 위임)
+        // 녹음 관련
         protected bool isRecording => RecordingService.IsRecording;
         protected string recordingDuration => RecordingService.RecordingDuration;
         protected double recordingDataSize => RecordingService.RecordingDataSize;
 
-        // JS Interop - 믹서 모듈
+        // JS Interop
         private IJSObjectReference _mixerModule;
-        private IJSObjectReference _jsModule; // 호환성 유지
+        private IJSObjectReference _jsModule;
         private IJSObjectReference _speakerModule;
         private DotNetObjectReference<ManageBroadCast> _dotNetRef;
+
+        // SubPage 참조
         protected BroadcastMonitoringSection monitoringSection;
         protected BroadcastPlaylistSection playlistSection;
         protected BroadcastTtsSection ttsSection;
+        protected BroadcastSpeakerSection speakerSection;
 
         // Broadcast 관련
-        private List<WicsPlatform.Server.Models.wics.Speaker> _currentOnlineSpeakers;
         private bool _currentLoopbackSetting = false;
-
         private MicConfig _micConfig = new MicConfig();
         #endregion
 
@@ -118,7 +105,6 @@ namespace WicsPlatform.Client.Pages
         private AudioConfiguration _currentAudioConfig = new AudioConfiguration();
         private int _preferredSampleRate = 48000;
         private int _preferredChannels = 2;
-        private int _preferredBitrate = 128000;
 
         private List<SampleRateOption> sampleRateOptions = new List<SampleRateOption>
         {
@@ -157,7 +143,6 @@ namespace WicsPlatform.Client.Pages
 
         protected override async Task OnParametersSetAsync()
         {
-            // 채널의 볼륨 설정 로드
             if (selectedChannel != null)
             {
                 micVolume = (int)(selectedChannel.MicVolume * 100);
@@ -184,10 +169,8 @@ namespace WicsPlatform.Client.Pages
             if (initialData != null)
             {
                 channels = initialData.Channels;
-                speakerGroups = initialData.SpeakerGroups;
-                allSpeakers = initialData.AllSpeakers;
-                speakerGroupMappings = initialData.SpeakerGroupMappings;
             }
+
             isLoading = false;
             StateHasChanged();
         }
@@ -207,17 +190,14 @@ namespace WicsPlatform.Client.Pages
         protected async Task SelectChannel(WicsPlatform.Server.Models.wics.Channel channel)
         {
             selectedChannel = channel;
-            selectedGroups.Clear();
             ResetAllPanels();
 
             if (channel != null)
             {
-                // 볼륨 설정 로드 (기존 그대로)
                 micVolume = (int)(channel.MicVolume * 100);
                 mediaVolume = (int)(channel.MediaVolume * 100);
                 ttsVolume = (int)(channel.TtsVolume * 100);
 
-                // UI 바인딩용 - 채널 설정 (마이크와 무관)
                 var channelSampleRate = (int)(channel.SamplingRate > 0 ? channel.SamplingRate : 48000);
                 var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
                 _preferredSampleRate = FindClosestSampleRate(channelSampleRate, supportedSampleRates);
@@ -231,6 +211,12 @@ namespace WicsPlatform.Client.Pages
 
                 _logger.LogInformation($"Channel selected: {channel.Name}, Channel Settings: {_preferredSampleRate}Hz, {_preferredChannels}ch");
                 _logger.LogInformation($"Mic Config (fixed): {_micConfig.SampleRate}Hz, {_micConfig.Channels}ch");
+            }
+
+            // 스피커 섹션 초기화
+            if (speakerSection != null)
+            {
+                speakerSection.ClearSelection();
             }
 
             await InvokeAsync(StateHasChanged);
@@ -266,7 +252,7 @@ namespace WicsPlatform.Client.Pages
         }
         #endregion
 
-        #region Broadcast Control - 마이크 전용으로 수정
+        #region Broadcast Control
         protected async Task StartBroadcast()
         {
             _logger.LogInformation("StartBroadcast 메서드 호출됨");
@@ -275,15 +261,16 @@ namespace WicsPlatform.Client.Pages
 
             try
             {
-                var (onlineSpeakers, offlineSpeakers) = GetSpeakersByStatus();
+                // 스피커 섹션에서 온라인/오프라인 스피커 가져오기
+                var onlineSpeakers = speakerSection.GetOnlineSpeakers();
+                var offlineSpeakers = speakerSection.GetOfflineSpeakers();
 
                 if (!await ValidateAndNotifyOnlineStatus(onlineSpeakers, offlineSpeakers))
                     return;
 
-                _currentOnlineSpeakers = onlineSpeakers;
-                var onlineGroups = GetOnlineGroups(onlineSpeakers);
+                var onlineGroups = speakerSection.GetSelectedGroups();
 
-                // 1단계: DB에 선택사항 저장 (UI 기록용)
+                // 1단계: DB에 선택사항 저장
                 _logger.LogInformation("1단계: DB 저장 작업");
 
                 if (isMediaEnabled)
@@ -298,7 +285,7 @@ namespace WicsPlatform.Client.Pages
                     await SaveSelectedTtsToChannel();
                 }
 
-                // 2단계: 오디오 믹서 초기화 (마이크 전용)
+                // 2단계: 오디오 믹서 초기화
                 if (!await InitializeAudioMixer())
                     return;
 
@@ -329,7 +316,6 @@ namespace WicsPlatform.Client.Pages
                 await CreateBroadcastRecords(onlineSpeakers);
                 NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
 
-                // _jsModule 참조 설정 (호환성)
                 _jsModule = _mixerModule;
 
                 await InvokeAsync(StateHasChanged);
@@ -340,6 +326,49 @@ namespace WicsPlatform.Client.Pages
             }
         }
 
+        private bool ValidateBroadcastPrerequisites()
+        {
+            if (selectedChannel == null)
+            {
+                NotifyWarn("채널 선택", "먼저 방송할 채널을 선택하세요.");
+                return false;
+            }
+
+            if (speakerSection == null || !speakerSection.GetSelectedGroups().Any())
+            {
+                NotifyWarn("스피커 그룹 선택", "방송할 스피커 그룹을 선택하세요.");
+                return false;
+            }
+
+            if (!isMicEnabled && !isMediaEnabled && !isTtsEnabled)
+            {
+                NotifyWarn("방송 소스 선택", "최소 하나의 방송 소스(마이크, 미디어, TTS)를 활성화해주세요.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private async Task<bool> ValidateAndNotifyOnlineStatus(
+            List<WicsPlatform.Server.Models.wics.Speaker> onlineSpeakers,
+            List<WicsPlatform.Server.Models.wics.Speaker> offlineSpeakers)
+        {
+            if (!onlineSpeakers.Any())
+            {
+                NotifyError("방송 불가", new Exception("온라인 상태인 스피커가 없습니다. 스피커 상태를 확인해 주세요."));
+                return false;
+            }
+
+            if (offlineSpeakers.Any())
+            {
+                var offlineNames = string.Join(", ", offlineSpeakers.Select(s => s.Name));
+                NotifyWarn("오프라인 스피커 제외", $"다음 스피커는 오프라인 상태여서 방송에서 제외됩니다: {offlineNames}");
+                await Task.Delay(2000);
+            }
+
+            return true;
+        }
+
         private async Task<bool> InitializeAudioMixer()
         {
             try
@@ -347,13 +376,8 @@ namespace WicsPlatform.Client.Pages
                 _dotNetRef = DotNetObjectReference.Create(this);
                 _mixerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/audiomixer.js");
 
-                // MicConfig를 JavaScript 설정으로 변환 (마이크 전용)
-                var jsConfig = _micConfig.ToJavaScriptConfig();
-
-                // Dictionary로 변환하여 볼륨만 추가
                 var configWithVolume = new Dictionary<string, object>
                 {
-                    // MicConfig 설정 (마이크용)
                     { "sampleRate", _micConfig.SampleRate },
                     { "channels", _micConfig.Channels },
                     { "timeslice", _micConfig.TimesliceMs },
@@ -363,8 +387,6 @@ namespace WicsPlatform.Client.Pages
                     { "autoGainControl", _micConfig.AutoGainControl },
                     { "localPlayback", _micConfig.LocalPlayback },
                     { "samplesPerSend", _micConfig.GetSamplesPerTimeslice() },
-                    
-                    // 볼륨 설정 (MicConfig와 별도)
                     { "micVolume", micVolume / 100.0 },
                     { "mediaVolume", mediaVolume / 100.0 },
                     { "ttsVolume", ttsVolume / 100.0 }
@@ -401,7 +423,6 @@ namespace WicsPlatform.Client.Pages
         {
             try
             {
-                // 미디어/TTS ID는 UI에서 선택된 것들을 그대로 저장 (기록용)
                 var selectedMediaIds = new List<ulong>();
                 if (playlistSection != null && isMediaEnabled)
                 {
@@ -496,87 +517,14 @@ namespace WicsPlatform.Client.Pages
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, $"Error updating broadcast {broadcast.Id}");
-                        // 개별 업데이트 실패는 무시하고 계속 진행
                     }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to update broadcast records");
-                throw; // 상위로 예외 전파
+                throw;
             }
-        }
-
-        private bool ValidateBroadcastPrerequisites()
-        {
-            if (selectedChannel == null)
-            {
-                NotifyWarn("채널 선택", "먼저 방송할 채널을 선택하세요.");
-                return false;
-            }
-
-            if (selectedGroups == null || !selectedGroups.Any())
-            {
-                NotifyWarn("스피커 그룹 선택", "방송할 스피커 그룹을 선택하세요.");
-                return false;
-            }
-
-            if (!isMicEnabled && !isMediaEnabled && !isTtsEnabled)
-            {
-                NotifyWarn("방송 소스 선택", "최소 하나의 방송 소스(마이크, 미디어, TTS)를 활성화해주세요.");
-                return false;
-            }
-
-            return true;
-        }
-
-        private (List<WicsPlatform.Server.Models.wics.Speaker> online, List<WicsPlatform.Server.Models.wics.Speaker> offline) GetSpeakersByStatus()
-        {
-            var selectedSpeakerIds = speakerGroupMappings
-                .Where(m => selectedGroups.Contains(m.GroupId))
-                .Select(m => m.SpeakerId)
-                .Distinct()
-                .ToList();
-
-            var online = allSpeakers
-                .Where(s => selectedSpeakerIds.Contains(s.Id) && s.State == 1)
-                .ToList();
-
-            var offline = allSpeakers
-                .Where(s => selectedSpeakerIds.Contains(s.Id) && s.State != 1)
-                .ToList();
-
-            return (online, offline);
-        }
-
-        private async Task<bool> ValidateAndNotifyOnlineStatus(
-            List<WicsPlatform.Server.Models.wics.Speaker> onlineSpeakers,
-            List<WicsPlatform.Server.Models.wics.Speaker> offlineSpeakers)
-        {
-            if (!onlineSpeakers.Any())
-            {
-                NotifyError("방송 불가", new Exception("온라인 상태인 스피커가 없습니다. 스피커 상태를 확인해 주세요."));
-                return false;
-            }
-
-            if (offlineSpeakers.Any())
-            {
-                var offlineNames = string.Join(", ", offlineSpeakers.Select(s => s.Name));
-                NotifyWarn("오프라인 스피커 제외", $"다음 스피커는 오프라인 상태여서 방송에서 제외됩니다: {offlineNames}");
-                await Task.Delay(2000);
-            }
-
-            return true;
-        }
-
-        private List<ulong> GetOnlineGroups(List<WicsPlatform.Server.Models.wics.Speaker> onlineSpeakers)
-        {
-            var onlineSpeakerIds = onlineSpeakers.Select(s => s.Id).ToList();
-            return speakerGroupMappings
-                .Where(m => onlineSpeakerIds.Contains(m.SpeakerId) && selectedGroups.Contains(m.GroupId))
-                .Select(m => m.GroupId)
-                .Distinct()
-                .ToList();
         }
 
         private async Task<bool> InitializeWebSocketBroadcast(List<ulong> onlineGroups)
@@ -759,7 +707,7 @@ namespace WicsPlatform.Client.Pages
         }
         #endregion
 
-        #region Audio Processing - 마이크 데이터만 처리
+        #region Audio Processing
         [JSInvokable]
         public async Task OnMixedAudioCaptured(string base64Data)
         {
@@ -786,7 +734,6 @@ namespace WicsPlatform.Client.Pages
                 if (_currentLoopbackSetting && _speakerModule != null)
                     await _speakerModule.InvokeVoidAsync("feed", base64Data);
 
-                // 100번에 한 번만 UI 업데이트
                 if (totalDataPackets % 100 == 0)
                 {
                     await InvokeAsync(StateHasChanged);
@@ -858,7 +805,7 @@ namespace WicsPlatform.Client.Pages
 
         protected async Task OnVolumeSaved()
         {
-            if (!isBroadcasting && !isTestBroadcasting)
+            if (!isBroadcasting)
             {
                 await LoadInitialData();
                 if (selectedChannel != null)
@@ -867,7 +814,6 @@ namespace WicsPlatform.Client.Pages
 
                     if (selectedChannel != null)
                     {
-                        // 볼륨 설정 재로드
                         micVolume = (int)(selectedChannel.MicVolume * 100);
                         mediaVolume = (int)(selectedChannel.MediaVolume * 100);
                         ttsVolume = (int)(selectedChannel.TtsVolume * 100);
@@ -881,7 +827,6 @@ namespace WicsPlatform.Client.Pages
             }
             else if (isBroadcasting && _mixerModule != null)
             {
-                // 방송 중이면 실시간으로 볼륨 업데이트 (마이크만 적용됨)
                 await _mixerModule.InvokeVoidAsync("setVolumes",
                     micVolume / 100.0,
                     mediaVolume / 100.0,
@@ -920,7 +865,7 @@ namespace WicsPlatform.Client.Pages
 
         private void OnBroadcastStatusReceived(string broadcastId, BroadcastStatus status)
         {
-            if (broadcastId == currentBroadcastId || broadcastId == testBroadcastId)
+            if (broadcastId == currentBroadcastId)
             {
                 _logger.LogDebug($"Broadcast status update - Packets: {status.PacketCount}, Bytes: {status.TotalBytes}");
             }
@@ -928,7 +873,7 @@ namespace WicsPlatform.Client.Pages
 
         private void OnWebSocketConnectionStatusChanged(string broadcastId, string status)
         {
-            if (broadcastId == currentBroadcastId || broadcastId == testBroadcastId)
+            if (broadcastId == currentBroadcastId)
             {
                 switch (status)
                 {
@@ -950,13 +895,6 @@ namespace WicsPlatform.Client.Pages
             {
                 isBroadcasting = false;
                 currentBroadcastId = null;
-                InvokeAsync(StateHasChanged);
-            }
-
-            if (isTestBroadcasting && broadcastId == testBroadcastId)
-            {
-                isTestBroadcasting = false;
-                testBroadcastId = null;
                 InvokeAsync(StateHasChanged);
             }
         }
@@ -1003,7 +941,6 @@ namespace WicsPlatform.Client.Pages
                 isBroadcasting = false;
                 monitoringPanelCollapsed = false;
 
-                // 1. 타이머 정리
                 if (_broadcastTimer != null)
                 {
                     _broadcastTimer.Dispose();
@@ -1011,7 +948,6 @@ namespace WicsPlatform.Client.Pages
                     _logger.LogInformation("브로드캐스트 타이머 정리 완료");
                 }
 
-                // 2. DB 업데이트 - 완료까지 대기 ✅
                 try
                 {
                     await UpdateBroadcastRecordsToStopped();
@@ -1020,10 +956,8 @@ namespace WicsPlatform.Client.Pages
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "DB 업데이트 실패");
-                    // DB 업데이트 실패해도 나머지 정리는 계속 진행
                 }
 
-                // 3. WebSocket 정리 - 완료까지 대기 ✅
                 if (!string.IsNullOrEmpty(currentBroadcastId))
                 {
                     var broadcastIdToStop = currentBroadcastId;
@@ -1041,18 +975,13 @@ namespace WicsPlatform.Client.Pages
                     }
                 }
 
-                // 4. 믹서 모듈 정리 - 완료까지 대기 ✅
                 if (_mixerModule != null)
                 {
                     try
                     {
                         _logger.LogInformation("믹서 모듈 정리 시작");
-
-                        // dispose 호출 및 완료 대기
                         await _mixerModule.InvokeVoidAsync("dispose");
                         _logger.LogInformation("믹서 dispose 완료");
-
-                        // 모듈 자체 dispose
                         await _mixerModule.DisposeAsync();
                         _logger.LogInformation("믹서 모듈 DisposeAsync 완료");
                     }
@@ -1067,7 +996,6 @@ namespace WicsPlatform.Client.Pages
                     }
                 }
 
-                // 5. 스피커 모듈 정리 (루프백 사용 시)
                 if (_speakerModule != null)
                 {
                     try
@@ -1085,11 +1013,8 @@ namespace WicsPlatform.Client.Pages
                     }
                 }
 
-                // 6. 상태 초기화
-                _currentOnlineSpeakers = null;
                 _currentLoopbackSetting = false;
 
-                // 7. UI 업데이트
                 await InvokeAsync(StateHasChanged);
 
                 _logger.LogInformation("HandleBroadcastStopped 완료");
@@ -1098,13 +1023,11 @@ namespace WicsPlatform.Client.Pages
             {
                 _logger.LogError(ex, "HandleBroadcastStopped 전체 오류");
 
-                // 오류 발생 시에도 최소한의 정리는 보장
                 isBroadcasting = false;
                 currentBroadcastId = null;
                 _mixerModule = null;
                 _jsModule = null;
                 _speakerModule = null;
-                _currentOnlineSpeakers = null;
                 _currentLoopbackSetting = false;
 
                 try
@@ -1188,39 +1111,8 @@ namespace WicsPlatform.Client.Pages
                     }
                 }
 
-                var unchanged = selectedMediaIds.Intersect(existingMediaIds);
-                if (unchanged.Any())
-                {
-                    LoggingService.AddLog("INFO", $"변경 없음: {unchanged.Count()}개 미디어 유지");
-                }
-
-                foreach (var mediaId in selectedMediaIds)
-                {
-                    var deletedMapping = existingMappings.Value.FirstOrDefault(m => m.MediaId == mediaId && m.DeleteYn == "Y");
-                    if (deletedMapping != null)
-                    {
-                        var updateData = new
-                        {
-                            DeleteYn = "N",
-                            UpdatedAt = DateTime.Now
-                        };
-
-                        var response = await Http.PatchAsJsonAsync($"odata/wics/MapChannelMedia(Id={deletedMapping.Id})", updateData);
-
-                        if (response.IsSuccessStatusCode)
-                        {
-                            var media = selectedMedia.FirstOrDefault(m => m.Id == mediaId);
-                            LoggingService.AddLog("SUCCESS", $"미디어 복구: {media?.FileName ?? $"ID {mediaId}"} (delete_yn=N)");
-                        }
-                        else
-                        {
-                            LoggingService.AddLog("ERROR", $"미디어 복구 실패: MediaID {mediaId}, Status: {response.StatusCode}");
-                        }
-                    }
-                }
-
                 LoggingService.AddLog("SUCCESS",
-                    $"미디어 매핑 동기화 완료 - 추가: {toAdd.Count()}개, 제거: {toDelete.Count()}개, 유지: {unchanged.Count()}개");
+                    $"미디어 매핑 동기화 완료 - 추가: {toAdd.Count()}개, 제거: {toDelete.Count()}개");
             }
             catch (Exception ex)
             {
@@ -1324,33 +1216,8 @@ namespace WicsPlatform.Client.Pages
         {
             _dotNetRef?.Dispose();
             _broadcastTimer?.Dispose();
-            _testDataTimer?.Dispose();
             RecordingService?.Dispose();
         }
-
-        // Group & Speaker Helpers
-        protected void ToggleGroupSelection(ulong groupId)
-        {
-            if (selectedGroups.Contains(groupId))
-                selectedGroups.Remove(groupId);
-            else
-                selectedGroups.Add(groupId);
-        }
-
-        protected int GetSpeakerCountInGroup(ulong groupId) =>
-            speakerGroupMappings.Where(m => m.GroupId == groupId)
-                .Select(m => m.SpeakerId).Distinct().Count();
-
-        protected IEnumerable<string> GetSpeakerGroups(ulong speakerId) =>
-            speakerGroupMappings.Where(m => m.SpeakerId == speakerId && m.Group != null)
-                .Select(m => m.Group.Name).Distinct();
-
-        protected bool IsSpeakerInSelectedGroups(ulong speakerId) =>
-            speakerGroupMappings.Any(m => m.SpeakerId == speakerId && selectedGroups.Contains(m.GroupId));
-
-        protected int GetSelectedSpeakersCount() =>
-            speakerGroupMappings.Where(m => selectedGroups.Contains(m.GroupId))
-                .Select(m => m.SpeakerId).Distinct().Count();
 
         // UI Helpers
         protected string GetChannelIcon(byte type) => type switch
@@ -1376,14 +1243,6 @@ namespace WicsPlatform.Client.Pages
             -1 => "일시정지",
             _ => "알 수 없음"
         };
-
-        protected BadgeStyle GetSpeakerStatusBadgeStyle(byte state) =>
-            state == 1 ? BadgeStyle.Success :
-            state == 0 ? BadgeStyle.Danger : BadgeStyle.Light;
-
-        protected string GetSpeakerStatusText(byte state) =>
-            state == 1 ? "온라인" :
-            state == 0 ? "오프라인" : "알 수 없음";
 
         // Notification Helpers
         private void Notify(NotificationSeverity severity, string summary, string detail, int duration = 4000) =>
