@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -190,9 +190,10 @@ namespace WicsPlatform.Client.Pages
             {
                 isLoadingGroups = true;
 
+                // Type이 0인 스피커 그룹만 가져오도록 필터 수정
                 var query = new Radzen.Query
                 {
-                    Filter = "DeleteYn eq 'N' or DeleteYn eq null"
+                    Filter = "(DeleteYn eq 'N' or DeleteYn eq null) and Type eq 0"  // Type eq 0 조건 추가
                 };
 
                 var result = await WicsService.GetGroups(query);

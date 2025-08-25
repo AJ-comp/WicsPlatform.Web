@@ -198,96 +198,6 @@
     <!-- 선택된 채널의 섹션들 -->
     @if (selectedChannel != null)
     {
-        <!-- 방송 소스 선택 패널 -->
-        <RadzenCard class="mt-3" Style="padding: 1rem;">
-            <RadzenStack Gap="1rem">
-                <RadzenRow AlignItems="AlignItems.Center" class="mb-2">
-                    <RadzenColumn Size="1">
-                        <RadzenIcon Icon="radio" Style="font-size: 20px; color: var(--rz-primary);" />
-                    </RadzenColumn>
-                    <RadzenColumn Size="11">
-                        <RadzenText TextStyle="TextStyle.Subtitle2" class="mb-0">방송 소스 선택</RadzenText>
-                    </RadzenColumn>
-                </RadzenRow>
-
-                <RadzenRow Gap="1rem" AlignItems="AlignItems.Center">
-                    <RadzenColumn Size="12" SizeMD="4">
-                        <RadzenCheckBox @bind-Value="isMicEnabled"
-                                        Name="micEnabled"
-                                        Disabled="@isBroadcasting" />
-                        <RadzenLabel Text="마이크" Component="micEnabled" Style="margin-left: 8px; font-weight: 500;" />
-                        @if (isMicEnabled)
-                        {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="활성" IsPill="true"
-                                         Style="margin-left: 8px; font-size: 0.7rem; padding: 2px 8px;" />
-                        }
-                        else
-                        {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="비활성" IsPill="true"
-                                         Style="margin-left: 8px; font-size: 0.7rem; padding: 2px 8px;" />
-                        }
-                    </RadzenColumn>
-
-                    <RadzenColumn Size="12" SizeMD="4">
-                        <RadzenCheckBox @bind-Value="isMediaEnabled"
-                                        Name="mediaEnabled"
-                                        Disabled="@isBroadcasting" />
-                        <RadzenLabel Text="미디어" Component="mediaEnabled" Style="margin-left: 8px; font-weight: 500;" />
-                        @if (isMediaEnabled)
-                        {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="활성" IsPill="true"
-                                         Style="margin-left: 8px; font-size: 0.7rem; padding: 2px 8px;" />
-                        }
-                        else
-                        {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="비활성" IsPill="true"
-                                         Style="margin-left: 8px; font-size: 0.7rem; padding: 2px 8px;" />
-                        }
-                    </RadzenColumn>
-
-                    <RadzenColumn Size="12" SizeMD="4">
-                        <RadzenCheckBox @bind-Value="isTtsEnabled"
-                                        Name="ttsEnabled"
-                                        Disabled="@isBroadcasting" />
-                        <RadzenLabel Text="TTS" Component="ttsEnabled" Style="margin-left: 8px; font-weight: 500;" />
-                        @if (isTtsEnabled)
-                        {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="활성" IsPill="true"
-                                         Style="margin-left: 8px; font-size: 0.7rem; padding: 2px 8px;" />
-                        }
-                        else
-                        {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="비활성" IsPill="true"
-                                         Style="margin-left: 8px; font-size: 0.7rem; padding: 2px 8px;" />
-                        }
-                    </RadzenColumn>
-                </RadzenRow>
-
-                @if (isBroadcasting)
-                {
-                    <RadzenCard Style="background-color: var(--rz-warning-lighter); padding: 0.75rem;">
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                            <RadzenIcon Icon="warning" Style="color: var(--rz-warning); font-size: 1rem;" />
-                            <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.8rem;">
-                                <strong>방송 중에는 방송 소스 설정을 변경할 수 없습니다.</strong>
-                            </RadzenText>
-                        </RadzenStack>
-                    </RadzenCard>
-                }
-                else
-                {
-                    <RadzenCard Style="background-color: var(--rz-info-lighter); padding: 0.75rem;">
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                            <RadzenIcon Icon="info" Style="color: var(--rz-info); font-size: 1rem;" />
-                            <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.8rem;">
-                                <strong>최소 하나의 방송 소스를 선택해야 합니다.</strong> 마이크는 실시간 음성, 미디어는 저장된 파일, TTS는 텍스트 음성변환을 담당합니다.
-                            </RadzenText>
-                        </RadzenStack>
-                    </RadzenCard>
-                }
-            </RadzenStack>
-        </RadzenCard>
-
         <!-- 오디오 설정 패널 -->
         <RadzenCard class="mt-3" Style="padding: 1rem;">
             <RadzenStack Gap="1rem">
@@ -441,9 +351,9 @@
         {
             <BroadcastMonitoringSection Channel="@selectedChannel"
                                         @bind-IsCollapsed="@monitoringPanelCollapsed"
-                                        IsMicEnabled="@isMicEnabled"
-                                        IsMediaEnabled="@isMediaEnabled"
-                                        IsTtsEnabled="@isTtsEnabled"
+                                        IsMicEnabled="true"
+                                        IsMediaEnabled="false"
+                                        IsTtsEnabled="false"
                                         JSModule="@_jsModule"
                                         OnBroadcastStatusChanged="@OnBroadcastStatusChanged"
                                         OnBroadcastStopped="@OnBroadcastStopped"
