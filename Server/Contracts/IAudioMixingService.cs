@@ -1,4 +1,5 @@
 ﻿using WicsPlatform.Server.Services;
+using WicsPlatform.Shared;
 
 namespace WicsPlatform.Server.Contracts
 {
@@ -11,13 +12,5 @@ namespace WicsPlatform.Server.Contracts
         Task SetVolume(string broadcastId, AudioSource source, float volume);
         Task<bool> StopMixer(string broadcastId);
         bool IsMixerActive(string broadcastId);
-    }
-
-    public enum AudioSource
-    {
-        Microphone,
-        Media,
-        TTS,
-        Master
     }
 }

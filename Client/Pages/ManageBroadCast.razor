@@ -368,7 +368,7 @@
         <!-- 볼륨 설정 패널 -->
         <BroadcastVolumeSection Channel="@selectedChannel"
                                 @bind-IsCollapsed="@volumePanelCollapsed"
-                                OnVolumeSaved="@OnVolumeSaved" />
+                                CurrentBroadcastId="@currentBroadcastId" />
 
         <!-- TTS 설정 패널 -->
         <BroadcastTtsSection Channel="@selectedChannel"

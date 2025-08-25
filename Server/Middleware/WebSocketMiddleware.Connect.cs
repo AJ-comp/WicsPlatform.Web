@@ -1,10 +1,10 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Net.WebSockets;
 using System.Text.Json;
 using WicsPlatform.Server.Contracts;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Services;
+using WicsPlatform.Shared;
 
 namespace WicsPlatform.Server.Middleware
 {

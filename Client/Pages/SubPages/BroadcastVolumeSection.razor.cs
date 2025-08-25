@@ -1,10 +1,12 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Radzen;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading;
+using Microsoft.Extensions.Logging;
+using WicsPlatform.Shared;
 
 namespace WicsPlatform.Client.Pages.SubPages
 {
@@ -14,27 +16,29 @@ namespace WicsPlatform.Client.Pages.SubPages
         [Parameter] public bool IsCollapsed { get; set; }
         [Parameter] public EventCallback<bool> IsCollapsedChanged { get; set; }
         [Parameter] public EventCallback OnVolumeSaved { get; set; }
+        [Parameter] public string CurrentBroadcastId { get; set; } // 현재 방송 ID (실시간 조절용)
 
         [Inject] protected NotificationService NotificationService { get; set; }
         [Inject] protected HttpClient Http { get; set; }
+        [Inject] protected ILogger<BroadcastVolumeSection> Logger { get; set; }
 
         private int micVolume = 50;
         private int ttsVolume = 50;
         private int mediaVolume = 50;
         private int globalVolume = 50;
         private bool isSavingVolumes = false;
-        
+
         // 디바운싱을 위한 필드
         private Timer _debounceTimer;
         private bool _hasUnsavedChanges = false;
         private readonly object _debouncelock = new object();
 
-        // ★ 중복 초기화 방지를 위한 변수
+        // 중복 초기화 방지를 위한 변수
         private ulong? _lastLoadedChannelId = null;
 
         protected override void OnParametersSet()
         {
-            // ★ 채널이 실제로 변경되었을 때만 볼륨 값을 초기화
+            // 채널이 실제로 변경되었을 때만 볼륨 값을 초기화
             if (Channel != null && _lastLoadedChannelId != Channel.Id)
             {
                 _lastLoadedChannelId = Channel.Id;
@@ -42,7 +46,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
         }
 
-        // ★ 채널에서 볼륨 값을 로드하는 별도 메서드
+        // 채널에서 볼륨 값을 로드하는 별도 메서드
         private void LoadVolumeFromChannel()
         {
             if (Channel != null)
@@ -102,50 +106,86 @@ namespace WicsPlatform.Client.Pages.SubPages
                 isSavingVolumes = true;
                 await InvokeAsync(StateHasChanged);
 
-                var updateData = new
+                // VolumeController API 호출
+                var volumeRequests = new[]
                 {
-                    MicVolume = micVolume / 100f,
-                    TtsVolume = ttsVolume / 100f,
-                    MediaVolume = mediaVolume / 100f,
-                    Volume = globalVolume / 100f,
-                    UpdatedAt = DateTime.Now
+                    new VolumeRequest
+                    {
+                        BroadcastId = CurrentBroadcastId, // 방송 중이면 실시간 적용
+                        ChannelId = Channel.Id,
+                        Source = AudioSource.Microphone,
+                        Volume = micVolume / 100f
+                    },
+                    new VolumeRequest
+                    {
+                        BroadcastId = CurrentBroadcastId,
+                        ChannelId = Channel.Id,
+                        Source = AudioSource.TTS,
+                        Volume = ttsVolume / 100f
+                    },
+                    new VolumeRequest
+                    {
+                        BroadcastId = CurrentBroadcastId,
+                        ChannelId = Channel.Id,
+                        Source = AudioSource.Media,
+                        Volume = mediaVolume / 100f
+                    },
+                    new VolumeRequest
+                    {
+                        BroadcastId = CurrentBroadcastId,
+                        ChannelId = Channel.Id,
+                        Source = AudioSource.Master,
+                        Volume = globalVolume / 100f
+                    }
                 };
 
-                var response = await Http.PatchAsJsonAsync($"odata/wics/Channels(Id={Channel.Id})", updateData);
-
-                if (response.IsSuccessStatusCode)
+                // 각 볼륨 설정을 VolumeController로 전송
+                foreach (var request in volumeRequests)
                 {
-                    _hasUnsavedChanges = false;
-                    
-                    // ★ 로컬 채널 객체의 볼륨 값도 업데이트하여 동기화
-                    if (Channel != null)
+                    var response = await Http.PostAsJsonAsync("api/volume/set", request);
+
+                    if (!response.IsSuccessStatusCode)
                     {
-                        Channel.MicVolume = micVolume / 100f;
-                        Channel.TtsVolume = ttsVolume / 100f;
-                        Channel.MediaVolume = mediaVolume / 100f;
-                        Channel.Volume = globalVolume / 100f;
-                        Channel.UpdatedAt = DateTime.Now;
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Logger.LogError($"Volume update failed for {request.Source}: {errorContent}");
                     }
-                    
-                    NotificationService.Notify(new NotificationMessage
+                    else
                     {
-                        Severity = NotificationSeverity.Success,
-                        Summary = "저장 완료",
-                        Detail = "볼륨 설정이 저장되었습니다.",
-                        Duration = 3000
-                    });
+                        var result = await response.Content.ReadFromJsonAsync<VolumeSetResponse>();
+                        Logger.LogInformation($"Volume updated - Source: {request.Source}, " +
+                            $"Volume: {request.Volume:P0}, SavedToDb: {result?.SavedToDb}, " +
+                            $"BroadcastId: {result?.BroadcastId}");
+                    }
+                }
 
-                    // 부모 컴포넌트에 저장 완료 알림
-                    await OnVolumeSaved.InvokeAsync();
-                }
-                else
+                _hasUnsavedChanges = false;
+
+                // 로컬 채널 객체의 볼륨 값도 업데이트하여 동기화
+                if (Channel != null)
                 {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    throw new Exception($"서버 응답 오류: {response.StatusCode} - {errorContent}");
+                    Channel.MicVolume = micVolume / 100f;
+                    Channel.TtsVolume = ttsVolume / 100f;
+                    Channel.MediaVolume = mediaVolume / 100f;
+                    Channel.Volume = globalVolume / 100f;
+                    Channel.UpdatedAt = DateTime.Now;
                 }
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "저장 완료",
+                    Detail = CurrentBroadcastId != null
+                        ? "볼륨 설정이 저장되고 실시간으로 적용되었습니다."
+                        : "볼륨 설정이 저장되었습니다. 다음 방송부터 적용됩니다.",
+                    Duration = 3000
+                });
+
+                // 부모 컴포넌트에 저장 완료 알림
+                await OnVolumeSaved.InvokeAsync();
             }
             catch (Exception ex)
             {
+                Logger.LogError(ex, "Failed to save volume settings");
                 NotificationService.Notify(new NotificationMessage
                 {
                     Severity = NotificationSeverity.Error,
@@ -184,5 +224,16 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             _debounceTimer?.Dispose();
         }
+    }
+
+    public class VolumeSetResponse
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; }
+        public string BroadcastId { get; set; }
+        public ulong ChannelId { get; set; }
+        public string Source { get; set; }
+        public float Volume { get; set; }
+        public bool SavedToDb { get; set; }
     }
 }

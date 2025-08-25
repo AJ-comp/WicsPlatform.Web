@@ -768,34 +768,6 @@ namespace WicsPlatform.Client.Pages
             await InvokeAsync(StateHasChanged);
         }
 
-        protected async Task OnVolumeSaved()
-        {
-            if (!isBroadcasting)
-            {
-                await LoadInitialData();
-                if (selectedChannel == null) return;
-
-                selectedChannel = channels.FirstOrDefault(c => c.Id == selectedChannel.Id);
-                if (selectedChannel == null) return;
-
-                micVolume = (int)(selectedChannel.MicVolume * 100);
-                mediaVolume = (int)(selectedChannel.MediaVolume * 100);
-                ttsVolume = (int)(selectedChannel.TtsVolume * 100);
-
-                var channelSampleRate = (int)(selectedChannel.SamplingRate > 0 ? selectedChannel.SamplingRate : 48000);
-                var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
-                _preferredSampleRate = FindClosestSampleRate(channelSampleRate, supportedSampleRates);
-                _preferredChannels = selectedChannel.Channel1 == "mono" ? 1 : 2;
-            }
-            else if (isBroadcasting && _mixerModule != null)
-            {
-                await _mixerModule.InvokeVoidAsync("setVolumes",
-                    micVolume / 100.0,
-                    mediaVolume / 100.0,
-                    ttsVolume / 100.0);
-            }
-        }
-
         protected Task TogglePanel(string panelName)
         {
             switch (panelName)

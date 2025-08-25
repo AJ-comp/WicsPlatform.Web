@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WicsPlatform.Server.Contracts;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Models.wics;
+using WicsPlatform.Shared;
 
 namespace WicsPlatform.Server.Controllers
 {
@@ -148,20 +149,5 @@ namespace WicsPlatform.Server.Controllers
                 }
             });
         }
-    }
-
-    // Request DTOs
-    public class VolumeRequest
-    {
-        public string BroadcastId { get; set; }  // nullable - 방송 중이 아니면 null
-        public ulong ChannelId { get; set; }     // 필수 - DB 저장용
-        public AudioSource Source { get; set; }
-        public float Volume { get; set; }
-    }
-
-    public class VolumeSetting
-    {
-        public AudioSource Source { get; set; }
-        public float Volume { get; set; }
     }
 }
