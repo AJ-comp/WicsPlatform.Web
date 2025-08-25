@@ -867,16 +867,15 @@ namespace WicsPlatform.Client.Pages
             {
                 byte[] data = Convert.FromBase64String(base64Data);
 
-                var opusData = OpusCodec.Encode(data);
-                UpdateAudioStatistics(opusData);
-                RecordingService.AddAudioData(opusData);
+                UpdateAudioStatistics(data);
+                RecordingService.AddAudioData(data);
 
                 if (monitoringSection != null)
-                    await monitoringSection.OnAudioCaptured(opusData);
+                    await monitoringSection.OnAudioCaptured(data);
 
                 if (!string.IsNullOrEmpty(currentBroadcastId))
                 {
-                    await WebSocketService.SendAudioDataAsync(currentBroadcastId, opusData);
+                    await WebSocketService.SendAudioDataAsync(currentBroadcastId, data);
                 }
 
                 if (_currentLoopbackSetting && _speakerModule != null)

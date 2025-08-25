@@ -159,16 +159,16 @@ namespace WicsPlatform.Server.Middleware
             if (!root.TryGetProperty("data", out var dataElement)) return;
 
             var base64Data = dataElement.GetString();
-            var opusData = Convert.FromBase64String(base64Data);
-            session.TotalBytes += opusData.Length;
+            var audioData = Convert.FromBase64String(base64Data);
+            session.TotalBytes += audioData.Length;
 
             if (session.OnlineSpeakers?.Any() != true) return;
 
             try
             {
                 // UDP로 압축된 데이터 전송
-                await udpService.SendAudioToSpeakers(session.OnlineSpeakers, opusData);
-//                await audioMixingService.AddMicrophoneData(broadcastId, opusCodec.Decode(opusData));
+//                await udpService.SendAudioToSpeakers(session.OnlineSpeakers, opusData);
+                await audioMixingService.AddMicrophoneData(broadcastId, audioData);
             }
             catch (Exception ex)
             {

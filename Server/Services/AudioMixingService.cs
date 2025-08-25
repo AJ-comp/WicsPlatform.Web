@@ -2,6 +2,7 @@
 using ManagedBass.Mix;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using WicsPlatform.Audio;
 using WicsPlatform.Server.Contracts;
 using WicsPlatform.Shared;  // MicConfig 사용
 
@@ -9,8 +10,9 @@ namespace WicsPlatform.Server.Services
 {
     public class AudioMixingService : IAudioMixingService, IDisposable
     {
-        private readonly ILogger<AudioMixingService> _logger;
-        private readonly IUdpBroadcastService _udpService;
+        private readonly ILogger<AudioMixingService> logger;
+        private readonly IUdpBroadcastService udpService;
+        private readonly OpusCodec opusCodec;
         private readonly ConcurrentDictionary<string, MixerSession> _sessions = new();
         private bool _bassInitialized = false;
 
@@ -37,10 +39,12 @@ namespace WicsPlatform.Server.Services
 
         public AudioMixingService(
             ILogger<AudioMixingService> logger,
-            IUdpBroadcastService udpService)
+            IUdpBroadcastService udpService,
+            OpusCodec opusCodec)
         {
-            _logger = logger;
-            _udpService = udpService;
+            this.logger = logger;
+            this.udpService = udpService;
+            this.opusCodec = opusCodec;
             InitializeBass();
         }
 
@@ -53,17 +57,17 @@ namespace WicsPlatform.Server.Services
 
                 if (!Bass.Init(-1, micConfig.SampleRate, DeviceInitFlags.Mono))
                 {
-                    _logger.LogWarning($"Failed to initialize BASS: {Bass.LastError}");
+                    logger.LogWarning($"Failed to initialize BASS: {Bass.LastError}");
                 }
                 else
                 {
                     _bassInitialized = true;
-                    _logger.LogInformation($"BASS initialized with MicConfig: {micConfig.SampleRate}Hz");
+                    logger.LogInformation($"BASS initialized with MicConfig: {micConfig.SampleRate}Hz");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error initializing BASS");
+                logger.LogError(ex, "Error initializing BASS");
             }
         }
 
@@ -71,7 +75,7 @@ namespace WicsPlatform.Server.Services
         {
             if (!_bassInitialized)
             {
-                _logger.LogError("BASS not initialized");
+                logger.LogError("BASS not initialized");
                 return false;
             }
 
@@ -106,7 +110,7 @@ namespace WicsPlatform.Server.Services
 
                 if (session.MixerStream == 0)
                 {
-                    _logger.LogError($"Failed to create mixer: {Bass.LastError}");
+                    logger.LogError($"Failed to create mixer: {Bass.LastError}");
                     return false;
                 }
 
@@ -120,7 +124,7 @@ namespace WicsPlatform.Server.Services
 
                 if (session.MicPushStream == 0)
                 {
-                    _logger.LogError($"Failed to create mic push stream: {Bass.LastError}");
+                    logger.LogError($"Failed to create mic push stream: {Bass.LastError}");
                     Bass.StreamFree(session.MixerStream);
                     return false;
                 }
@@ -131,7 +135,7 @@ namespace WicsPlatform.Server.Services
                     session.MicPushStream,
                     BassFlags.MixerChanNoRampin | BassFlags.MixerChanDownMix))
                 {
-                    _logger.LogError($"Failed to add mic stream to mixer: {Bass.LastError}");
+                    logger.LogError($"Failed to add mic stream to mixer: {Bass.LastError}");
                     Bass.StreamFree(session.MixerStream);
                     Bass.StreamFree(session.MicPushStream);
                     return false;
@@ -150,14 +154,14 @@ namespace WicsPlatform.Server.Services
 
                 _sessions[broadcastId] = session;
 
-                _logger.LogInformation($"Audio mixer initialized for broadcast: {broadcastId} " +
+                logger.LogInformation($"Audio mixer initialized for broadcast: {broadcastId} " +
                     $"(MicConfig: {micConfig.SampleRate}Hz, {micConfig.Channels}ch, {micConfig.TimesliceMs}ms)");
 
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Failed to initialize mixer for broadcast: {broadcastId}");
+                logger.LogError(ex, $"Failed to initialize mixer for broadcast: {broadcastId}");
 
                 // 정리
                 if (session.MixerStream != 0) Bass.StreamFree(session.MixerStream);
@@ -171,7 +175,7 @@ namespace WicsPlatform.Server.Services
         {
             if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
             {
-                _logger.LogWarning($"No active mixer session for broadcast: {broadcastId}");
+                logger.LogWarning($"No active mixer session for broadcast: {broadcastId}");
                 return;
             }
 
@@ -196,12 +200,12 @@ namespace WicsPlatform.Server.Services
 
                 if (result == -1)
                 {
-                    _logger.LogWarning($"Failed to push mic data: {Bass.LastError}");
+                    logger.LogWarning($"Failed to push mic data: {Bass.LastError}");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error adding microphone data");
+                logger.LogError(ex, "Error adding microphone data");
             }
         }
 
@@ -241,12 +245,21 @@ namespace WicsPlatform.Server.Services
                     pcm16[i * 2 + 1] = (byte)(int16Sample >> 8);
                 }
 
-                // UDP로 전송
-                await _udpService.SendAudioToSpeakers(session.Speakers, pcm16);
+                // ✅ PCM을 Opus로 압축
+                var opusData = opusCodec.Encode(pcm16);
+
+                // ✅ 압축된 Opus 데이터를 UDP로 전송
+                await udpService.SendAudioToSpeakers(session.Speakers, opusData);
+
+                // 디버깅용 로그 (선택사항)
+                if (session.Speakers.Count > 0 && logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug($"Broadcast {broadcastId}: PCM {pcm16.Length} bytes → Opus {opusData.Length} bytes (압축률: {(opusData.Length * 100.0 / pcm16.Length):F1}%)");
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error processing mixed output for broadcast: {broadcastId}");
+                logger.LogError(ex, $"Error processing mixed output for broadcast: {broadcastId}");
             }
         }
 
@@ -254,7 +267,7 @@ namespace WicsPlatform.Server.Services
         {
             if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
             {
-                _logger.LogWarning($"No active mixer session for broadcast: {broadcastId}");
+                logger.LogWarning($"No active mixer session for broadcast: {broadcastId}");
                 return;
             }
 
@@ -273,7 +286,7 @@ namespace WicsPlatform.Server.Services
 
                 if (!File.Exists(fullPath))
                 {
-                    _logger.LogError($"Media file not found: {fullPath}");
+                    logger.LogError($"Media file not found: {fullPath}");
                     return;
                 }
 
@@ -285,7 +298,7 @@ namespace WicsPlatform.Server.Services
 
                 if (session.MediaStream == 0)
                 {
-                    _logger.LogError($"Failed to create media stream: {Bass.LastError}");
+                    logger.LogError($"Failed to create media stream: {Bass.LastError}");
                     return;
                 }
 
@@ -295,7 +308,7 @@ namespace WicsPlatform.Server.Services
                     session.MediaStream,
                     BassFlags.MixerChanNoRampin))
                 {
-                    _logger.LogError($"Failed to add media to mixer: {Bass.LastError}");
+                    logger.LogError($"Failed to add media to mixer: {Bass.LastError}");
                     Bass.StreamFree(session.MediaStream);
                     session.MediaStream = 0;
                     return;
@@ -304,11 +317,11 @@ namespace WicsPlatform.Server.Services
                 // 볼륨 설정
                 Bass.ChannelSetAttribute(session.MediaStream, ChannelAttribute.Volume, session.MediaVolume);
 
-                _logger.LogInformation($"Media stream added to mixer: {Path.GetFileName(mediaPath)}");
+                logger.LogInformation($"Media stream added to mixer: {Path.GetFileName(mediaPath)}");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error adding media stream: {mediaPath}");
+                logger.LogError(ex, $"Error adding media stream: {mediaPath}");
             }
         }
 
@@ -323,7 +336,7 @@ namespace WicsPlatform.Server.Services
                 Bass.StreamFree(session.MediaStream);
                 session.MediaStream = 0;
 
-                _logger.LogInformation($"Media stream removed from mixer for broadcast: {broadcastId}");
+                logger.LogInformation($"Media stream removed from mixer for broadcast: {broadcastId}");
             }
         }
 
@@ -362,7 +375,7 @@ namespace WicsPlatform.Server.Services
             if (targetStream != 0)
             {
                 Bass.ChannelSetAttribute(targetStream, ChannelAttribute.Volume, volume);
-                _logger.LogDebug($"Volume set for {source}: {volume:F2}");
+                logger.LogDebug($"Volume set for {source}: {volume:F2}");
             }
         }
 
@@ -398,7 +411,7 @@ namespace WicsPlatform.Server.Services
                     Bass.StreamFree(session.MixerStream);
                 }
 
-                _logger.LogInformation($"Audio mixer stopped for broadcast: {broadcastId}");
+                logger.LogInformation($"Audio mixer stopped for broadcast: {broadcastId}");
                 return true;
             }
 
@@ -421,7 +434,7 @@ namespace WicsPlatform.Server.Services
             if (_bassInitialized)
             {
                 Bass.Free();
-                _logger.LogInformation("BASS freed in AudioMixingService");
+                logger.LogInformation("BASS freed in AudioMixingService");
             }
         }
     }
