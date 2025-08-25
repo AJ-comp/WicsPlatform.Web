@@ -26,11 +26,7 @@ namespace WicsPlatform.Server.Services
             public List<SpeakerInfo> Speakers { get; set; }
             public Timer OutputTimer { get; set; }
             public bool IsActive { get; set; }
-
-            // MicConfig 사용 (마이크 설정)
             public MicConfig MicConfig { get; set; }
-
-            // 볼륨 설정 (별도 관리)
             public float MicVolume { get; set; } = 1.0f;
             public float MediaVolume { get; set; } = 0.7f;
             public float TtsVolume { get; set; } = 0.8f;
@@ -45,6 +41,7 @@ namespace WicsPlatform.Server.Services
             this.logger = logger;
             this.udpService = udpService;
             this.opusCodec = opusCodec;
+
             InitializeBass();
         }
 

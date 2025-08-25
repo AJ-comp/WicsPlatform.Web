@@ -370,14 +370,6 @@
                                       Style="width: 100%"
                                       Click="@StartBroadcast" />
                     </RadzenColumn>
-                    <RadzenColumn Size="6">
-                        <RadzenButton Text="@(!isTestBroadcasting ? "방송 테스트" : "테스트 중...")"
-                                      Icon="@(!isTestBroadcasting ? "science" : "stop_circle")"
-                                      ButtonStyle="@(!isTestBroadcasting ? ButtonStyle.Secondary : ButtonStyle.Warning)"
-                                      Size="ButtonSize.Large"
-                                      Style="width: 100%"
-                                      Click="@ToggleTestBroadcast" />
-                    </RadzenColumn>
                 </RadzenRow>
 
                 @if (isBroadcasting)

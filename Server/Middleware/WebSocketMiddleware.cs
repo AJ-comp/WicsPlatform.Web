@@ -103,6 +103,8 @@ namespace WicsPlatform.Server.Middleware
 
                 foreach (var broadcastId in sessionsToRemove)
                 {
+                    await audioMixingService.StopMixer(broadcastId);
+
                     if (_broadcastSessions.TryRemove(broadcastId, out var session))
                     {
                         logger.LogInformation($"Removed broadcast session and cleaned up OpusCodec: {broadcastId}");

@@ -447,7 +447,11 @@ namespace WicsPlatform.Client.Pages
         {
             try
             {
-                if (selectedChannel == null) return;
+                if (selectedChannel == null)
+                {
+                    _logger.LogWarning("UpdateBroadcastRecordsToStopped: selectedChannel is null");
+                    return;
+                }
 
                 var query = new Radzen.Query
                 {
@@ -456,29 +460,50 @@ namespace WicsPlatform.Client.Pages
 
                 var result = await WicsService.GetBroadcasts(query);
 
+                if (result?.Value == null || !result.Value.Any())
+                {
+                    _logger.LogInformation("No ongoing broadcasts to update");
+                    return;
+                }
+
+                _logger.LogInformation($"Updating {result.Value.Count()} ongoing broadcasts to stopped");
+
                 foreach (var broadcast in result.Value)
                 {
-                    var updateData = new
+                    try
                     {
-                        OngoingYn = "N",
-                        UpdatedAt = DateTime.Now
-                    };
+                        var updateData = new
+                        {
+                            OngoingYn = "N",
+                            UpdatedAt = DateTime.Now
+                        };
 
-                    var response = await Http.PatchAsJsonAsync($"odata/wics/Broadcasts(Id={broadcast.Id})", updateData);
+                        var response = await Http.PatchAsJsonAsync(
+                            $"odata/wics/Broadcasts(Id={broadcast.Id})",
+                            updateData
+                        );
 
-                    if (response.IsSuccessStatusCode)
-                    {
-                        _logger.LogInformation($"Successfully updated broadcast {broadcast.Id} to stopped");
+                        if (response.IsSuccessStatusCode)
+                        {
+                            _logger.LogInformation($"Successfully updated broadcast {broadcast.Id} to stopped");
+                        }
+                        else
+                        {
+                            var content = await response.Content.ReadAsStringAsync();
+                            _logger.LogError($"Failed to update broadcast {broadcast.Id}: {response.StatusCode} - {content}");
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        _logger.LogError($"Failed to update broadcast {broadcast.Id}: {response.StatusCode}");
+                        _logger.LogError(ex, $"Error updating broadcast {broadcast.Id}");
+                        // 개별 업데이트 실패는 무시하고 계속 진행
                     }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to update broadcast records");
+                throw; // 상위로 예외 전파
             }
         }
 
@@ -705,126 +730,6 @@ namespace WicsPlatform.Client.Pages
             catch (Exception ex)
             {
                 NotifyError("루프백 설정 변경", ex);
-            }
-        }
-        #endregion
-
-        #region Test Broadcast Control
-        protected async Task ToggleTestBroadcast()
-        {
-            if (!isTestBroadcasting)
-            {
-                await StartTestBroadcast();
-            }
-            else
-            {
-                await StopTestBroadcast();
-            }
-        }
-
-        protected async Task StartTestBroadcast()
-        {
-            if (!ValidateBroadcastPrerequisites()) return;
-
-            try
-            {
-                var (onlineSpeakers, offlineSpeakers) = GetSpeakersByStatus();
-
-                if (!onlineSpeakers.Any())
-                {
-                    NotifyError("방송 불가", new Exception("온라인 상태인 스피커가 없습니다."));
-                    return;
-                }
-
-                var onlineGroups = GetOnlineGroups(onlineSpeakers);
-
-                var response = await WebSocketService.StartBroadcastAsync(selectedChannel.Id, onlineGroups);
-
-                if (!response.Success)
-                {
-                    NotifyError("테스트 방송 시작 실패", new Exception(response.Error));
-                    return;
-                }
-
-                testBroadcastId = response.BroadcastId;
-                isTestBroadcasting = true;
-
-                _testDataTimer = new System.Threading.Timer(
-                    SendTestData,
-                    null,
-                    TimeSpan.Zero,
-                    TimeSpan.FromMilliseconds(50));
-
-                NotifySuccess("테스트 방송 시작",
-                    $"'{selectedChannel.Name}' 채널에서 테스트 방송을 시작했습니다. " +
-                    $"랜덤 데이터를 50ms마다 전송합니다.");
-
-                await InvokeAsync(StateHasChanged);
-            }
-            catch (Exception ex)
-            {
-                isTestBroadcasting = false;
-                testBroadcastId = null;
-                NotifyError("테스트 방송 시작", ex);
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-
-        protected async Task StopTestBroadcast()
-        {
-            try
-            {
-                _testDataTimer?.Dispose();
-                _testDataTimer = null;
-
-                if (!string.IsNullOrEmpty(testBroadcastId))
-                {
-                    await WebSocketService.StopBroadcastAsync(testBroadcastId);
-                    testBroadcastId = null;
-                }
-
-                isTestBroadcasting = false;
-
-                NotifyInfo("테스트 방송 종료", "테스트 방송이 종료되었습니다.");
-                await InvokeAsync(StateHasChanged);
-            }
-            catch (Exception ex)
-            {
-                NotifyError("테스트 방송 종료", ex);
-            }
-        }
-
-        private async void SendTestData(object state)
-        {
-            if (!isTestBroadcasting || string.IsNullOrEmpty(testBroadcastId))
-                return;
-
-            try
-            {
-                var dataSize = 1024;
-                var testData = new byte[dataSize];
-
-                await WebSocketService.SendAudioDataAsync(testBroadcastId, testData);
-
-                Interlocked.Increment(ref totalDataPackets);
-                var sizeDelta = dataSize / 1024.0;
-                var currentTotal = totalDataSize;
-                while (currentTotal != Interlocked.CompareExchange(
-                    ref totalDataSize,
-                    currentTotal + sizeDelta,
-                    currentTotal))
-                {
-                    currentTotal = totalDataSize;
-                }
-
-                if (totalDataPackets % 20 == 0)
-                {
-                    await InvokeAsync(StateHasChanged);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "테스트 데이터 전송 중 오류");
             }
         }
         #endregion
@@ -1093,55 +998,67 @@ namespace WicsPlatform.Client.Pages
         {
             try
             {
+                _logger.LogInformation("HandleBroadcastStopped 시작");
+
                 isBroadcasting = false;
                 monitoringPanelCollapsed = false;
 
-                // 타이머 정리
-                _broadcastTimer?.Dispose();
-                _broadcastTimer = null;
-
-                // DB 업데이트 (비동기로 처리)
-                _ = Task.Run(async () => await UpdateBroadcastRecordsToStopped());
-
-                // WebSocket 정리
-                if (!string.IsNullOrEmpty(currentBroadcastId))
+                // 1. 타이머 정리
+                if (_broadcastTimer != null)
                 {
-                    _ = Task.Run(async () =>
-                    {
-                        await WebSocketService.StopBroadcastAsync(currentBroadcastId);
-                    });
-                    currentBroadcastId = null;
+                    _broadcastTimer.Dispose();
+                    _broadcastTimer = null;
+                    _logger.LogInformation("브로드캐스트 타이머 정리 완료");
                 }
 
-                // 믹서 정리 (타임아웃 설정)
+                // 2. DB 업데이트 - 완료까지 대기 ✅
+                try
+                {
+                    await UpdateBroadcastRecordsToStopped();
+                    _logger.LogInformation("DB 업데이트 완료");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "DB 업데이트 실패");
+                    // DB 업데이트 실패해도 나머지 정리는 계속 진행
+                }
+
+                // 3. WebSocket 정리 - 완료까지 대기 ✅
+                if (!string.IsNullOrEmpty(currentBroadcastId))
+                {
+                    var broadcastIdToStop = currentBroadcastId;
+                    currentBroadcastId = null;
+
+                    try
+                    {
+                        _logger.LogInformation($"WebSocket 종료 시작: {broadcastIdToStop}");
+                        await WebSocketService.StopBroadcastAsync(broadcastIdToStop);
+                        _logger.LogInformation($"WebSocket 종료 완료: {broadcastIdToStop}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"WebSocket 종료 실패: {broadcastIdToStop}");
+                    }
+                }
+
+                // 4. 믹서 모듈 정리 - 완료까지 대기 ✅
                 if (_mixerModule != null)
                 {
                     try
                     {
-                        var disposeTask = _mixerModule.InvokeVoidAsync("dispose").AsTask();
-                        var timeoutTask = Task.Delay(3000); // 3초 타임아웃
+                        _logger.LogInformation("믹서 모듈 정리 시작");
 
-                        var completedTask = await Task.WhenAny(disposeTask, timeoutTask);
+                        // dispose 호출 및 완료 대기
+                        await _mixerModule.InvokeVoidAsync("dispose");
+                        _logger.LogInformation("믹서 dispose 완료");
 
-                        if (completedTask == timeoutTask)
-                        {
-                            _logger.LogWarning("Mixer dispose timeout");
-                        }
-
-                        // DisposeAsync도 타임아웃 설정
-                        var moduleDisposeTask = _mixerModule.DisposeAsync().AsTask();
-                        timeoutTask = Task.Delay(2000);
-
-                        completedTask = await Task.WhenAny(moduleDisposeTask, timeoutTask);
-
-                        if (completedTask == timeoutTask)
-                        {
-                            _logger.LogWarning("Mixer module dispose timeout");
-                        }
+                        // 모듈 자체 dispose
+                        await _mixerModule.DisposeAsync();
+                        _logger.LogInformation("믹서 모듈 DisposeAsync 완료");
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to dispose mixer module");
+                        _logger.LogError(ex, "믹서 모듈 정리 실패");
                     }
                     finally
                     {
@@ -1150,23 +1067,51 @@ namespace WicsPlatform.Client.Pages
                     }
                 }
 
+                // 5. 스피커 모듈 정리 (루프백 사용 시)
+                if (_speakerModule != null)
+                {
+                    try
+                    {
+                        await _speakerModule.DisposeAsync();
+                        _logger.LogInformation("스피커 모듈 정리 완료");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "스피커 모듈 정리 실패");
+                    }
+                    finally
+                    {
+                        _speakerModule = null;
+                    }
+                }
+
+                // 6. 상태 초기화
                 _currentOnlineSpeakers = null;
                 _currentLoopbackSetting = false;
 
-                // UI 업데이트
+                // 7. UI 업데이트
                 await InvokeAsync(StateHasChanged);
+
+                _logger.LogInformation("HandleBroadcastStopped 완료");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "HandleBroadcastStopped error");
+                _logger.LogError(ex, "HandleBroadcastStopped 전체 오류");
 
-                // 최소한의 정리는 보장
+                // 오류 발생 시에도 최소한의 정리는 보장
                 isBroadcasting = false;
+                currentBroadcastId = null;
                 _mixerModule = null;
                 _jsModule = null;
-                currentBroadcastId = null;
+                _speakerModule = null;
+                _currentOnlineSpeakers = null;
+                _currentLoopbackSetting = false;
 
-                await InvokeAsync(StateHasChanged);
+                try
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch { }
             }
         }
 
@@ -1306,6 +1251,7 @@ namespace WicsPlatform.Client.Pages
                 {
                     Filter = $"ChannelId eq {selectedChannel.Id}"
                 };
+
                 var existingMappings = await WicsService.GetMapChannelTts(query);
                 var existingTtsIds = existingMappings.Value
                     .Where(m => m.DeleteYn != "Y")
