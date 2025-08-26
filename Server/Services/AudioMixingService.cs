@@ -415,6 +415,112 @@ namespace WicsPlatform.Server.Services
             return false;
         }
 
+
+        // 마이크 스트림만 제거하는 메서드
+        public async Task RemoveMicrophoneStream(string broadcastId)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session))
+            {
+                logger.LogWarning($"No session found for broadcast: {broadcastId}");
+                return;
+            }
+
+            try
+            {
+                if (session.MicPushStream != 0)
+                {
+                    // 믹서에서 마이크 스트림 제거
+                    BassMix.MixerRemoveChannel(session.MicPushStream);
+
+                    // 스트림 해제
+                    Bass.StreamFree(session.MicPushStream);
+                    session.MicPushStream = 0;
+
+                    logger.LogInformation($"Microphone stream removed for broadcast: {broadcastId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"Error removing microphone stream for broadcast: {broadcastId}");
+            }
+        }
+
+        // 활성 미디어 스트림이 있는지 확인
+        public bool HasActiveMediaStream(string broadcastId)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session))
+                return false;
+
+            return session.MediaStream != 0 && session.IsActive;
+        }
+
+        // 활성 TTS 스트림이 있는지 확인
+        public bool HasActiveTtsStream(string broadcastId)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session))
+                return false;
+
+            return session.TtsStream != 0 && session.IsActive;
+        }
+
+        // 마이크 스트림 재초기화 (재연결 시 사용)
+        public async Task<bool> InitializeMicStream(string broadcastId)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session))
+            {
+                logger.LogError($"No session found for broadcast: {broadcastId}");
+                return false;
+            }
+
+            try
+            {
+                // 기존 마이크 스트림이 있으면 제거
+                if (session.MicPushStream != 0)
+                {
+                    await RemoveMicrophoneStream(broadcastId);
+                }
+
+                // 새 Push 스트림 생성
+                session.MicPushStream = Bass.CreateStream(
+                    session.MicConfig.SampleRate,
+                    session.MicConfig.Channels,
+                    BassFlags.Float | BassFlags.Decode,
+                    StreamProcedureType.Push
+                );
+
+                if (session.MicPushStream == 0)
+                {
+                    logger.LogError($"Failed to create mic push stream: {Bass.LastError}");
+                    return false;
+                }
+
+                // 믹서에 추가
+                if (!BassMix.MixerAddChannel(
+                    session.MixerStream,
+                    session.MicPushStream,
+                    BassFlags.MixerChanNoRampin | BassFlags.MixerChanDownMix))
+                {
+                    logger.LogError($"Failed to add mic stream to mixer: {Bass.LastError}");
+                    Bass.StreamFree(session.MicPushStream);
+                    session.MicPushStream = 0;
+                    return false;
+                }
+
+                // 볼륨 설정
+                Bass.ChannelSetAttribute(session.MicPushStream, ChannelAttribute.Volume, session.MicVolume);
+
+                logger.LogInformation($"Microphone stream re-initialized for broadcast: {broadcastId}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"Error initializing mic stream for broadcast: {broadcastId}");
+                return false;
+            }
+        }
+
+
+
         public bool IsMixerActive(string broadcastId)
         {
             return _sessions.TryGetValue(broadcastId, out var session) && session.IsActive;

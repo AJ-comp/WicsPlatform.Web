@@ -12,5 +12,11 @@ namespace WicsPlatform.Server.Contracts
         Task SetVolume(string broadcastId, AudioSource source, float volume);
         Task<bool> StopMixer(string broadcastId);
         bool IsMixerActive(string broadcastId);
+
+
+        Task RemoveMicrophoneStream(string broadcastId);
+        bool HasActiveMediaStream(string broadcastId);
+        bool HasActiveTtsStream(string broadcastId);
+        Task<bool> InitializeMicStream(string broadcastId);
     }
 }

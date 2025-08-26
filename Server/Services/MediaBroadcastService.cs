@@ -14,6 +14,8 @@ namespace WicsPlatform.Server.Services
         private readonly ConcurrentDictionary<string, MediaSession> _sessions = new();
         private bool _bassInitialized = false;
 
+        public event Action<string> OnPlaybackCompleted;
+
         private class MediaSession
         {
             public string BroadcastId { get; set; }

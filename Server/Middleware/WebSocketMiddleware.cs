@@ -8,183 +8,167 @@ using WicsPlatform.Server.Contracts;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Services;
 
-namespace WicsPlatform.Server.Middleware
+namespace WicsPlatform.Server.Middleware;
+
+public partial class WebSocketMiddleware
 {
-    public partial class WebSocketMiddleware
+    private readonly RequestDelegate next;
+    private readonly OpusCodec opusCodec;
+    private readonly ILogger<WebSocketMiddleware> logger;
+    private readonly IServiceScopeFactory serviceScopeFactory;
+    private readonly IUdpBroadcastService udpService;
+    private readonly IMediaBroadcastService mediaBroadcastService;
+    private readonly IAudioMixingService audioMixingService;
+    private static readonly ConcurrentDictionary<string, BroadcastSession> _broadcastSessions = new();
+
+    private readonly ushort MaxBuffer = 10000; // 최대 패킷 크기
+
+    public WebSocketMiddleware(
+        RequestDelegate next,
+        OpusCodec opusCodec,
+        ILogger<WebSocketMiddleware> logger,
+        IServiceScopeFactory serviceScopeFactory,
+        IUdpBroadcastService udpService,
+        IMediaBroadcastService mediaBroadcastService,
+        IAudioMixingService audioMixingService)
     {
-        private readonly RequestDelegate next;
-        private readonly OpusCodec opusCodec;
-        private readonly ILogger<WebSocketMiddleware> logger;
-        private readonly IServiceScopeFactory serviceScopeFactory;
-        private readonly IUdpBroadcastService udpService;
-        private readonly IMediaBroadcastService mediaBroadcastService;
-        private readonly IAudioMixingService audioMixingService;
-        private static readonly ConcurrentDictionary<string, BroadcastSession> _broadcastSessions = new();
+        this.next = next;
+        this.opusCodec = opusCodec;
+        this.logger = logger;
+        this.serviceScopeFactory = serviceScopeFactory;
+        this.udpService = udpService;
+        this.mediaBroadcastService = mediaBroadcastService;
+        this.audioMixingService = audioMixingService;
 
-        private readonly ushort MaxBuffer = 10000; // 최대 패킷 크기
+        mediaBroadcastService.OnPlaybackCompleted += OnMediaPlaybackCompleted;
+    }
 
-        public WebSocketMiddleware(
-            RequestDelegate next,
-            OpusCodec opusCodec,
-            ILogger<WebSocketMiddleware> logger,
-            IServiceScopeFactory serviceScopeFactory,
-            IUdpBroadcastService udpService,
-            IMediaBroadcastService mediaBroadcastService,
-            IAudioMixingService audioMixingService)
+    public async Task InvokeAsync(HttpContext context)
+    {
+        if (context.Request.Path.StartsWithSegments("/broadcast") && context.WebSockets.IsWebSocketRequest)
         {
-            this.next = next;
-            this.opusCodec = opusCodec;
-            this.logger = logger;
-            this.serviceScopeFactory = serviceScopeFactory;
-            this.udpService = udpService;
-            this.mediaBroadcastService = mediaBroadcastService;
-            this.audioMixingService = audioMixingService;
-        }
-
-        public async Task InvokeAsync(HttpContext context)
-        {
-            if (context.Request.Path.StartsWithSegments("/broadcast") && context.WebSockets.IsWebSocketRequest)
+            var pathSegments = context.Request.Path.Value.Split('/');
+            if (pathSegments.Length >= 3 && ulong.TryParse(pathSegments[2], out var channelId))
             {
-                var pathSegments = context.Request.Path.Value.Split('/');
-                if (pathSegments.Length >= 3 && ulong.TryParse(pathSegments[2], out var channelId))
-                {
-                    await HandleWebSocketAsync(context, channelId);
-                }
-                else
-                {
-                    context.Response.StatusCode = 400;
-                }
+                await HandleWebSocketAsync(context, channelId);
             }
             else
             {
-                await next(context);
+                context.Response.StatusCode = 400;
             }
         }
-
-        private async Task HandleWebSocketAsync(HttpContext context, ulong channelId)
+        else
         {
-            using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-            var connectionId = Guid.NewGuid().ToString();
+            await next(context);
+        }
+    }
 
-            logger.LogInformation($"WebSocket connected: {connectionId} for channel: {channelId}");
+    private async Task HandleWebSocketAsync(HttpContext context, ulong channelId)
+    {
+        using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+        var connectionId = Guid.NewGuid().ToString();
 
-            var buffer = new ArraySegment<byte>(new byte[MaxBuffer]);
-            var cancellationToken = context.RequestAborted;
+        logger.LogInformation($"WebSocket connected: {connectionId} for channel: {channelId}");
 
-            try
+        var buffer = new ArraySegment<byte>(new byte[MaxBuffer]);
+        var cancellationToken = context.RequestAborted;
+
+        try
+        {
+            while (webSocket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
             {
-                while (webSocket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
-                {
-                    var result = await webSocket.ReceiveAsync(buffer, cancellationToken);
+                var result = await webSocket.ReceiveAsync(buffer, cancellationToken);
 
-                    if (result.MessageType == WebSocketMessageType.Text)
+                if (result.MessageType == WebSocketMessageType.Text)
+                {
+                    var message = Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
+                    await ProcessMessageAsync(webSocket, connectionId, channelId, message);
+                }
+                else if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, $"WebSocket error for connection: {connectionId}");
+        }
+        finally
+        {
+            var sessionsToRemove = _broadcastSessions
+                .Where(kvp => kvp.Value.ConnectionId == connectionId)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var broadcastId in sessionsToRemove)
+            {
+                if (_broadcastSessions.TryGetValue(broadcastId, out var session))
+                {
+                    // WebSocket 연결만 null로 설정
+                    session.WebSocket = null;
+
+                    // 마이크 스트림만 제거
+                    await audioMixingService.RemoveMicrophoneStream(broadcastId);
+
+                    // 미디어 재생 확인
+                    var mediaStatus = await mediaBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
+
+                    if (mediaStatus?.IsPlaying == true)
                     {
-                        var message = Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
-                        await ProcessMessageAsync(webSocket, connectionId, channelId, message);
+                        // 미디어 재생 중 - 세션 유지, WebSocket만 null
+                        logger.LogInformation($"Client disconnected but media continues: {broadcastId}");
                     }
-                    else if (result.MessageType == WebSocketMessageType.Close)
+                    else
                     {
-                        await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+                        // 미디어도 없으면 전체 정리
+                        await audioMixingService.StopMixer(broadcastId);
+                        _broadcastSessions.TryRemove(broadcastId, out _);
+                        logger.LogInformation($"Broadcast session fully cleaned up: {broadcastId}");
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task ProcessMessageAsync(WebSocket webSocket, string connectionId, ulong channelId, string message)
+    {
+        try
+        {
+            var jsonDoc = JsonDocument.Parse(message);
+            var root = jsonDoc.RootElement;
+
+            if (root.TryGetProperty("type", out var typeElement))
+            {
+                var messageType = typeElement.GetString();
+
+                switch (messageType)
+                {
+                    case "connect":
+                        await HandleConnectAsync(webSocket, connectionId, channelId, root);
                         break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, $"WebSocket error for connection: {connectionId}");
-            }
-            finally
-            {
-                // 연결 종료 시 세션 정리
-                var sessionsToRemove = _broadcastSessions
-                    .Where(kvp => kvp.Value.ConnectionId == connectionId)
-                    .Select(kvp => kvp.Key)
-                    .ToList();
-
-                foreach (var broadcastId in sessionsToRemove)
-                {
-                    await audioMixingService.StopMixer(broadcastId);
-
-                    if (_broadcastSessions.TryRemove(broadcastId, out var session))
-                    {
-                        logger.LogInformation($"Removed broadcast session and cleaned up OpusCodec: {broadcastId}");
-                    }
+                    case "disconnect":
+                        await HandleDisconnectAsync(root);
+                        break;
+                    case "audio":
+                        await HandleAudioDataAsync(webSocket, root);
+                        break;
                 }
             }
         }
-
-        private async Task ProcessMessageAsync(WebSocket webSocket, string connectionId, ulong channelId, string message)
+        catch (Exception ex)
         {
-            try
-            {
-                var jsonDoc = JsonDocument.Parse(message);
-                var root = jsonDoc.RootElement;
-
-                if (root.TryGetProperty("type", out var typeElement))
-                {
-                    var messageType = typeElement.GetString();
-
-                    switch (messageType)
-                    {
-                        case "connect":
-                            await HandleConnectAsync(webSocket, connectionId, channelId, root);
-                            break;
-                        case "disconnect":
-                            await HandleDisconnectAsync(root);
-                            break;
-                        case "audio":
-                            await HandleAudioDataAsync(webSocket, root);
-                            break;
-                        case "media_play":
-                            await HandleMediaPlayAsync(webSocket, root);
-                            break;
-                        case "media_stop":
-                            await HandleMediaStopAsync(webSocket, root);
-                            break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error processing message");
-            }
+            logger.LogError(ex, "Error processing message");
         }
+    }
 
-        private async Task HandleAudioDataAsync(WebSocket webSocket, JsonElement root)
+    private async Task SendMessageAsync(WebSocket webSocket, string message)
+    {
+        if (webSocket.State == WebSocketState.Open)
         {
-            if (!root.TryGetProperty("broadcastId", out var broadcastIdElement)) return;
-            var broadcastId = broadcastIdElement.GetString();
-            if (!_broadcastSessions.TryGetValue(broadcastId, out var session)) return;
-
-            session.PacketCount++;
-
-            if (!root.TryGetProperty("data", out var dataElement)) return;
-
-            var base64Data = dataElement.GetString();
-            var audioData = Convert.FromBase64String(base64Data);
-            session.TotalBytes += audioData.Length;
-
-            if (session.OnlineSpeakers?.Any() != true) return;
-
-            try
-            {
-                // UDP로 압축된 데이터 전송
-//                await udpService.SendAudioToSpeakers(session.OnlineSpeakers, opusData);
-                await audioMixingService.AddMicrophoneData(broadcastId, audioData);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, $"Opus encoding failed for broadcast {broadcastId}");
-            }
-        }
-
-        private async Task SendMessageAsync(WebSocket webSocket, string message)
-        {
-            if (webSocket.State == WebSocketState.Open)
-            {
-                var bytes = Encoding.UTF8.GetBytes(message);
-                await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
-            }
+            var bytes = Encoding.UTF8.GetBytes(message);
+            await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
         }
     }
 }

@@ -12,7 +12,7 @@ namespace WicsPlatform.Server.Middleware
     {
         private async Task HandleConnectAsync(WebSocket webSocket, string connectionId, ulong channelId, JsonElement root)
         {
-            var req = JsonSerializer.Deserialize<BroadcastRequest>(root);
+            var req = JsonSerializer.Deserialize<ConnectBroadcastRequest>(root);
             if (req is null || string.IsNullOrWhiteSpace(req.BroadcastId)) return;
 
             var broadcastId = req.BroadcastId;
@@ -109,15 +109,9 @@ namespace WicsPlatform.Server.Middleware
 
         private async Task HandleDisconnectAsync(JsonElement root)
         {
-            var req = JsonSerializer.Deserialize<BroadcastRequest>(root);
-            var broadcastId = req.BroadcastId;
+            var req = JsonSerializer.Deserialize<DisconnectBroadcastRequest>(root);
 
-            await audioMixingService.StopMixer(broadcastId);
-
-            if (_broadcastSessions.TryRemove(broadcastId, out var session))
-            {
-                logger.LogInformation($"Broadcast disconnected: {broadcastId}");
-            }
+            await CleanupBroadcastSessionAsync(req.BroadcastId, true);
         }
 
 

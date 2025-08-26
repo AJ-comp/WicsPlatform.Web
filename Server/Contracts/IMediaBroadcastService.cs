@@ -17,6 +17,9 @@ namespace WicsPlatform.Server.Contracts
 
         Task<bool> StopMediaByBroadcastIdAsync(string broadcastId);
         Task<MediaPlaybackStatus> GetStatusByBroadcastIdAsync(string broadcastId);
+
+        public event Action<string> OnPlaybackCompleted;
+
         void Dispose();
     }
 
