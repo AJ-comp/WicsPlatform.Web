@@ -4,18 +4,29 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Radzen;
+using System.Net.Http;
+using System.Net.Http.Json;
+using WicsPlatform.Shared;
 
 namespace WicsPlatform.Client.Pages.SubPages
 {
     public partial class BroadcastPlaylistSection
     {
+        /* ────────────────────── [Parameters] ────────────────────── */
         [Parameter] public WicsPlatform.Server.Models.wics.Channel Channel { get; set; }
         [Parameter] public bool IsCollapsed { get; set; }
         [Parameter] public EventCallback<bool> IsCollapsedChanged { get; set; }
 
+        // 방송 관련 파라미터 추가
+        [Parameter] public bool IsBroadcasting { get; set; }
+        [Parameter] public string BroadcastId { get; set; }
+
+        /* ────────────────────── [DI] ────────────────────── */
         [Inject] protected NotificationService NotificationService { get; set; }
         [Inject] protected wicsService WicsService { get; set; }
+        [Inject] protected HttpClient Http { get; set; }
 
+        /* ────────────────────── [State - 기존] ────────────────────── */
         // 플레이리스트 관련 필드
         private IEnumerable<WicsPlatform.Server.Models.wics.Group> playlists = new List<WicsPlatform.Server.Models.wics.Group>();
         private WicsPlatform.Server.Models.wics.Group selectedPlaylist = null;
@@ -31,17 +42,149 @@ namespace WicsPlatform.Client.Pages.SubPages
         private Dictionary<ulong, bool> selectedMedia = new Dictionary<ulong, bool>();
         private bool selectAllMedia = false;
 
+        /* ────────────────────── [State - 미디어 재생 관련 추가] ────────────────────── */
+        private bool isMediaPlaying = false;
+        private bool isMediaActionInProgress = false;
+        private string currentMediaSessionId = null;
+
+        /* ────────────────────── [Life-Cycle] ────────────────────── */
         protected override async Task OnInitializedAsync()
         {
             await LoadPlaylists();
         }
 
+        protected override async Task OnParametersSetAsync()
+        {
+            // 방송이 종료되면 미디어 재생 상태 초기화
+            if (!IsBroadcasting && isMediaPlaying)
+            {
+                isMediaPlaying = false;
+                currentMediaSessionId = null;
+                StateHasChanged();
+            }
+        }
+
+        /* ────────────────────── [Panel Toggle] ────────────────────── */
         private async Task TogglePanel()
         {
             await IsCollapsedChanged.InvokeAsync(!IsCollapsed);
         }
 
-        // 플레이리스트 로드
+        /* ────────────────────── [미디어 재생/중지] ────────────────────── */
+        private async Task PlayMedia()
+        {
+            if (!IsBroadcasting || string.IsNullOrEmpty(BroadcastId) || !HasSelectedMedia())
+            {
+                NotifyWarning("미디어를 재생하려면 방송 중이어야 하고 미디어가 선택되어 있어야 합니다.");
+                return;
+            }
+
+            try
+            {
+                isMediaActionInProgress = true;
+                StateHasChanged();
+
+                // 선택된 미디어 ID 가져오기
+                var mediaIds = GetSelectedMedia().Select(m => m.Id).ToList();
+                if (!mediaIds.Any())
+                {
+                    NotifyWarning("선택된 미디어가 없습니다.");
+                    return;
+                }
+
+                // MediaPlayerController의 play 엔드포인트 호출
+                var request = new
+                {
+                    broadcastId = BroadcastId,
+                    mediaIds = mediaIds
+                };
+
+                var response = await Http.PostAsJsonAsync("api/mediaplayer/play", request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<MediaPlayResponse>();
+                    if (result.Success)
+                    {
+                        isMediaPlaying = true;
+                        currentMediaSessionId = result.SessionId;
+                        NotifySuccess($"미디어 재생을 시작했습니다. ({mediaIds.Count}개 파일)");
+                    }
+                    else
+                    {
+                        NotifyError("미디어 재생 실패", new Exception(result.Message));
+                    }
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    NotifyError("미디어 재생 요청 실패", new Exception($"Status: {response.StatusCode}, Error: {errorContent}"));
+                }
+            }
+            catch (Exception ex)
+            {
+                NotifyError("미디어 재생 중 오류가 발생했습니다", ex);
+            }
+            finally
+            {
+                isMediaActionInProgress = false;
+                StateHasChanged();
+            }
+        }
+
+        private async Task StopMedia()
+        {
+            if (!IsBroadcasting || string.IsNullOrEmpty(BroadcastId))
+            {
+                NotifyWarning("방송 중이 아닙니다.");
+                return;
+            }
+
+            try
+            {
+                isMediaActionInProgress = true;
+                StateHasChanged();
+
+                // MediaPlayerController의 stop 엔드포인트 호출
+                var request = new
+                {
+                    broadcastId = BroadcastId
+                };
+
+                var response = await Http.PostAsJsonAsync("api/mediaplayer/stop", request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<MediaStopResponse>();
+                    if (result.Success)
+                    {
+                        isMediaPlaying = false;
+                        currentMediaSessionId = null;
+                        NotifyInfo("미디어 재생을 중지했습니다.");
+                    }
+                    else
+                    {
+                        NotifyError("미디어 중지 실패", new Exception(result.Message));
+                    }
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    NotifyError("미디어 중지 요청 실패", new Exception($"Status: {response.StatusCode}, Error: {errorContent}"));
+                }
+            }
+            catch (Exception ex)
+            {
+                NotifyError("미디어 중지 중 오류가 발생했습니다", ex);
+            }
+            finally
+            {
+                isMediaActionInProgress = false;
+                StateHasChanged();
+            }
+        }
+
+        /* ────────────────────── [플레이리스트 관련 - 기존] ────────────────────── */
         private async Task LoadPlaylists()
         {
             try
@@ -71,13 +214,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
             catch (Exception ex)
             {
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "오류",
-                    Detail = $"플레이리스트 목록을 불러오는 중 오류가 발생했습니다: {ex.Message}",
-                    Duration = 4000
-                });
+                NotifyError("플레이리스트 목록을 불러오는 중 오류가 발생했습니다", ex);
             }
             finally
             {
@@ -108,23 +245,6 @@ namespace WicsPlatform.Client.Pages.SubPages
         private void OnPlaylistCheckChanged(ulong playlistId, bool isChecked)
         {
             selectedPlaylists[playlistId] = isChecked;
-            StateHasChanged();
-        }
-
-        // 플레이리스트 선택 시 (기존 메서드 - ListBox용)
-        private async Task OnPlaylistSelected(object value)
-        {
-            Console.WriteLine($"OnPlaylistSelected called. SelectedPlaylist: {selectedPlaylist?.Name ?? "null"}");
-
-            if (selectedPlaylist != null)
-            {
-                await LoadPlaylistMedia(selectedPlaylist.Id);
-            }
-            else
-            {
-                playlistMedia = new List<WicsPlatform.Server.Models.wics.Medium>();
-            }
-
             StateHasChanged();
         }
 
@@ -196,13 +316,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 Console.WriteLine($"Error loading media: {ex.Message}");
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
 
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "오류",
-                    Detail = $"미디어 파일 목록을 불러오는 중 오류가 발생했습니다: {ex.Message}",
-                    Duration = 4000
-                });
+                NotifyError("미디어 파일 목록을 불러오는 중 오류가 발생했습니다", ex);
 
                 playlistMedia = new List<WicsPlatform.Server.Models.wics.Medium>();
                 selectAllMedia = false;
@@ -281,6 +395,8 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
         }
 
+        /* ────────────────────── [Public Methods] ────────────────────── */
+
         // 선택된 플레이리스트 목록 가져오기
         public IEnumerable<WicsPlatform.Server.Models.wics.Group> GetSelectedPlaylists()
         {
@@ -292,5 +408,35 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             return playlistMedia.Where(m => selectedMedia.ContainsKey(m.Id) && selectedMedia[m.Id]);
         }
+
+        // 선택된 미디어가 있는지 확인
+        public bool HasSelectedMedia()
+        {
+            return selectedMedia.Any(kvp => kvp.Value);
+        }
+
+        // 미디어 재생 상태 초기화 (외부에서 호출 가능)
+        public void ResetMediaPlaybackState()
+        {
+            isMediaPlaying = false;
+            currentMediaSessionId = null;
+            StateHasChanged();
+        }
+
+        /* ────────────────────── [Helpers] ────────────────────── */
+        private void NotifySuccess(string message) => Notify(NotificationSeverity.Success, "완료", message);
+        private void NotifyInfo(string message) => Notify(NotificationSeverity.Info, "안내", message);
+        private void NotifyWarning(string message) => Notify(NotificationSeverity.Warning, "경고", message);
+        private void NotifyError(string summary, Exception ex) =>
+            Notify(NotificationSeverity.Error, summary, ex.Message);
+
+        private void Notify(NotificationSeverity severity, string summary, string detail) =>
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = severity,
+                Summary = summary,
+                Detail = detail,
+                Duration = 4000
+            });
     }
 }

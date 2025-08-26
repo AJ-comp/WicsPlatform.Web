@@ -378,6 +378,8 @@
         <!-- 플레이리스트 설정 패널 -->
         <BroadcastPlaylistSection Channel="@selectedChannel"
                                   @bind-IsCollapsed="@playlistPanelCollapsed"
+                                  IsBroadcasting="@isBroadcasting"
+                                  BroadcastId="@currentBroadcastId"
                                   @ref="playlistSection" />
     }
 </RadzenStack>

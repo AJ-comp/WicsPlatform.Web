@@ -1,4 +1,4 @@
-@using WicsPlatform.Server.Models.wics
+﻿@using WicsPlatform.Server.Models.wics
 
 <RadzenCard class="mt-3 collapsible-panel-container">
     <!-- 클릭 가능한 커스텀 헤더 -->
@@ -11,9 +11,54 @@
                     @(Channel?.Name ?? "채널") - 플레이리스트 관리
                 </RadzenText>
             </RadzenStack>
-            <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")"
-                        Style="font-size: 1.25rem; transition: transform 0.3s ease;"
-                        class="@(IsCollapsed ? "rotate-icon" : "")" />
+
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                @* 방송 중일 때 미디어 재생/중지 버튼 표시 *@
+                @if (IsBroadcasting && !IsCollapsed)
+                {
+                    <div class="broadcast-media-controls" @onclick:stopPropagation="true">
+                        @if (!isMediaPlaying)
+                        {
+                            <RadzenButton Icon="play_circle_filled"
+                                          Text="미디어 재생"
+                                          ButtonStyle="ButtonStyle.Success"
+                                          Size="ButtonSize.Small"
+                                          Variant="Variant.Flat"
+                                          Disabled="@(!HasSelectedMedia() || isMediaActionInProgress)"
+                                          Click="@PlayMedia"
+                                          Style="height: 28px; font-size: 0.75rem;"
+                                          Title="@(!HasSelectedMedia() ? "재생할 미디어를 먼저 선택하세요" : "선택된 미디어 재생")" />
+                        }
+                        else
+                        {
+                            <RadzenButton Icon="stop_circle"
+                                          Text="미디어 중지"
+                                          ButtonStyle="ButtonStyle.Warning"
+                                          Size="ButtonSize.Small"
+                                          Variant="Variant.Flat"
+                                          Disabled="@isMediaActionInProgress"
+                                          Click="@StopMedia"
+                                          Style="height: 28px; font-size: 0.75rem;"
+                                          Title="미디어 재생 중지" />
+                        }
+
+                        @if (isMediaActionInProgress)
+                        {
+                            <RadzenProgressBarCircular Value="100"
+                                                       ShowValue="false"
+                                                       Mode="ProgressBarMode.Indeterminate"
+                                                       Size="ProgressBarCircularSize.ExtraSmall"
+                                                       Style="width: 20px; height: 20px; margin-left: 8px;" />
+                        }
+                    </div>
+
+                    <div style="width: 1px; height: 20px; background-color: var(--rz-border-color); margin: 0 4px;"></div>
+                }
+
+                <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")"
+                            Style="font-size: 1.25rem; transition: transform 0.3s ease;"
+                            class="@(IsCollapsed ? "rotate-icon" : "")" />
+            </RadzenStack>
         </RadzenStack>
     </div>
 
@@ -21,6 +66,37 @@
     @if (!IsCollapsed)
     {
         <div class="panel-content" Style="padding: 1rem;">
+            @* 방송 중 상태 표시 *@
+            @if (IsBroadcasting)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Info"
+                             Variant="Variant.Flat"
+                             Size="AlertSize.Small"
+                             AllowClose="false"
+                             Style="margin-bottom: 1rem; padding: 0.5rem 0.75rem;">
+                    <RadzenStack Orientation="Orientation.Horizontal"
+                                 AlignItems="AlignItems.Center"
+                                 Gap="0.5rem">
+                        <RadzenIcon Icon="broadcast_on_home" Style="font-size: 1.2rem;" />
+                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-size: 0.8rem;">
+                            방송 중 - 방송 ID: <strong>@BroadcastId</strong>
+                        </RadzenText>
+                        @if (isMediaPlaying)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success"
+                                         Text="미디어 재생 중"
+                                         Style="font-size: 0.65rem; padding: 2px 6px;" />
+                        }
+                        @if (HasSelectedMedia())
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info"
+                                         Text="@($"{GetSelectedMedia().Count()}개 선택됨")"
+                                         Style="font-size: 0.65rem; padding: 2px 6px;" />
+                        }
+                    </RadzenStack>
+                </RadzenAlert>
+            }
+
             <RadzenStack Gap="1rem">
                 <!-- 플레이리스트 목록 -->
                 <RadzenRow Gap="0.75rem">
@@ -212,6 +288,12 @@
         transform: rotate(-90deg);
     }
 
+    .broadcast-media-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
     .playlist-section {
         height: 100%;
         min-height: 350px;
@@ -265,5 +347,11 @@
 
     :root[data-theme='dark'] .text-muted {
         color: var(--rz-text-secondary-color) !important;
+    }
+
+    :root[data-theme='dark'] .broadcast-media-controls {
+        background-color: rgba(0,0,0,.2);
+        padding: 2px 4px;
+        border-radius: var(--rz-border-radius);
     }
 </style>
