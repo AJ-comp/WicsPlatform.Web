@@ -18,6 +18,7 @@ public partial class WebSocketMiddleware
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly IUdpBroadcastService udpService;
     private readonly IMediaBroadcastService mediaBroadcastService;
+    private readonly ITtsBroadcastService ttsBroadcastService;
     private readonly IAudioMixingService audioMixingService;
     private static readonly ConcurrentDictionary<string, BroadcastSession> _broadcastSessions = new();
 
@@ -30,6 +31,7 @@ public partial class WebSocketMiddleware
         IServiceScopeFactory serviceScopeFactory,
         IUdpBroadcastService udpService,
         IMediaBroadcastService mediaBroadcastService,
+        ITtsBroadcastService ttsBroadcastService,
         IAudioMixingService audioMixingService)
     {
         this.next = next;
@@ -38,9 +40,11 @@ public partial class WebSocketMiddleware
         this.serviceScopeFactory = serviceScopeFactory;
         this.udpService = udpService;
         this.mediaBroadcastService = mediaBroadcastService;
+        this.ttsBroadcastService = ttsBroadcastService;
         this.audioMixingService = audioMixingService;
 
-        mediaBroadcastService.OnPlaybackCompleted += OnMediaPlaybackCompleted;
+        mediaBroadcastService.OnPlaybackCompleted += OnPlaybackCompleted;
+        ttsBroadcastService.OnPlaybackCompleted += OnPlaybackCompleted;
     }
 
     public async Task InvokeAsync(HttpContext context)

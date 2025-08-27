@@ -6,8 +6,8 @@ namespace WicsPlatform.Server.Middleware;
 
 public partial class WebSocketMiddleware
 {
-    // 미디어 재생 완료 시 처리
-    private async void OnMediaPlaybackCompleted(string broadcastId)
+    // 미디어/TTS 재생 완료 시 처리 (통합)
+    private async void OnPlaybackCompleted(string broadcastId)
     {
         try
         {
@@ -16,38 +16,63 @@ public partial class WebSocketMiddleware
                 // WebSocket 연결이 이미 끊어진 상태인지 확인
                 if (session.WebSocket == null)
                 {
-                    // 클라이언트도 없고 미디어도 끝났으므로 완전 정리
-                    logger.LogInformation($"Media playback completed, cleaning up broadcast: {broadcastId}");
+                    // 미디어와 TTS 둘 다 재생 중인지 확인
+                    var mediaStatus = await mediaBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
+                    var ttsStatus = await ttsBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
 
-                    await CleanupBroadcastSessionAsync(broadcastId);
+                    // 둘 다 재생이 끝났을 때만 정리
+                    if (mediaStatus?.IsPlaying != true && ttsStatus?.IsPlaying != true)
+                    {
+                        logger.LogInformation($"All playback completed (Media & TTS), cleaning up broadcast: {broadcastId}");
+                        await CleanupBroadcastSessionAsync(broadcastId);
+                    }
+                    else
+                    {
+                        // 아직 재생 중인 것이 있으면 로그만 남김
+                        if (mediaStatus?.IsPlaying == true)
+                        {
+                            logger.LogInformation($"Media still playing, waiting for all playback to complete: {broadcastId}");
+                        }
+                        if (ttsStatus?.IsPlaying == true)
+                        {
+                            logger.LogInformation($"TTS still playing, waiting for all playback to complete: {broadcastId}");
+                        }
+                    }
                 }
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, $"Error handling media playback completion for broadcast {broadcastId}");
+            logger.LogError(ex, $"Error handling playback completion for broadcast {broadcastId}");
         }
     }
-
 
     /// <summary>
     /// 브로드캐스트 세션을 완전히 정리합니다.
     /// </summary>
     /// <param name="broadcastId">정리할 브로드캐스트 ID</param>
-    /// <param name="forceCleanup">강제 정리 여부 (true: 미디어 상관없이 정리)</param>
+    /// <param name="forceCleanup">강제 정리 여부 (true: 미디어/TTS 상관없이 정리)</param>
     /// <param name="updateDatabase">DB 업데이트 여부 (기본값: true)</param>
     /// <returns>정리 성공 여부</returns>
     private async Task<bool> CleanupBroadcastSessionAsync(string broadcastId, bool forceCleanup = false, bool updateDatabase = true)
     {
         try
         {
-            // 강제 정리가 아닌 경우에만 미디어 재생 확인
+            // 강제 정리가 아닌 경우에만 미디어/TTS 재생 확인
             if (!forceCleanup)
             {
                 var mediaStatus = await mediaBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
                 if (mediaStatus?.IsPlaying == true)
                 {
                     logger.LogInformation($"Media is still playing, skipping cleanup: {broadcastId}");
+                    return false;
+                }
+
+                // TTS 재생 상태도 확인
+                var ttsStatus = await ttsBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
+                if (ttsStatus?.IsPlaying == true)
+                {
+                    logger.LogInformation($"TTS is still playing, skipping cleanup: {broadcastId}");
                     return false;
                 }
             }
@@ -67,7 +92,10 @@ public partial class WebSocketMiddleware
             // 2. 미디어 재생 중지
             await mediaBroadcastService.StopMediaByBroadcastIdAsync(broadcastId);
 
-            // 3. 세션 제거
+            // 3. TTS 재생 중지
+            await ttsBroadcastService.StopTtsByBroadcastIdAsync(broadcastId);
+
+            // 4. 세션 제거
             bool removed = _broadcastSessions.TryRemove(broadcastId, out _);
 
             if (removed && session != null)
@@ -123,13 +151,18 @@ public partial class WebSocketMiddleware
         }
     }
 
-
     public void Dispose()
     {
         // 이벤트 구독 해제
         if (mediaBroadcastService != null)
         {
-            mediaBroadcastService.OnPlaybackCompleted -= OnMediaPlaybackCompleted;
+            mediaBroadcastService.OnPlaybackCompleted -= OnPlaybackCompleted;
+        }
+
+        // TTS 이벤트 구독 해제
+        if (ttsBroadcastService != null)
+        {
+            ttsBroadcastService.OnPlaybackCompleted -= OnPlaybackCompleted;
         }
     }
 }

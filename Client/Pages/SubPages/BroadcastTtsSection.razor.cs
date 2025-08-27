@@ -8,6 +8,7 @@ using Radzen;
 using System.Net.Http;
 using System.Net.Http.Json;
 using WicsPlatform.Client.Dialogs;
+using WicsPlatform.Shared;
 
 namespace WicsPlatform.Client.Pages.SubPages
 {
@@ -17,6 +18,10 @@ namespace WicsPlatform.Client.Pages.SubPages
         [Parameter] public WicsPlatform.Server.Models.wics.Channel Channel { get; set; }
         [Parameter] public bool IsCollapsed { get; set; }
         [Parameter] public EventCallback<bool> IsCollapsedChanged { get; set; }
+
+        // 방송 관련 파라미터 추가
+        [Parameter] public bool IsBroadcasting { get; set; }
+        [Parameter] public string BroadcastId { get; set; }
 
         /* ────────────────────── [DI] ─────────────────────────────── */
         [Inject] protected NotificationService NotificationService { get; set; }
@@ -28,9 +33,9 @@ namespace WicsPlatform.Client.Pages.SubPages
         /* ────────────────────── [State] ──────────────────────────── */
         private IEnumerable<WicsPlatform.Server.Models.wics.Tt> ttsList = new List<WicsPlatform.Server.Models.wics.Tt>();
         private WicsPlatform.Server.Models.wics.Tt selectedTts = null;
-        private ulong? selectedTtsId = null;  // ★ 추가된 변수
+        private ulong? selectedTtsId = null;
         private bool isLoadingTts = false;
-        private ulong? playingTtsId = null;   // 현재 재생 중인 TTS
+        private ulong? playingTtsId = null;   // 현재 재생 중인 TTS (로컬)
 
         // ★ 변경: 미디어처럼 선택된 TTS를 메모리에 저장
         private List<WicsPlatform.Server.Models.wics.Tt> _selectedTtsList = new List<WicsPlatform.Server.Models.wics.Tt>();
@@ -38,6 +43,11 @@ namespace WicsPlatform.Client.Pages.SubPages
         // ★ 중복 로딩 방지를 위한 변수들
         private ulong? _lastLoadedChannelId = null;
         private bool _hasLoadedTts = false;
+
+        // ★ 방송 중 TTS 재생 관련 추가
+        private bool isTtsPlaying = false;
+        private bool isTtsActionInProgress = false;
+        private string currentTtsSessionId = null;
 
         /* ────────────────────── [Life‑Cycle] ─────────────────────── */
         protected override async Task OnInitializedAsync()
@@ -48,11 +58,19 @@ namespace WicsPlatform.Client.Pages.SubPages
 
         protected override async Task OnParametersSetAsync()
         {
-            // ★ 채널이 실제로 변경되었을 때만 채널 TTS를 다시 로드
+            // 채널이 실제로 변경되었을 때만 채널 TTS를 다시 로드
             if (Channel != null && !IsCollapsed && _lastLoadedChannelId != Channel.Id)
             {
                 _lastLoadedChannelId = Channel.Id;
                 await LoadChannelTts(Channel.Id);
+            }
+
+            // 방송이 종료되면 TTS 재생 상태 초기화
+            if (!IsBroadcasting && isTtsPlaying)
+            {
+                isTtsPlaying = false;
+                currentTtsSessionId = null;
+                StateHasChanged();
             }
         }
 
@@ -62,7 +80,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             var newCollapsedState = !IsCollapsed;
             await IsCollapsedChanged.InvokeAsync(newCollapsedState);
 
-            // ★ 패널이 열릴 때만 그리고 아직 로드되지 않은 경우에만 로드
+            // 패널이 열릴 때만 그리고 아직 로드되지 않은 경우에만 로드
             if (!newCollapsedState && Channel != null && _lastLoadedChannelId != Channel.Id)
             {
                 _lastLoadedChannelId = Channel.Id;
@@ -70,10 +88,124 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
         }
 
+        /* ────────────────────── [TTS 재생/중지] ────────────────────── */
+        private async Task PlayTts()
+        {
+            if (!IsBroadcasting || string.IsNullOrEmpty(BroadcastId) || !HasSelectedTts())
+            {
+                NotifyWarning("TTS를 재생하려면 방송 중이어야 하고 TTS가 선택되어 있어야 합니다.");
+                return;
+            }
+
+            try
+            {
+                isTtsActionInProgress = true;
+                StateHasChanged();
+
+                // 선택된 TTS ID 가져오기
+                var ttsIds = GetSelectedTts().Select(t => t.Id).ToList();
+                if (!ttsIds.Any())
+                {
+                    NotifyWarning("선택된 TTS가 없습니다.");
+                    return;
+                }
+
+                // TtsPlayerController의 play 엔드포인트 호출
+                var request = new TtsPlayRequest
+                {
+                    BroadcastId = BroadcastId,
+                    TtsIds = ttsIds
+                };
+
+                var response = await Http.PostAsJsonAsync("api/ttsplayer/play", request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<TtsPlayResponse>();
+                    if (result.Success)
+                    {
+                        isTtsPlaying = true;
+                        currentTtsSessionId = result.SessionId;
+                        NotifySuccess($"TTS 재생을 시작했습니다. ({ttsIds.Count}개 항목)");
+                    }
+                    else
+                    {
+                        NotifyError("TTS 재생 실패", new Exception(result.Message));
+                    }
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    NotifyError("TTS 재생 요청 실패", new Exception($"Status: {response.StatusCode}, Error: {errorContent}"));
+                }
+            }
+            catch (Exception ex)
+            {
+                NotifyError("TTS 재생 중 오류가 발생했습니다", ex);
+            }
+            finally
+            {
+                isTtsActionInProgress = false;
+                StateHasChanged();
+            }
+        }
+
+        private async Task StopTts()
+        {
+            if (!IsBroadcasting || string.IsNullOrEmpty(BroadcastId))
+            {
+                NotifyWarning("방송 중이 아닙니다.");
+                return;
+            }
+
+            try
+            {
+                isTtsActionInProgress = true;
+                StateHasChanged();
+
+                // TtsPlayerController의 stop 엔드포인트 호출
+                var request = new TtsStopRequest
+                {
+                    BroadcastId = BroadcastId
+                };
+
+                var response = await Http.PostAsJsonAsync("api/ttsplayer/stop", request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<TtsStopResponse>();
+                    if (result.Success)
+                    {
+                        isTtsPlaying = false;
+                        currentTtsSessionId = null;
+                        NotifyInfo("TTS 재생을 중지했습니다.");
+                    }
+                    else
+                    {
+                        NotifyError("TTS 중지 실패", new Exception(result.Message));
+                    }
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    NotifyError("TTS 중지 요청 실패", new Exception($"Status: {response.StatusCode}, Error: {errorContent}"));
+                }
+            }
+            catch (Exception ex)
+            {
+                NotifyError("TTS 중지 중 오류가 발생했습니다", ex);
+            }
+            finally
+            {
+                isTtsActionInProgress = false;
+                StateHasChanged();
+            }
+        }
+
         /* ────────────────────── [TTS 목록] ───────────────────────── */
         private async Task LoadTts()
         {
-            // ★ 이미 로드된 경우 스킵
+            // 이미 로드된 경우 스킵
             if (_hasLoadedTts && ttsList.Any())
                 return;
 
@@ -103,7 +235,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
         }
 
-        // ★ TTS 목록 강제 새로고침 메서드 추가
+        // TTS 목록 강제 새로고침 메서드 추가
         private async Task RefreshTtsList()
         {
             _hasLoadedTts = false;
@@ -131,7 +263,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                     selectedTts = ttsList.FirstOrDefault(t => t.Id == mapping.TtsId);
                     if (selectedTts != null)
                     {
-                        selectedTtsId = selectedTts.Id;  // ★ selectedTtsId도 설정
+                        selectedTtsId = selectedTts.Id;
                         _selectedTtsList.Clear();
                         _selectedTtsList.Add(selectedTts);
                     }
@@ -139,7 +271,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 else
                 {
                     selectedTts = null;
-                    selectedTtsId = null;  // ★ selectedTtsId도 null로 설정
+                    selectedTtsId = null;
                     _selectedTtsList.Clear();
                 }
             }
@@ -156,9 +288,9 @@ namespace WicsPlatform.Client.Pages.SubPages
         /* ────────────────────── [선택 변경] ──────────────────────── */
         private async Task OnRadioButtonListChanged()
         {
-            if (selectedTtsId.HasValue)  // ★ selectedTtsId 사용
+            if (selectedTtsId.HasValue)
             {
-                selectedTts = ttsList.FirstOrDefault(t => t.Id == selectedTtsId.Value);  // ★ selectedTtsId로 selectedTts 찾기
+                selectedTts = ttsList.FirstOrDefault(t => t.Id == selectedTtsId.Value);
                 if (selectedTts != null)
                 {
                     _selectedTtsList.Clear();
@@ -177,17 +309,17 @@ namespace WicsPlatform.Client.Pages.SubPages
         private async Task ClearTtsSelection()
         {
             selectedTts = null;
-            selectedTtsId = null;  // ★ selectedTtsId도 clear
+            selectedTtsId = null;
             _selectedTtsList.Clear();
 
             NotifyInfo("TTS 선택이 해제되었습니다.");
             await InvokeAsync(StateHasChanged);
         }
 
-        /* ────────────────────── [Public Methods - 미디어와 동일한 인터페이스] ────────────────────── */
+        /* ────────────────────── [Public Methods] ────────────────────── */
 
         /// <summary>
-        /// 선택된 TTS 목록 가져오기 (미디어의 GetSelectedMedia와 동일)
+        /// 선택된 TTS 목록 가져오기
         /// </summary>
         public IEnumerable<WicsPlatform.Server.Models.wics.Tt> GetSelectedTts()
         {
@@ -202,7 +334,17 @@ namespace WicsPlatform.Client.Pages.SubPages
             return _selectedTtsList.Any();
         }
 
-        /* ────────────────────── [재생 / 중지] ────────────────────── */
+        /// <summary>
+        /// TTS 재생 상태 초기화 (외부에서 호출 가능)
+        /// </summary>
+        public void ResetTtsPlaybackState()
+        {
+            isTtsPlaying = false;
+            currentTtsSessionId = null;
+            StateHasChanged();
+        }
+
+        /* ────────────────────── [로컬 재생 / 중지] ────────────────────── */
         /// <summary>
         /// Web Speech API를 이용해 브라우저에서 직접 재생/중지
         /// </summary>
@@ -271,7 +413,7 @@ namespace WicsPlatform.Client.Pages.SubPages
 
             if (true.Equals(result))
             {
-                await RefreshTtsList();          // ★ 강제 새로고침 사용
+                await RefreshTtsList();
             }
         }
 
@@ -293,7 +435,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 });
             if (result == true)
             {
-                await RefreshTtsList();       // ★ 강제 새로고침 사용
+                await RefreshTtsList();
             }
         }
 
@@ -313,7 +455,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             try
             {
                 // 삭제할 TTS가 현재 선택된 TTS인 경우 처리
-                if (selectedTts?.Id == tts.Id || selectedTtsId == tts.Id)  // ★ selectedTtsId도 체크
+                if (selectedTts?.Id == tts.Id || selectedTtsId == tts.Id)
                 {
                     await ClearTtsSelection();
                 }
@@ -337,7 +479,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                         Detail = $"'{tts.Name}' TTS가 삭제되었습니다.",
                         Duration = 4000
                     });
-                    await RefreshTtsList();       // ★ 강제 새로고침 사용
+                    await RefreshTtsList();
                 }
                 else
                 {
@@ -365,6 +507,7 @@ namespace WicsPlatform.Client.Pages.SubPages
         /* ────────────────────── [Helpers] ───────────────────────── */
         private void NotifySuccess(string message) => Notify(NotificationSeverity.Success, "완료", message);
         private void NotifyInfo(string message) => Notify(NotificationSeverity.Info, "안내", message);
+        private void NotifyWarning(string message) => Notify(NotificationSeverity.Warning, "경고", message);
         private void NotifyError(string summary, Exception ex) =>
             Notify(NotificationSeverity.Error, summary, ex.Message);
 

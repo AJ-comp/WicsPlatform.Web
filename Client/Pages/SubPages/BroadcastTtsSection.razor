@@ -1,4 +1,4 @@
-@using WicsPlatform.Server.Models.wics
+﻿@using WicsPlatform.Server.Models.wics
 
 <RadzenCard class="mt-3 collapsible-panel-container">
     <div @onclick="TogglePanel"
@@ -20,15 +20,92 @@
                 </RadzenText>
             </RadzenStack>
 
-            <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")"
-                        Style="font-size: 1.25rem; transition: transform 0.3s ease;"
-                        class="@(IsCollapsed ? "rotate-icon" : "")" />
+            <RadzenStack Orientation="Orientation.Horizontal"
+                         AlignItems="AlignItems.Center"
+                         Gap="0.5rem">
+                @* 방송 중일 때 TTS 재생/중지 버튼 표시 *@
+                @if (IsBroadcasting && !IsCollapsed)
+                {
+                    <div class="broadcast-tts-controls" @onclick:stopPropagation="true">
+                        @if (!isTtsPlaying)
+                        {
+                            <RadzenButton Icon="play_circle_filled"
+                                          Text="TTS 재생"
+                                          ButtonStyle="ButtonStyle.Success"
+                                          Size="ButtonSize.Small"
+                                          Variant="Variant.Flat"
+                                          Disabled="@(!HasSelectedTts() || isTtsActionInProgress)"
+                                          Click="@PlayTts"
+                                          Style="height: 28px; font-size: 0.75rem;"
+                                          Title="@(!HasSelectedTts() ? "재생할 TTS를 먼저 선택하세요" : "선택된 TTS 재생")" />
+                        }
+                        else
+                        {
+                            <RadzenButton Icon="stop_circle"
+                                          Text="TTS 중지"
+                                          ButtonStyle="ButtonStyle.Warning"
+                                          Size="ButtonSize.Small"
+                                          Variant="Variant.Flat"
+                                          Disabled="@isTtsActionInProgress"
+                                          Click="@StopTts"
+                                          Style="height: 28px; font-size: 0.75rem;"
+                                          Title="TTS 재생 중지" />
+                        }
+
+                        @if (isTtsActionInProgress)
+                        {
+                            <RadzenProgressBarCircular Value="100"
+                                                       ShowValue="false"
+                                                       Mode="ProgressBarMode.Indeterminate"
+                                                       Size="ProgressBarCircularSize.ExtraSmall"
+                                                       Style="width: 20px; height: 20px; margin-left: 8px;" />
+                        }
+                    </div>
+
+                    <div style="width: 1px; height: 20px; background-color: var(--rz-border-color); margin: 0 4px;"></div>
+                }
+
+                <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")"
+                            Style="font-size: 1.25rem; transition: transform 0.3s ease;"
+                            class="@(IsCollapsed ? "rotate-icon" : "")" />
+            </RadzenStack>
         </RadzenStack>
     </div>
 
     @if (!IsCollapsed)
     {
         <div class="panel-content" Style="padding: 1rem;">
+            @* 방송 중 상태 표시 *@
+            @if (IsBroadcasting)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Info"
+                             Variant="Variant.Flat"
+                             Size="AlertSize.Small"
+                             AllowClose="false"
+                             Style="margin-bottom: 1rem; padding: 0.5rem 0.75rem;">
+                    <RadzenStack Orientation="Orientation.Horizontal"
+                                 AlignItems="AlignItems.Center"
+                                 Gap="0.5rem">
+                        <RadzenIcon Icon="broadcast_on_home" Style="font-size: 1.2rem;" />
+                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-size: 0.8rem;">
+                            방송 중 - 방송 ID: <strong>@BroadcastId</strong>
+                        </RadzenText>
+                        @if (isTtsPlaying)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success"
+                                         Text="TTS 재생 중"
+                                         Style="font-size: 0.65rem; padding: 2px 6px;" />
+                        }
+                        @if (HasSelectedTts())
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info"
+                                         Text="@($"{GetSelectedTts().Count()}개 선택됨")"
+                                         Style="font-size: 0.65rem; padding: 2px 6px;" />
+                        }
+                    </RadzenStack>
+                </RadzenAlert>
+            }
+
             <RadzenStack Gap="0.75rem">
                 <RadzenRow>
                     <RadzenColumn Size="12">
@@ -77,9 +154,9 @@
                         {
                             <RadzenStack Gap="0.5rem">
                                 <div style="max-height: 300px; overflow-y: auto;
-                                                    border: 1px solid var(--rz-border-color);
-                                                    border-radius: var(--rz-border-radius);
-                                                    padding: 0.75rem;">
+                                                            border: 1px solid var(--rz-border-color);
+                                                            border-radius: var(--rz-border-radius);
+                                                            padding: 0.75rem;">
                                     @foreach (var tts in ttsList)
                                     {
                                         <div class="tts-item @(selectedTtsId == tts.Id ? "selected" : "")"
@@ -99,8 +176,8 @@
                                                     <RadzenText TextStyle="TextStyle.Caption"
                                                                 class="mb-0"
                                                                 Style="max-width: 500px; overflow: hidden;
-                                                                                   text-overflow: ellipsis; white-space: nowrap;
-                                                                                   color: var(--rz-text-secondary-color); opacity: .8; font-size: 0.7rem;">
+                                                                                               text-overflow: ellipsis; white-space: nowrap;
+                                                                                               color: var(--rz-text-secondary-color); opacity: .8; font-size: 0.7rem;">
                                                         @tts.Content
                                                     </RadzenText>
                                                 </RadzenStack>
@@ -108,7 +185,7 @@
                                                 <!-- ▶ / ■  토글 버튼 -->
                                                 <RadzenButton Icon="@(playingTtsId == tts.Id ? "stop" : "play_arrow")"
                                                               ButtonStyle="@(playingTtsId == tts.Id ? ButtonStyle.Warning
-                                                                                                                                                                 : ButtonStyle.Success)"
+                                                                                                                                                                                                                               : ButtonStyle.Success)"
                                                   Variant="Variant.Flat"
                                                   Size="ButtonSize.Small"
                                                   Style="width: 28px; height: 28px; padding: 0;"
@@ -221,6 +298,12 @@
         transform: rotate(-90deg);
     }
 
+    .broadcast-tts-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
     .tts-item {
         margin-bottom: 0.5rem;
         padding: 0.5rem;
@@ -273,4 +356,10 @@
             background-color: rgba(var(--rz-primary-rgb), .15);
             border-color: var(--rz-primary);
         }
+
+    :root[data-theme='dark'] .broadcast-tts-controls {
+        background-color: rgba(0,0,0,.2);
+        padding: 2px 4px;
+        border-radius: var(--rz-border-radius);
+    }
 </style>
