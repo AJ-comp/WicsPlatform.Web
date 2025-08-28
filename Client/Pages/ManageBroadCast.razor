@@ -237,7 +237,7 @@
 
                     <RadzenColumn Size="12" SizeMD="3">
                         <RadzenFormField Text="현재 설정" Style="width: 100%">
-                            <RadzenTextBox Value="@($"{(selectedChannel?.SamplingRate > 0 ? selectedChannel.SamplingRate : _currentAudioConfig.SampleRate)}Hz, {(selectedChannel?.Channel1 == "mono" ? 1 : _currentAudioConfig.ChannelCount)}ch")"
+                            <RadzenTextBox Value="@($"{(selectedChannel?.SamplingRate > 0 ? selectedChannel.SamplingRate : _currentAudioConfig.SampleRate)}Hz, {(selectedChannel?.ChannelCount)}ch")"
                                            ReadOnly="true"
                                            Style="width: 100%; background-color: var(--rz-base-200);" />
                         </RadzenFormField>

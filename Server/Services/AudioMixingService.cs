@@ -5,6 +5,9 @@ using System.Collections.Concurrent;
 using WicsPlatform.Audio;
 using WicsPlatform.Server.Contracts;
 using WicsPlatform.Shared;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using WicsPlatform.Server.Data;
 
 namespace WicsPlatform.Server.Services
 {
@@ -13,18 +16,18 @@ namespace WicsPlatform.Server.Services
         private readonly ILogger<AudioMixingService> logger;
         private readonly IUdpBroadcastService udpService;
         private readonly IServiceScopeFactory serviceScopeFactory;
-        private readonly OpusCodec opusCodec;
         private readonly ConcurrentDictionary<string, MixerSession> _sessions = new();
         private bool _bassInitialized = false;
 
         private class MixerSession
         {
-            public string BroadcastId { get; set; }
+            public ulong ChannelId { get; set; }
             public int MixerStream { get; set; }
             public int MicPushStream { get; set; }
             public int MediaStream { get; set; }
             public List<int> TtsStreams { get; set; } = new(); // TTS는 여러 개 가능
             public List<SpeakerInfo> Speakers { get; set; }
+            public OpusCodec OpusCodec { get; set; } // 세션별 OpusCodec
             public Timer OutputTimer { get; set; }
             public bool IsActive { get; set; }
             public MicConfig MicConfig { get; set; }
@@ -37,13 +40,11 @@ namespace WicsPlatform.Server.Services
         public AudioMixingService(
             ILogger<AudioMixingService> logger,
             IUdpBroadcastService udpService,
-            IServiceScopeFactory serviceScopeFactory,
-            OpusCodec opusCodec)
+            IServiceScopeFactory serviceScopeFactory)
         {
             this.logger = logger;
             this.udpService = udpService;
             this.serviceScopeFactory = serviceScopeFactory;
-            this.opusCodec = opusCodec;
 
             InitializeBass();
         }
@@ -70,7 +71,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        public async Task<bool> InitializeMixer(string broadcastId, List<SpeakerInfo> speakers)
+        public async Task<bool> InitializeMixer(string broadcastId, ulong channelId, List<SpeakerInfo> speakers)
         {
             if (!_bassInitialized)
             {
@@ -83,14 +84,44 @@ namespace WicsPlatform.Server.Services
                 await StopMixer(broadcastId);
             }
 
+            // DB에서 채널 설정 읽어오기
+            int channelSampleRate = 16000; // 기본값
+            byte channelCount = 1; // 기본값
+
+            using (var scope = serviceScopeFactory.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<wicsContext>();
+
+                var channel = await dbContext.Channels
+                    .FirstOrDefaultAsync(c => c.Id == channelId);
+
+                if (channel != null)
+                {
+                    channelSampleRate = (int)channel.SamplingRate;
+                    channelCount = channel.ChannelCount;
+
+                    logger.LogInformation($"Loaded channel settings from DB - SampleRate: {channelSampleRate}Hz, Channel Count: {channelCount}");
+                }
+                else
+                {
+                    logger.LogWarning($"Channel not found in DB for broadcast: {broadcastId}, using defaults");
+                }
+            }
+
             var micConfig = new MicConfig();
 
             var session = new MixerSession
             {
-                BroadcastId = broadcastId,
+                ChannelId = channelId,
                 Speakers = speakers,
                 IsActive = true,
-                MicConfig = micConfig
+                MicConfig = micConfig,
+                OpusCodec = new OpusCodec(
+                    sampleRate: channelSampleRate,
+                    channels: channelCount,
+                    bitrate: 32000,
+                    logger: logger
+                )
             };
 
             try
@@ -99,14 +130,15 @@ namespace WicsPlatform.Server.Services
 
                 // 1. 메인 믹서 생성
                 session.MixerStream = BassMix.CreateMixerStream(
-                    16000,
-                    micConfig.Channels,
+                    channelSampleRate,
+                    channelCount,
                     flags
                 );
 
                 if (session.MixerStream == 0)
                 {
                     logger.LogError($"Failed to create mixer: {Bass.LastError}");
+                    session.OpusCodec?.Dispose();
                     return false;
                 }
 
@@ -122,6 +154,7 @@ namespace WicsPlatform.Server.Services
                 {
                     logger.LogError($"Failed to create mic push stream: {Bass.LastError}");
                     Bass.StreamFree(session.MixerStream);
+                    session.OpusCodec?.Dispose();
                     return false;
                 }
 
@@ -134,6 +167,7 @@ namespace WicsPlatform.Server.Services
                     logger.LogError($"Failed to add mic stream to mixer: {Bass.LastError}");
                     Bass.StreamFree(session.MixerStream);
                     Bass.StreamFree(session.MicPushStream);
+                    session.OpusCodec?.Dispose();
                     return false;
                 }
 
@@ -151,7 +185,8 @@ namespace WicsPlatform.Server.Services
                 _sessions[broadcastId] = session;
 
                 logger.LogInformation($"Audio mixer initialized for broadcast: {broadcastId} " +
-                    $"(MicConfig: {micConfig.SampleRate}Hz, {micConfig.Channels}ch, {micConfig.TimesliceMs}ms)");
+                    $"(MicConfig: {micConfig.SampleRate}Hz, {micConfig.Channels}ch, {micConfig.TimesliceMs}ms) " +
+                    $"with OpusCodec (16000Hz, 1ch, 32000bps)");
 
                 return true;
             }
@@ -161,6 +196,7 @@ namespace WicsPlatform.Server.Services
 
                 if (session.MixerStream != 0) Bass.StreamFree(session.MixerStream);
                 if (session.MicPushStream != 0) Bass.StreamFree(session.MicPushStream);
+                session.OpusCodec?.Dispose();
 
                 return false;
             }
@@ -234,7 +270,8 @@ namespace WicsPlatform.Server.Services
                     pcm16[i * 2 + 1] = (byte)(int16Sample >> 8);
                 }
 
-                var opusData = opusCodec.Encode(pcm16);
+                // OpusCodec으로 인코딩하여 모든 스피커에게 전송
+                var opusData = session.OpusCodec.Encode(pcm16);
                 await udpService.SendAudioToSpeakers(session.Speakers, opusData);
             }
             catch (Exception ex)
@@ -317,7 +354,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        // ★ TTS 스트림 추가 메서드 (새로 추가)
+        // ★ TTS 스트림 추가 메서드
         public async Task<int> AddTtsStream(string broadcastId, string ttsPath)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
@@ -374,7 +411,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        // ★ TTS 스트림 제거 메서드 (새로 추가)
+        // ★ TTS 스트림 제거 메서드
         public async Task RemoveTtsStream(string broadcastId, int ttsStreamId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
@@ -390,7 +427,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        // ★ 모든 TTS 스트림 제거 메서드 (새로 추가)
+        // ★ 모든 TTS 스트림 제거 메서드
         public async Task RemoveAllTtsStreams(string broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
@@ -405,6 +442,19 @@ namespace WicsPlatform.Server.Services
             session.TtsStreams.Clear();
 
             logger.LogInformation($"All TTS streams removed from mixer for broadcast: {broadcastId}");
+        }
+
+        // ★ OpusCodec 설정 업데이트 메서드 (새로 추가)
+        public async Task UpdateCodecSettings(string broadcastId, int sampleRate, int channels, int bitrate)
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session))
+            {
+                logger.LogWarning($"No session found for broadcast: {broadcastId}");
+                return;
+            }
+
+            session.OpusCodec?.UpdateSettings(sampleRate, channels, bitrate);
+            logger.LogInformation($"Updated OpusCodec settings for broadcast {broadcastId}: {sampleRate}Hz, {channels}ch, {bitrate}bps");
         }
 
         public async Task SetVolume(string broadcastId, AudioSource source, float volume)
@@ -478,7 +528,10 @@ namespace WicsPlatform.Server.Services
                     Bass.StreamFree(session.MixerStream);
                 }
 
-                logger.LogInformation($"Audio mixer stopped for broadcast: {broadcastId}");
+                // OpusCodec 정리
+                session.OpusCodec?.Dispose();
+
+                logger.LogInformation($"Audio mixer and OpusCodec stopped for broadcast: {broadcastId}");
                 return true;
             }
 

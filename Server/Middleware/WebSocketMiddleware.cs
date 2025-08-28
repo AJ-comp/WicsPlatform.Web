@@ -13,7 +13,6 @@ namespace WicsPlatform.Server.Middleware;
 public partial class WebSocketMiddleware
 {
     private readonly RequestDelegate next;
-    private readonly OpusCodec opusCodec;
     private readonly ILogger<WebSocketMiddleware> logger;
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly IUdpBroadcastService udpService;
@@ -26,7 +25,6 @@ public partial class WebSocketMiddleware
 
     public WebSocketMiddleware(
         RequestDelegate next,
-        OpusCodec opusCodec,
         ILogger<WebSocketMiddleware> logger,
         IServiceScopeFactory serviceScopeFactory,
         IUdpBroadcastService udpService,
@@ -35,7 +33,6 @@ public partial class WebSocketMiddleware
         IAudioMixingService audioMixingService)
     {
         this.next = next;
-        this.opusCodec = opusCodec;
         this.logger = logger;
         this.serviceScopeFactory = serviceScopeFactory;
         this.udpService = udpService;

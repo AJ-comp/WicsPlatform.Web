@@ -46,14 +46,14 @@ namespace WicsPlatform.Server.Models.wics
         [Column("codec")]
         public string Codec { get; set; }
 
-        [Column("channel")]
-        public string Channel1 { get; set; }
-
         [Column("sampling_rate")]
         public uint SamplingRate { get; set; }
 
-        [Column("bit")]
-        public byte Bit { get; set; }
+        [Column("channel_count")]
+        public byte ChannelCount { get; set; }
+
+        [Column("bit_rate")]
+        public uint BitRate { get; set; }
 
         [Column("state")]
         [Required]

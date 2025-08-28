@@ -43,9 +43,9 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         [HttpGet("/odata/wics/Mics(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.Mic> GetMic(ulong key)
+        public SingleResult<WicsPlatform.Server.Models.wics.Mic> GetMic(string key)
         {
-            var items = this.context.Mics.Where(i => i.Id == key);
+            var items = this.context.Mics.Where(i => i.Id == Uri.UnescapeDataString(key));
             var result = SingleResult.Create(items);
 
             OnMicGet(ref result);
@@ -56,7 +56,7 @@ namespace WicsPlatform.Server.Controllers.wics
         partial void OnAfterMicDeleted(WicsPlatform.Server.Models.wics.Mic item);
 
         [HttpDelete("/odata/wics/Mics(Id={Id})")]
-        public IActionResult DeleteMic(ulong key)
+        public IActionResult DeleteMic(string key)
         {
             try
             {
@@ -67,7 +67,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
 
                 var item = this.context.Mics
-                    .Where(i => i.Id == key)
+                    .Where(i => i.Id == Uri.UnescapeDataString(key))
                     .FirstOrDefault();
 
                 if (item == null)
@@ -94,7 +94,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPut("/odata/wics/Mics(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutMic(ulong key, [FromBody]WicsPlatform.Server.Models.wics.Mic item)
+        public IActionResult PutMic(string key, [FromBody]WicsPlatform.Server.Models.wics.Mic item)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                if (item == null || (item.Id != key))
+                if (item == null || (item.Id != Uri.UnescapeDataString(key)))
                 {
                     return BadRequest();
                 }
@@ -111,7 +111,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Mics.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Mics.Where(i => i.Id == key);
+                var itemToReturn = this.context.Mics.Where(i => i.Id == Uri.UnescapeDataString(key));
                 
                 this.OnAfterMicUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
@@ -125,7 +125,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPatch("/odata/wics/Mics(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchMic(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.Mic> patch)
+        public IActionResult PatchMic(string key, [FromBody]Delta<WicsPlatform.Server.Models.wics.Mic> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.Mics.Where(i => i.Id == key).FirstOrDefault();
+                var item = this.context.Mics.Where(i => i.Id == Uri.UnescapeDataString(key)).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -146,7 +146,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Mics.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Mics.Where(i => i.Id == key);
+                var itemToReturn = this.context.Mics.Where(i => i.Id == Uri.UnescapeDataString(key));
                 
                 this.OnAfterMicUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));

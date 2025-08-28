@@ -62,7 +62,6 @@ builder.Services.AddSingleton<IAudioMixingService, AudioMixingService>();
 builder.Services.AddSingleton<IUdpBroadcastService, UdpBroadcastService>();
 builder.Services.AddSingleton<ITtsBroadcastService, TtsBroadcastService>();
 builder.Services.AddSingleton<IMediaBroadcastService, MediaBroadcastService>();
-builder.Services.AddSingleton<OpusCodec>(provider => new OpusCodec(48000, 1, 32000));
 RegisterDBContext(builder);
 builder.Services.AddControllers().AddOData(opt =>
 {

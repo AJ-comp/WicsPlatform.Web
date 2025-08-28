@@ -1,9 +1,5 @@
-﻿using Concentus;
-using Concentus.Enums;
+﻿using Concentus.Enums;
 using Concentus.Structs;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Linq;
 
 namespace WicsPlatform.Audio
 {
@@ -12,11 +8,11 @@ namespace WicsPlatform.Audio
     /// </summary>
     public class OpusCodec : IDisposable
     {
-        private readonly OpusEncoder _encoder;
-        private readonly OpusDecoder _decoder;
-        private readonly int _sampleRate;
-        private readonly int _channels;
-        private readonly ILogger _logger;
+        private OpusEncoder _encoder;
+        private OpusDecoder _decoder;
+        private int _sampleRate;
+        private int _channels;
+        private ILogger _logger;
         private readonly int _frameDurationMs = 60;  // 60ms 프레임 고정
 
         /// <summary>
@@ -40,6 +36,34 @@ namespace WicsPlatform.Audio
 
             // 디코더 초기화
             _decoder = new OpusDecoder(sampleRate, channels);
+        }
+
+        /// <summary>
+        /// 코덱 설정을 동적으로 변경
+        /// </summary>
+        /// <param name="sampleRate">새로운 샘플레이트</param>
+        /// <param name="channels">새로운 채널 수</param>
+        /// <param name="bitrate">새로운 비트레이트</param>
+        public void UpdateSettings(int sampleRate, int channels, int bitrate)
+        {
+            // 기존 인코더/디코더 정리
+            _encoder?.Dispose();
+            _decoder?.Dispose();
+
+            // 새로운 설정 저장
+            _sampleRate = sampleRate;
+            _channels = channels;
+
+            // 새로운 인코더 초기화
+            _encoder = new OpusEncoder(sampleRate, channels, OpusApplication.OPUS_APPLICATION_VOIP);
+            _encoder.Bitrate = bitrate;
+            _encoder.SignalType = OpusSignal.OPUS_SIGNAL_VOICE;
+            _encoder.UseInbandFEC = true;
+
+            // 새로운 디코더 초기화
+            _decoder = new OpusDecoder(sampleRate, channels);
+
+            _logger?.LogInformation($"OpusCodec settings updated - SampleRate: {sampleRate}, Channels: {channels}, Bitrate: {bitrate}");
         }
 
         /// <summary>

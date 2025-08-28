@@ -202,7 +202,7 @@ namespace WicsPlatform.Client.Pages
                     await BroadcastDataService.UpdateChannelAudioSettingsAsync(channel, _preferredSampleRate, null);
                 }
 
-                _preferredChannels = channel.Channel1 == "mono" ? 1 : 2;
+                _preferredChannels = channel.ChannelCount;
 
                 _logger.LogInformation($"Channel selected: {channel.Name}, Channel Settings: {_preferredSampleRate}Hz, {_preferredChannels}ch");
                 _logger.LogInformation($"Mic Config (fixed): {_micConfig.SampleRate}Hz, {_micConfig.Channels}ch");
@@ -416,9 +416,9 @@ namespace WicsPlatform.Client.Pages
                 var broadcast = new WicsPlatform.Server.Models.wics.Broadcast
                 {
                     ChannelId = selectedChannel.Id,
-                    SpeakerIds = onlineSpeakers.Select(s => s.Id).ToList(),
-                    MediaIds = selectedMediaIds,
-                    TtsIds = selectedTtsIds,
+                    SpeakerIdList = string.Join(' ', onlineSpeakers.Select(s => s.Id)),
+                    MediaIdList = string.Join(' ', selectedMediaIds),
+                    TtsIdList = string.Join(' ', selectedTtsIds),
                     LoopbackYn = "N",
                     OngoingYn = "Y",
                     CreatedAt = DateTime.Now,

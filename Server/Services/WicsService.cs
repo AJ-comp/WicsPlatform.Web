@@ -1421,7 +1421,7 @@ namespace WicsPlatform.Server
         partial void OnGetMicById(ref IQueryable<WicsPlatform.Server.Models.wics.Mic> items);
 
 
-        public async Task<WicsPlatform.Server.Models.wics.Mic> GetMicById(ulong id)
+        public async Task<WicsPlatform.Server.Models.wics.Mic> GetMicById(string id)
         {
             var items = Context.Mics
                               .AsNoTracking()
@@ -1484,7 +1484,7 @@ namespace WicsPlatform.Server
         partial void OnMicUpdated(WicsPlatform.Server.Models.wics.Mic item);
         partial void OnAfterMicUpdated(WicsPlatform.Server.Models.wics.Mic item);
 
-        public async Task<WicsPlatform.Server.Models.wics.Mic> UpdateMic(ulong id, WicsPlatform.Server.Models.wics.Mic mic)
+        public async Task<WicsPlatform.Server.Models.wics.Mic> UpdateMic(string id, WicsPlatform.Server.Models.wics.Mic mic)
         {
             OnMicUpdated(mic);
 
@@ -1511,7 +1511,7 @@ namespace WicsPlatform.Server
         partial void OnMicDeleted(WicsPlatform.Server.Models.wics.Mic item);
         partial void OnAfterMicDeleted(WicsPlatform.Server.Models.wics.Mic item);
 
-        public async Task<WicsPlatform.Server.Models.wics.Mic> DeleteMic(ulong id)
+        public async Task<WicsPlatform.Server.Models.wics.Mic> DeleteMic(string id)
         {
             var itemToDelete = Context.Mics
                               .Where(i => i.Id == id)

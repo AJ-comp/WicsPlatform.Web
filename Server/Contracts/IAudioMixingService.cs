@@ -5,7 +5,7 @@ namespace WicsPlatform.Server.Contracts
 {
     public interface IAudioMixingService
     {
-        Task<bool> InitializeMixer(string broadcastId, List<SpeakerInfo> speakers);
+        Task<bool> InitializeMixer(string broadcastId, ulong channelId, List<SpeakerInfo> speakers);
         Task AddMicrophoneData(string broadcastId, byte[] pcmData);
 
         // 미디어 관련

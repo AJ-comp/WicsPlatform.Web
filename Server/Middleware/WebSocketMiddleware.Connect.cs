@@ -52,7 +52,7 @@ namespace WicsPlatform.Server.Middleware
             _broadcastSessions[broadcastId] = session;
 
             // 믹서 초기화
-            await audioMixingService.InitializeMixer(broadcastId, onlineSpeakers);
+            await audioMixingService.InitializeMixer(broadcastId, channelId, onlineSpeakers);
 
             // ✅ DB에서 채널의 볼륨 설정 읽어서 적용
             var channel = await context.Channels

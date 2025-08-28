@@ -50,11 +50,7 @@ namespace WicsPlatform.Client.Services
                     TtsVolume = 0.5f,
                     MediaVolume = 0.5f,
                     Volume = 0.5f,
-                    SamplingRate = 48000,
                     AudioMethod = 0,
-                    Codec = "webm",
-                    Channel1 = "stereo",
-                    Bit = 16,
                     Description = "",
                     DeleteYn = "N",
                     CreatedAt = DateTime.Now,
@@ -85,12 +81,8 @@ namespace WicsPlatform.Client.Services
 
             if (channels.HasValue)
             {
-                var channelString = channels.Value == 1 ? "mono" : "stereo";
-                if (channel.Channel1 != channelString)
-                {
-                    channel.Channel1 = channelString;
-                    updated = true;
-                }
+                channel.ChannelCount = (byte)channels.Value;
+                updated = true;
             }
 
             if (updated)

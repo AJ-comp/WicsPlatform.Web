@@ -27,6 +27,9 @@ namespace WicsPlatform.Server.Models.wics
 
         public Group Group { get; set; }
 
+        [Column("delete_yn")]
+        public string DeleteYn { get; set; }
+
         [Column("last_yn")]
         public string LastYn { get; set; }
 

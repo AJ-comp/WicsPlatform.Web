@@ -833,9 +833,9 @@ namespace WicsPlatform.Client
 
         partial void OnDeleteMic(HttpRequestMessage requestMessage);
 
-        public async Task<HttpResponseMessage> DeleteMic(ulong id = default(ulong))
+        public async Task<HttpResponseMessage> DeleteMic(string id = default(string))
         {
-            var uri = new Uri(baseUri, $"Mics({id})");
+            var uri = new Uri(baseUri, $"Mics('{Uri.EscapeDataString(id.Trim().Replace("'", "''"))}')");
 
             var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
 
@@ -846,9 +846,9 @@ namespace WicsPlatform.Client
 
         partial void OnGetMicById(HttpRequestMessage requestMessage);
 
-        public async Task<WicsPlatform.Server.Models.wics.Mic> GetMicById(string expand = default(string), ulong id = default(ulong))
+        public async Task<WicsPlatform.Server.Models.wics.Mic> GetMicById(string expand = default(string), string id = default(string))
         {
-            var uri = new Uri(baseUri, $"Mics({id})");
+            var uri = new Uri(baseUri, $"Mics('{Uri.EscapeDataString(id.Trim().Replace("'", "''"))}')");
 
             uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
 
@@ -863,9 +863,9 @@ namespace WicsPlatform.Client
 
         partial void OnUpdateMic(HttpRequestMessage requestMessage);
         
-        public async Task<HttpResponseMessage> UpdateMic(ulong id = default(ulong), WicsPlatform.Server.Models.wics.Mic mic = default(WicsPlatform.Server.Models.wics.Mic))
+        public async Task<HttpResponseMessage> UpdateMic(string id = default(string), WicsPlatform.Server.Models.wics.Mic mic = default(WicsPlatform.Server.Models.wics.Mic))
         {
-            var uri = new Uri(baseUri, $"Mics({id})");
+            var uri = new Uri(baseUri, $"Mics('{Uri.EscapeDataString(id.Trim().Replace("'", "''"))}')");
 
             var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
 

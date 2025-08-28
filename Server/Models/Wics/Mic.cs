@@ -11,8 +11,21 @@ namespace WicsPlatform.Server.Models.wics
     public partial class Mic
     {
         [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         [Column("id")]
-        public ulong Id { get; set; }
+        [Required]
+        public string Id { get; set; }
+
+        [Column("label")]
+        [Required]
+        public string Label { get; set; }
+
+        [Column("samplerate")]
+        public uint Samplerate { get; set; }
+
+        [Column("channels")]
+        public byte Channels { get; set; }
+
+        [Column("bitrate")]
+        public uint Bitrate { get; set; }
     }
 }

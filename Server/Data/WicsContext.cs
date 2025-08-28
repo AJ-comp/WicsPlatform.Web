@@ -101,16 +101,16 @@ namespace WicsPlatform.Server.Data
               .HasDefaultValueSql(@"'OPUS'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
-              .Property(p => p.Channel1)
-              .HasDefaultValueSql(@"'mono'");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
               .Property(p => p.SamplingRate)
               .HasDefaultValueSql(@"'24000'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
-              .Property(p => p.Bit)
-              .HasDefaultValueSql(@"'8'");
+              .Property(p => p.ChannelCount)
+              .HasDefaultValueSql(@"'1'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
+              .Property(p => p.BitRate)
+              .HasDefaultValueSql(@"'32000'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
               .Property(p => p.Description)
@@ -133,6 +133,10 @@ namespace WicsPlatform.Server.Data
               .HasDefaultValueSql(@"'N'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.MapMediaGroup>()
+              .Property(p => p.DeleteYn)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapMediaGroup>()
               .Property(p => p.LastYn)
               .HasDefaultValueSql(@"'Y'");
 
@@ -143,6 +147,18 @@ namespace WicsPlatform.Server.Data
             builder.Entity<WicsPlatform.Server.Models.wics.Medium>()
               .Property(p => p.DeleteYn)
               .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Mic>()
+              .Property(p => p.Samplerate)
+              .HasDefaultValueSql(@"'16000'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Mic>()
+              .Property(p => p.Channels)
+              .HasDefaultValueSql(@"'1'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Mic>()
+              .Property(p => p.Bitrate)
+              .HasDefaultValueSql(@"'32000'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Speaker>()
               .Property(p => p.VpnUseYn)
