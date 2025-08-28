@@ -17,6 +17,7 @@ namespace WicsPlatform.Audio
         private readonly int _sampleRate;
         private readonly int _channels;
         private readonly ILogger _logger;
+        private readonly int _frameDurationMs = 60;  // 60ms 프레임 고정
 
         /// <summary>
         /// OpusCodec 생성자
@@ -52,11 +53,15 @@ namespace WicsPlatform.Audio
             var samples = new short[pcmBytes.Length / 2];
             Buffer.BlockCopy(pcmBytes, 0, samples, 0, pcmBytes.Length);
 
-            // 60ms = 2880 샘플 (48kHz 기준)
-            // Opus가 완벽하게 지원하는 프레임 크기
-            if (samples.Length != 2880)
+            // 샘플레이트에 따른 60ms 프레임 크기 동적 계산
+            // 16000Hz: 960 샘플
+            // 24000Hz: 1440 샘플
+            // 48000Hz: 2880 샘플
+            int expectedSamples = _sampleRate * _frameDurationMs / 1000;
+
+            if (samples.Length != expectedSamples)
             {
-                _logger?.LogWarning($"Expected 2880 samples (60ms), but got {samples.Length} samples");
+                _logger?.LogWarning($"Expected {expectedSamples} samples ({_frameDurationMs}ms @ {_sampleRate}Hz), but got {samples.Length} samples");
             }
 
             // Opus 인코딩
@@ -75,9 +80,9 @@ namespace WicsPlatform.Audio
         /// <returns>PCM 바이트 배열</returns>
         public byte[] Decode(byte[] opusBytes, int frameSize = 0)
         {
-            // 프레임 크기 자동 계산 (60ms 기준)
+            // 프레임 크기 자동 계산 (60ms 기준, 샘플레이트에 맞게)
             if (frameSize == 0)
-                frameSize = _sampleRate * 60 / 1000;  // 60ms = 2880 samples @ 48kHz
+                frameSize = _sampleRate * _frameDurationMs / 1000;
 
             // Opus 디코딩
             var samples = new short[frameSize * _channels];
@@ -97,8 +102,9 @@ namespace WicsPlatform.Audio
         /// <returns>복구된 PCM 데이터</returns>
         public byte[] DecodeLostPacket(int frameSize = 0)
         {
+            // 프레임 크기 자동 계산 (60ms 기준, 샘플레이트에 맞게)
             if (frameSize == 0)
-                frameSize = _sampleRate * 60 / 1000;  // 60ms = 2880 samples
+                frameSize = _sampleRate * _frameDurationMs / 1000;
 
             var samples = new short[frameSize * _channels];
             int decodedSamples = _decoder.Decode(null, 0, 0, samples, 0, frameSize);

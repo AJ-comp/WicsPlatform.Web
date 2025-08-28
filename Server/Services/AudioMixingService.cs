@@ -12,6 +12,7 @@ namespace WicsPlatform.Server.Services
     {
         private readonly ILogger<AudioMixingService> logger;
         private readonly IUdpBroadcastService udpService;
+        private readonly IServiceScopeFactory serviceScopeFactory;
         private readonly OpusCodec opusCodec;
         private readonly ConcurrentDictionary<string, MixerSession> _sessions = new();
         private bool _bassInitialized = false;
@@ -36,10 +37,12 @@ namespace WicsPlatform.Server.Services
         public AudioMixingService(
             ILogger<AudioMixingService> logger,
             IUdpBroadcastService udpService,
+            IServiceScopeFactory serviceScopeFactory,
             OpusCodec opusCodec)
         {
             this.logger = logger;
             this.udpService = udpService;
+            this.serviceScopeFactory = serviceScopeFactory;
             this.opusCodec = opusCodec;
 
             InitializeBass();
@@ -96,7 +99,7 @@ namespace WicsPlatform.Server.Services
 
                 // 1. 메인 믹서 생성
                 session.MixerStream = BassMix.CreateMixerStream(
-                    micConfig.SampleRate,
+                    16000,
                     micConfig.Channels,
                     flags
                 );
