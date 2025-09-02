@@ -131,6 +131,14 @@ public partial class WebSocketMiddleware
             using var scope = serviceScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<wicsContext>();
 
+            // ✅ 채널 상태 업데이트
+            var channel = await context.Channels.FirstOrDefaultAsync(c => c.Id == channelId);
+            if (channel != null)
+            {
+                channel.State = isOngoing ? (sbyte)1 : (sbyte)0;  // 1=방송중, 0=대기
+                channel.UpdatedAt = DateTime.Now;
+            }
+
             var broadcasts = await context.Broadcasts
                 .Where(b => b.ChannelId == channelId && b.OngoingYn == "Y")
                 .ToListAsync();

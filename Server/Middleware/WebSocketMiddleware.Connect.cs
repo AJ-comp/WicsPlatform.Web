@@ -51,6 +51,7 @@ namespace WicsPlatform.Server.Middleware
 
             _broadcastSessions[broadcastId] = session;
 
+
             // 믹서 초기화
             await audioMixingService.InitializeMixer(broadcastId, channelId, onlineSpeakers);
 
@@ -77,6 +78,8 @@ namespace WicsPlatform.Server.Middleware
                 logger.LogWarning($"Channel {channelId} not found in DB, using default volumes");
                 // 기본값은 MixerSession 생성 시 이미 설정됨 (1.0, 0.7, 0.8, 1.0)
             }
+
+            await StartBroadCastAsync(channelId);
 
             // 연결 확인 메시지 전송 (볼륨 정보 추가)
             var response = new
@@ -112,6 +115,24 @@ namespace WicsPlatform.Server.Middleware
             var req = JsonSerializer.Deserialize<DisconnectBroadcastRequest>(root);
 
             await CleanupBroadcastSessionAsync(req.BroadcastId, true);
+        }
+
+
+        private async Task StartBroadCastAsync(ulong channelId)
+        {
+            using var scope = serviceScopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<wicsContext>();
+
+            // ✅ 채널 상태를 1(방송 중)로 업데이트
+            var channel = await context.Channels.FirstOrDefaultAsync(c => c.Id == channelId);
+            if (channel != null)
+            {
+                channel.State = 1;  // 1 = 방송 중 상태
+                channel.UpdatedAt = DateTime.Now;
+                await context.SaveChangesAsync();
+
+                logger.LogInformation($"Channel {channelId} state updated to 1 (Broadcasting)");
+            }
         }
 
 
