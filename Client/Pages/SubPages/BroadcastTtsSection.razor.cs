@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Radzen;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Threading.Tasks;
 using WicsPlatform.Client.Dialogs;
 using WicsPlatform.Shared;
 
@@ -29,6 +30,7 @@ namespace WicsPlatform.Client.Pages.SubPages
         [Inject] protected IJSRuntime JSRuntime { get; set; }
         [Inject] protected DialogService DialogService { get; set; }
         [Inject] protected HttpClient Http { get; set; }
+        [Inject] protected ILogger<BroadcastTtsSection> logger { get; set; }
 
         /* ────────────────────── [State] ──────────────────────────── */
         private IEnumerable<WicsPlatform.Server.Models.wics.Tt> ttsList = new List<WicsPlatform.Server.Models.wics.Tt>();
@@ -71,6 +73,45 @@ namespace WicsPlatform.Client.Pages.SubPages
                 isTtsPlaying = false;
                 currentTtsSessionId = null;
                 StateHasChanged();
+            }
+        }
+
+
+        // TTS 선택 복구 메서드 추가
+        public async Task RecoverSelectedTts(List<ulong> ttsIds)
+        {
+            try
+            {
+                _selectedTtsList.Clear();
+                selectedTtsId = null;
+                selectedTts = null;
+
+                // TTS 목록이 로드되지 않았다면 로드
+                if (!ttsList.Any())
+                {
+                    await LoadTts();
+                }
+
+                // 첫 번째 TTS만 선택 (하나만 선택 가능)
+                if (ttsIds.Any())
+                {
+                    var ttsId = ttsIds.First();
+                    var tts = ttsList.FirstOrDefault(t => t.Id == ttsId);
+
+                    if (tts != null)
+                    {
+                        selectedTtsId = ttsId;
+                        selectedTts = tts;
+                        _selectedTtsList.Add(tts);
+                    }
+                }
+
+                logger.LogInformation($"Recovered TTS selection: {selectedTtsId}");
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to recover TTS selection");
             }
         }
 

@@ -165,7 +165,7 @@ namespace WicsPlatform.Client.Pages.SubPages
         }
 
         // 그룹 선택/해제
-        protected async Task ToggleGroupSelection(ulong groupId)
+        public async Task ToggleGroupSelection(ulong groupId)
         {
             if (selectedGroups.Contains(groupId))
             {

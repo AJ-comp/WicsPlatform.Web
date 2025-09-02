@@ -4,6 +4,27 @@
 
 <PageTitle>방송 관리</PageTitle>
 
+@* 방송 복구 중 오버레이 *@
+@if (_isRecoveringBroadcast)
+{
+    <div class="recovery-overlay">
+        <RadzenCard class="recovery-card">
+            <RadzenStack AlignItems="AlignItems.Center" Gap="1rem">
+                <RadzenProgressBarCircular Value="100"
+                                           ShowValue="false"
+                                           Mode="ProgressBarMode.Indeterminate"
+                                           Size="ProgressBarCircularSize.Large" />
+                <RadzenText TextStyle="TextStyle.H5">
+                    @(selectedChannel?.Name ?? "채널") 방송 복구 중...
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2" class="text-muted">
+                    잠시만 기다려주세요. 이전 방송 상태를 복구하고 있습니다.
+                </RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+    </div>
+}
+
 <RadzenStack>
     <!-- 상단 채널 생성 영역 -->
     <RadzenCard class="mb-3" Style="padding: 1rem;">
@@ -278,7 +299,7 @@
                                       Size="ButtonSize.Large"
                                       Disabled="@isBroadcasting"
                                       Style="width: 100%"
-                                      Click="@StartBroadcast" />
+                                      Click="@(() => StartBroadcast(false))" />
                     </RadzenColumn>
                 </RadzenRow>
 
@@ -480,6 +501,41 @@
     .tip-card {
         background-color: var(--rz-warning-lighter);
         border: 1px solid var(--rz-warning-light);
+    }
+
+    /* 복구 오버레이 스타일 */
+    .recovery-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+
+    .recovery-card {
+        min-width: 400px;
+        padding: 2rem;
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @@keyframes fadeIn {
+        from
+
+    {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+
     }
 
     /* 다크 테마 지원 */

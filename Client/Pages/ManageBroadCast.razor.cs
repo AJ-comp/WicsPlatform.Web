@@ -83,6 +83,9 @@ namespace WicsPlatform.Client.Pages
         // Broadcast 관련
         private bool _currentLoopbackSetting = false;
         private MicConfig _micConfig = new MicConfig();
+
+        // 복구 관련 추가
+        private bool _isRecoveringBroadcast = false;
         #endregion
 
         #region Audio Configuration
@@ -206,6 +209,9 @@ namespace WicsPlatform.Client.Pages
 
                 _logger.LogInformation($"Channel selected: {channel.Name}, Channel Settings: {_preferredSampleRate}Hz, {_preferredChannels}ch");
                 _logger.LogInformation($"Mic Config (fixed): {_micConfig.SampleRate}Hz, {_micConfig.Channels}ch");
+
+                // ✅ 방송 상태 확인 및 복구
+                await CheckAndRecoverBroadcast(channel.Id);
             }
 
             // 스피커 섹션 초기화
@@ -215,6 +221,120 @@ namespace WicsPlatform.Client.Pages
             }
 
             await InvokeAsync(StateHasChanged);
+        }
+
+        // ✅ 새로운 메서드: 방송 상태 확인 및 복구
+        private async Task CheckAndRecoverBroadcast(ulong channelId)
+        {
+            try
+            {
+                // DB에서 진행 중인 방송 확인
+                var query = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {channelId} and OngoingYn eq 'Y'",
+                    Top = 1,
+                    OrderBy = "CreatedAt desc"
+                };
+
+                var broadcasts = await WicsService.GetBroadcasts(query);
+                var ongoingBroadcast = broadcasts.Value.FirstOrDefault();
+
+                if (ongoingBroadcast != null)
+                {
+                    _logger.LogInformation($"Ongoing broadcast found for channel {channelId}, starting recovery...");
+
+                    // 복구 알림 표시
+                    NotifyInfo("방송 복구", $"'{selectedChannel.Name}' 채널의 진행 중인 방송을 복구하는 중입니다...");
+
+                    // 복구 플래그 설정
+                    _isRecoveringBroadcast = true;
+                    await InvokeAsync(StateHasChanged);
+
+                    // 복구 데이터 준비
+                    await PrepareRecoveryData(ongoingBroadcast);
+
+                    // 방송 시작 (복구 모드)
+                    await StartBroadcast(isRecovery: true);
+
+                    _isRecoveringBroadcast = false;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to recover broadcast for channel {channelId}");
+                NotifyError("방송 복구 실패", ex);
+                _isRecoveringBroadcast = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        // ✅ 복구 데이터 준비
+        private async Task PrepareRecoveryData(WicsPlatform.Server.Models.wics.Broadcast broadcast)
+        {
+            try
+            {
+                // 1. 스피커 그룹 복구
+                if (!string.IsNullOrEmpty(broadcast.SpeakerIdList))
+                {
+                    var speakerIds = broadcast.SpeakerIdList.Split(' ')
+                        .Where(s => !string.IsNullOrEmpty(s))
+                        .Select(ulong.Parse)
+                        .ToList();
+
+                    // 스피커가 속한 그룹 찾기
+                    var speakerGroupMappings = await WicsService.GetMapSpeakerGroups(
+                        new Radzen.Query { Filter = $"LastYn eq 'Y'" });
+
+                    var groupIds = speakerGroupMappings.Value
+                        .Where(m => speakerIds.Contains(m.SpeakerId))
+                        .Select(m => m.GroupId)
+                        .Distinct()
+                        .ToList();
+
+                    // 스피커 섹션에 그룹 선택 복구
+                    if (speakerSection != null)
+                    {
+                        foreach (var groupId in groupIds)
+                        {
+                            await speakerSection.ToggleGroupSelection(groupId);
+                        }
+                    }
+                }
+
+                // 2. 미디어 복구
+                if (!string.IsNullOrEmpty(broadcast.MediaIdList) && playlistSection != null)
+                {
+                    var mediaIds = broadcast.MediaIdList.Split(' ')
+                        .Where(s => !string.IsNullOrEmpty(s))
+                        .Select(ulong.Parse)
+                        .ToList();
+
+                    await playlistSection.RecoverSelectedMedia(mediaIds);
+                }
+
+                // 3. TTS 복구
+                if (!string.IsNullOrEmpty(broadcast.TtsIdList) && ttsSection != null)
+                {
+                    var ttsIds = broadcast.TtsIdList.Split(' ')
+                        .Where(s => !string.IsNullOrEmpty(s))
+                        .Select(ulong.Parse)
+                        .ToList();
+
+                    await ttsSection.RecoverSelectedTts(ttsIds);
+                }
+
+                // 4. 루프백 설정 복구
+                _currentLoopbackSetting = broadcast.LoopbackYn == "Y";
+
+                _logger.LogInformation($"Recovery data prepared - Speakers: {broadcast.SpeakerIdList}, " +
+                                      $"Media: {broadcast.MediaIdList}, TTS: {broadcast.TtsIdList}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to prepare recovery data");
+                throw;
+            }
         }
 
         private int FindClosestSampleRate(int targetSampleRate, int[] supportedSampleRates)
@@ -248,9 +368,9 @@ namespace WicsPlatform.Client.Pages
         #endregion
 
         #region Broadcast Control
-        protected async Task StartBroadcast()
+        protected async Task StartBroadcast(bool isRecovery = false)
         {
-            _logger.LogInformation("StartBroadcast 메서드 호출됨");
+            _logger.LogInformation($"StartBroadcast 메서드 호출됨 (Recovery: {isRecovery})");
 
             if (!ValidateBroadcastPrerequisites()) return;
 
@@ -265,12 +385,19 @@ namespace WicsPlatform.Client.Pages
 
                 var onlineGroups = speakerSection.GetSelectedGroups();
 
-                // 1단계: DB에 선택사항 저장 (미디어, TTS)
-                _logger.LogInformation("1단계: DB 저장 작업");
-                LoggingService.AddLog("INFO", "미디어 선택사항 DB 저장");
-                await SaveSelectedMediaToChannel();
-                LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
-                await SaveSelectedTtsToChannel();
+                // 복구 모드가 아닐 때만 DB 저장
+                if (!isRecovery)
+                {
+                    _logger.LogInformation("1단계: DB 저장 작업");
+                    LoggingService.AddLog("INFO", "미디어 선택사항 DB 저장");
+                    await SaveSelectedMediaToChannel();
+                    LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
+                    await SaveSelectedTtsToChannel();
+                }
+                else
+                {
+                    _logger.LogInformation("복구 모드: DB 저장 스킵");
+                }
 
                 // 2단계: 오디오 믹서 초기화 (마이크만)
                 if (!await InitializeAudioMixer())
@@ -294,10 +421,25 @@ namespace WicsPlatform.Client.Pages
                 }
                 LoggingService.AddLog("SUCCESS", "마이크 활성화 완료");
 
-                // 5단계: 방송 상태 초기화 및 기록
+                // 5단계: 방송 상태 초기화
                 InitializeBroadcastState();
-                await CreateBroadcastRecords(onlineSpeakers);
-                NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
+
+                // 복구 모드가 아닐 때만 새 레코드 생성
+                if (!isRecovery)
+                {
+                    await CreateBroadcastRecords(onlineSpeakers);
+                }
+
+                // 알림 메시지
+                if (isRecovery)
+                {
+                    NotifySuccess("방송 복구 완료",
+                        $"'{selectedChannel.Name}' 채널의 방송이 성공적으로 복구되었습니다.");
+                }
+                else
+                {
+                    NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
+                }
 
                 _jsModule = _mixerModule;
 

@@ -26,6 +26,8 @@ namespace WicsPlatform.Client.Pages.SubPages
         [Inject] protected wicsService WicsService { get; set; }
         [Inject] protected HttpClient Http { get; set; }
 
+        [Inject] protected ILogger<BroadcastPlaylistSection> _logger { get; set; }
+
         /* ────────────────────── [State - 기존] ────────────────────── */
         // 플레이리스트 관련 필드
         private IEnumerable<WicsPlatform.Server.Models.wics.Group> playlists = new List<WicsPlatform.Server.Models.wics.Group>();
@@ -61,6 +63,50 @@ namespace WicsPlatform.Client.Pages.SubPages
                 isMediaPlaying = false;
                 currentMediaSessionId = null;
                 StateHasChanged();
+            }
+        }
+
+        // 미디어 선택 복구 메서드 추가
+        public async Task RecoverSelectedMedia(List<ulong> mediaIds)
+        {
+            try
+            {
+                selectedMedia.Clear();
+
+                // 플레이리스트가 로드되지 않았다면 로드
+                if (!playlists.Any())
+                {
+                    await LoadPlaylists();
+                }
+
+                // 모든 미디어 데이터 로드 (플레이리스트와 무관하게)
+                var allMediaQuery = new Radzen.Query
+                {
+                    Filter = $"(DeleteYn eq 'N' or DeleteYn eq null)",
+                    OrderBy = "CreatedAt desc"
+                };
+
+                var allMediaResult = await WicsService.GetMedia(allMediaQuery);
+                var allAvailableMedia = allMediaResult.Value.AsODataEnumerable();
+
+                // 미디어 ID로 선택 복구
+                foreach (var mediaId in mediaIds)
+                {
+                    if (allAvailableMedia.Any(m => m.Id == mediaId))
+                    {
+                        selectedMedia[mediaId] = true;
+                    }
+                }
+
+                // 복구된 미디어를 playlistMedia에 설정 (UI 표시용)
+                playlistMedia = allAvailableMedia.Where(m => mediaIds.Contains(m.Id));
+
+                _logger.LogInformation($"Recovered {mediaIds.Count} media selections");
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to recover media selections");
             }
         }
 
