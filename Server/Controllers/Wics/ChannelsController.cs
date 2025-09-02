@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net;
 using System.Data;
 using System.Linq;
@@ -123,6 +123,7 @@ namespace WicsPlatform.Server.Controllers.wics
             }
         }
 
+        [HttpPatch("/odata/wics/Channels({Id})")]
         [HttpPatch("/odata/wics/Channels(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         public IActionResult PatchChannel(ulong Id, [FromBody]Delta<WicsPlatform.Server.Models.wics.Channel> patch)

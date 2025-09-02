@@ -8,6 +8,7 @@ using WicsPlatform.Shared;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using WicsPlatform.Server.Data;
+using System.Diagnostics;
 
 namespace WicsPlatform.Server.Services
 {
@@ -18,6 +19,21 @@ namespace WicsPlatform.Server.Services
         private readonly IServiceScopeFactory serviceScopeFactory;
         private readonly ConcurrentDictionary<string, MixerSession> _sessions = new();
         private bool _bassInitialized = false;
+
+        private class MainMixerConfig
+        {
+            public int SampleRate { get; set; }
+            public int Channels { get; set; }
+            public int TimesliceMs { get; set; }
+
+            /// <summary>
+            /// 타임슬라이스당 샘플 수
+            /// </summary>
+            public int GetSamplesPerTimeslice()
+            {
+                return (SampleRate * TimesliceMs) / 1000;
+            }
+        }
 
         private class MixerSession
         {
@@ -30,7 +46,7 @@ namespace WicsPlatform.Server.Services
             public OpusCodec OpusCodec { get; set; } // 세션별 OpusCodec
             public Timer OutputTimer { get; set; }
             public bool IsActive { get; set; }
-            public MicConfig MicConfig { get; set; }
+            public MainMixerConfig MixerConfig { get; set; }
             public float MicVolume { get; set; } = 1.0f;
             public float MediaVolume { get; set; } = 0.7f;
             public float TtsVolume { get; set; } = 0.8f;
@@ -115,7 +131,12 @@ namespace WicsPlatform.Server.Services
                 ChannelId = channelId,
                 Speakers = speakers,
                 IsActive = true,
-                MicConfig = micConfig,
+                MixerConfig = new MainMixerConfig()
+                {
+                    SampleRate = channelSampleRate,
+                    Channels = channelCount,
+                    TimesliceMs = micConfig.TimesliceMs
+                },
                 OpusCodec = new OpusCodec(
                     sampleRate: channelSampleRate,
                     channels: channelCount,
@@ -185,8 +206,7 @@ namespace WicsPlatform.Server.Services
                 _sessions[broadcastId] = session;
 
                 logger.LogInformation($"Audio mixer initialized for broadcast: {broadcastId} " +
-                    $"(MicConfig: {micConfig.SampleRate}Hz, {micConfig.Channels}ch, {micConfig.TimesliceMs}ms) " +
-                    $"with OpusCodec (16000Hz, 1ch, 32000bps)");
+                    $"(MicConfig: {channelSampleRate}Hz, {channelCount}ch, {micConfig.TimesliceMs}ms)");
 
                 return true;
             }
@@ -245,8 +265,8 @@ namespace WicsPlatform.Server.Services
 
             try
             {
-                var samplesPerOutput = session.MicConfig.GetSamplesPerTimeslice();
-                var floatBuffer = new float[samplesPerOutput * session.MicConfig.Channels];
+                var samplesPerOutput = session.MixerConfig.GetSamplesPerTimeslice();
+                var floatBuffer = new float[samplesPerOutput * session.MixerConfig.Channels];
 
                 var bytesRead = Bass.ChannelGetData(
                     session.MixerStream,
@@ -269,6 +289,9 @@ namespace WicsPlatform.Server.Services
                     pcm16[i * 2] = (byte)(int16Sample & 0xFF);
                     pcm16[i * 2 + 1] = (byte)(int16Sample >> 8);
                 }
+
+                // ✅ 인코딩 전 PCM 데이터 크기 디버그 출력
+                Debug.WriteLine($"[ProcessMixedOutput] PCM data size before encoding: {pcm16.Length} bytes (samples: {samplesRead})");
 
                 // OpusCodec으로 인코딩하여 모든 스피커에게 전송
                 var opusData = session.OpusCodec.Encode(pcm16);
@@ -595,8 +618,8 @@ namespace WicsPlatform.Server.Services
                 }
 
                 session.MicPushStream = Bass.CreateStream(
-                    session.MicConfig.SampleRate,
-                    session.MicConfig.Channels,
+                    session.MixerConfig.SampleRate,
+                    session.MixerConfig.Channels,
                     BassFlags.Float | BassFlags.Decode,
                     StreamProcedureType.Push
                 );
