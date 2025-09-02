@@ -63,11 +63,6 @@ namespace WicsPlatform.Client.Pages
         protected int mediaVolume = 50;
         protected int ttsVolume = 50;
 
-        // 녹음 관련
-        protected bool isRecording => RecordingService.IsRecording;
-        protected string recordingDuration => RecordingService.RecordingDuration;
-        protected double recordingDataSize => RecordingService.RecordingDataSize;
-
         // JS Interop
         private IJSObjectReference _mixerModule;
         private IJSObjectReference _jsModule;
@@ -82,10 +77,6 @@ namespace WicsPlatform.Client.Pages
 
         // Broadcast 관련
         private bool _currentLoopbackSetting = false;
-        private MicConfig _micConfig = new MicConfig();
-
-        // 복구 관련 추가
-        private bool _isRecoveringBroadcast = false;
         #endregion
 
         #region Audio Configuration
@@ -208,133 +199,16 @@ namespace WicsPlatform.Client.Pages
                 _preferredChannels = channel.ChannelCount;
 
                 _logger.LogInformation($"Channel selected: {channel.Name}, Channel Settings: {_preferredSampleRate}Hz, {_preferredChannels}ch");
-                _logger.LogInformation($"Mic Config (fixed): {_micConfig.SampleRate}Hz, {_micConfig.Channels}ch");
 
-                // ✅ 방송 상태 확인 및 복구
-                await CheckAndRecoverBroadcast(channel.Id);
+                await CheckAndRecoverIfNeeded(channel.Id);
             }
 
-            // 스피커 섹션 초기화
             if (speakerSection != null)
             {
                 speakerSection.ClearSelection();
             }
 
             await InvokeAsync(StateHasChanged);
-        }
-
-        // ✅ 새로운 메서드: 방송 상태 확인 및 복구
-        private async Task CheckAndRecoverBroadcast(ulong channelId)
-        {
-            try
-            {
-                // DB에서 진행 중인 방송 확인
-                var query = new Radzen.Query
-                {
-                    Filter = $"ChannelId eq {channelId} and OngoingYn eq 'Y'",
-                    Top = 1,
-                    OrderBy = "CreatedAt desc"
-                };
-
-                var broadcasts = await WicsService.GetBroadcasts(query);
-                var ongoingBroadcast = broadcasts.Value.FirstOrDefault();
-
-                if (ongoingBroadcast != null)
-                {
-                    _logger.LogInformation($"Ongoing broadcast found for channel {channelId}, starting recovery...");
-
-                    // 복구 알림 표시
-                    NotifyInfo("방송 복구", $"'{selectedChannel.Name}' 채널의 진행 중인 방송을 복구하는 중입니다...");
-
-                    // 복구 플래그 설정
-                    _isRecoveringBroadcast = true;
-                    await InvokeAsync(StateHasChanged);
-
-                    // 복구 데이터 준비
-                    await PrepareRecoveryData(ongoingBroadcast);
-
-                    // 방송 시작 (복구 모드)
-                    await StartBroadcast(isRecovery: true);
-
-                    _isRecoveringBroadcast = false;
-                    await InvokeAsync(StateHasChanged);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to recover broadcast for channel {channelId}");
-                NotifyError("방송 복구 실패", ex);
-                _isRecoveringBroadcast = false;
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-
-        // ✅ 복구 데이터 준비
-        private async Task PrepareRecoveryData(WicsPlatform.Server.Models.wics.Broadcast broadcast)
-        {
-            try
-            {
-                // 1. 스피커 그룹 복구
-                if (!string.IsNullOrEmpty(broadcast.SpeakerIdList))
-                {
-                    var speakerIds = broadcast.SpeakerIdList.Split(' ')
-                        .Where(s => !string.IsNullOrEmpty(s))
-                        .Select(ulong.Parse)
-                        .ToList();
-
-                    // 스피커가 속한 그룹 찾기
-                    var speakerGroupMappings = await WicsService.GetMapSpeakerGroups(
-                        new Radzen.Query { Filter = $"LastYn eq 'Y'" });
-
-                    var groupIds = speakerGroupMappings.Value
-                        .Where(m => speakerIds.Contains(m.SpeakerId))
-                        .Select(m => m.GroupId)
-                        .Distinct()
-                        .ToList();
-
-                    // 스피커 섹션에 그룹 선택 복구
-                    if (speakerSection != null)
-                    {
-                        foreach (var groupId in groupIds)
-                        {
-                            await speakerSection.ToggleGroupSelection(groupId);
-                        }
-                    }
-                }
-
-                // 2. 미디어 복구
-                if (!string.IsNullOrEmpty(broadcast.MediaIdList) && playlistSection != null)
-                {
-                    var mediaIds = broadcast.MediaIdList.Split(' ')
-                        .Where(s => !string.IsNullOrEmpty(s))
-                        .Select(ulong.Parse)
-                        .ToList();
-
-                    await playlistSection.RecoverSelectedMedia(mediaIds);
-                }
-
-                // 3. TTS 복구
-                if (!string.IsNullOrEmpty(broadcast.TtsIdList) && ttsSection != null)
-                {
-                    var ttsIds = broadcast.TtsIdList.Split(' ')
-                        .Where(s => !string.IsNullOrEmpty(s))
-                        .Select(ulong.Parse)
-                        .ToList();
-
-                    await ttsSection.RecoverSelectedTts(ttsIds);
-                }
-
-                // 4. 루프백 설정 복구
-                _currentLoopbackSetting = broadcast.LoopbackYn == "Y";
-
-                _logger.LogInformation($"Recovery data prepared - Speakers: {broadcast.SpeakerIdList}, " +
-                                      $"Media: {broadcast.MediaIdList}, TTS: {broadcast.TtsIdList}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to prepare recovery data");
-                throw;
-            }
         }
 
         private int FindClosestSampleRate(int targetSampleRate, int[] supportedSampleRates)
@@ -368,15 +242,14 @@ namespace WicsPlatform.Client.Pages
         #endregion
 
         #region Broadcast Control
-        protected async Task StartBroadcast(bool isRecovery = false)
+        protected async Task StartBroadcast()
         {
-            _logger.LogInformation($"StartBroadcast 메서드 호출됨 (Recovery: {isRecovery})");
+            _logger.LogInformation("StartBroadcast 메서드 호출됨");
 
             if (!ValidateBroadcastPrerequisites()) return;
 
             try
             {
-                // 스피커 섹션에서 온라인/오프라인 스피커 가져오기
                 var onlineSpeakers = speakerSection.GetOnlineSpeakers();
                 var offlineSpeakers = speakerSection.GetOfflineSpeakers();
 
@@ -385,61 +258,36 @@ namespace WicsPlatform.Client.Pages
 
                 var onlineGroups = speakerSection.GetSelectedGroups();
 
-                // 복구 모드가 아닐 때만 DB 저장
-                if (!isRecovery)
-                {
-                    _logger.LogInformation("1단계: DB 저장 작업");
-                    LoggingService.AddLog("INFO", "미디어 선택사항 DB 저장");
-                    await SaveSelectedMediaToChannel();
-                    LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
-                    await SaveSelectedTtsToChannel();
-                }
-                else
-                {
-                    _logger.LogInformation("복구 모드: DB 저장 스킵");
-                }
+                // DB 저장 작업
+                _logger.LogInformation("1단계: DB 저장 작업");
+                LoggingService.AddLog("INFO", "미디어 선택사항 DB 저장");
+                await SaveSelectedMediaToChannel();
+                LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
+                await SaveSelectedTtsToChannel();
 
-                // 2단계: 오디오 믹서 초기화 (마이크만)
+                // 마이크 초기화 (Microphone 파일의 메서드 호출)
                 if (!await InitializeAudioMixer())
                     return;
 
-                // 3단계: WebSocket 연결
                 _logger.LogInformation("3단계: WebSocket 연결 시작");
                 LoggingService.AddLog("INFO", "WebSocket 연결 중...");
 
                 if (!await InitializeWebSocketBroadcast(onlineGroups))
                     return;
 
-                // 4단계: 마이크 시작
+                // 마이크 활성화 (Microphone 파일의 메서드 호출)
                 _logger.LogInformation("4단계: 마이크 활성화");
-                var micEnabled = await _mixerModule.InvokeAsync<bool>("enableMic");
-                if (!micEnabled)
+                if (!await EnableMicrophone())
                 {
-                    NotifyWarn("마이크 활성화 실패", "마이크 권한을 확인해주세요.");
                     await CleanupFailedBroadcast();
                     return;
                 }
-                LoggingService.AddLog("SUCCESS", "마이크 활성화 완료");
 
-                // 5단계: 방송 상태 초기화
                 InitializeBroadcastState();
 
-                // 복구 모드가 아닐 때만 새 레코드 생성
-                if (!isRecovery)
-                {
-                    await CreateBroadcastRecords(onlineSpeakers);
-                }
+                await CreateBroadcastRecords(onlineSpeakers);
 
-                // 알림 메시지
-                if (isRecovery)
-                {
-                    NotifySuccess("방송 복구 완료",
-                        $"'{selectedChannel.Name}' 채널의 방송이 성공적으로 복구되었습니다.");
-                }
-                else
-                {
-                    NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
-                }
+                NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
 
                 _jsModule = _mixerModule;
 
@@ -486,56 +334,6 @@ namespace WicsPlatform.Client.Pages
             }
 
             return true;
-        }
-
-        private async Task<bool> InitializeAudioMixer()
-        {
-            try
-            {
-                _dotNetRef = DotNetObjectReference.Create(this);
-                _mixerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/audiomixer.js");
-
-                var configWithVolume = new Dictionary<string, object>
-                {
-                    { "sampleRate", _micConfig.SampleRate },
-                    { "channels", _micConfig.Channels },
-                    { "timeslice", _micConfig.TimesliceMs },
-                    { "bitrate", _micConfig.Bitrate },
-                    { "echoCancellation", _micConfig.EchoCancellation },
-                    { "noiseSuppression", _micConfig.NoiseSuppression },
-                    { "autoGainControl", _micConfig.AutoGainControl },
-                    { "localPlayback", _micConfig.LocalPlayback },
-                    { "samplesPerSend", _micConfig.GetSamplesPerTimeslice() },
-                    { "micVolume", micVolume / 100.0 },
-                    { "mediaVolume", mediaVolume / 100.0 },
-                    { "ttsVolume", ttsVolume / 100.0 }
-                };
-
-                var success = await _mixerModule.InvokeAsync<bool>("createMixer", _dotNetRef, configWithVolume);
-
-                if (!success)
-                {
-                    NotifyError("오디오 믹서 초기화 실패", new Exception("오디오 믹서를 초기화할 수 없습니다."));
-                    return false;
-                }
-
-                _logger.LogInformation($"오디오 믹서 초기화 완료 - Mic: {_micConfig.SampleRate}Hz/{_micConfig.Channels}ch, Timeslice: {_micConfig.TimesliceMs}ms");
-                LoggingService.AddLog("SUCCESS", $"마이크 초기화 완료 ({_micConfig.SampleRate}Hz/모노)");
-
-                if (_currentLoopbackSetting && _speakerModule == null)
-                {
-                    _speakerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/speaker.js");
-                    await _speakerModule.InvokeVoidAsync("init");
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "오디오 믹서 초기화 실패");
-                NotifyError("오디오 믹서 초기화 실패", ex);
-                return false;
-            }
         }
 
         private async Task CreateBroadcastRecords(List<WicsPlatform.Server.Models.wics.Speaker> onlineSpeakers)
@@ -646,21 +444,6 @@ namespace WicsPlatform.Client.Pages
             }
         }
 
-        private async Task<bool> InitializeWebSocketBroadcast(List<ulong> onlineGroups)
-        {
-            var response = await WebSocketService.StartBroadcastAsync(selectedChannel.Id, onlineGroups);
-
-            if (!response.Success)
-            {
-                NotifyError("방송 시작 실패", new Exception(response.Error));
-                return false;
-            }
-
-            currentBroadcastId = response.BroadcastId;
-            _logger.LogInformation($"WebSocket broadcast started with ID: {currentBroadcastId}");
-            return true;
-        }
-
         private void InitializeBroadcastState()
         {
             isBroadcasting = true;
@@ -696,15 +479,11 @@ namespace WicsPlatform.Client.Pages
 
         private async Task CleanupFailedBroadcast()
         {
-            await WebSocketService.StopBroadcastAsync(currentBroadcastId);
+            await StopWebSocketBroadcast();
             currentBroadcastId = null;
 
-            if (_mixerModule != null)
-            {
-                await _mixerModule.InvokeVoidAsync("dispose");
-                await _mixerModule.DisposeAsync();
-                _mixerModule = null;
-            }
+            // 마이크 정리는 Microphone 파일의 메서드 호출
+            await CleanupMicrophone();
         }
 
         private async Task HandleBroadcastError(Exception ex)
@@ -776,8 +555,7 @@ namespace WicsPlatform.Client.Pages
 
                 if (newLoopback && _speakerModule == null)
                 {
-                    _speakerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/speaker.js");
-                    await _speakerModule.InvokeVoidAsync("init");
+                    await InitializeSpeakerModule();
                 }
 
                 NotifySuccess("루프백 설정 변경",
@@ -789,101 +567,6 @@ namespace WicsPlatform.Client.Pages
             {
                 NotifyError("루프백 설정 변경", ex);
             }
-        }
-        #endregion
-
-        #region Recording Control
-        protected async Task StartRecording()
-        {
-            await RecordingService.StartRecording(isBroadcasting);
-        }
-
-        protected async Task StopRecording()
-        {
-            await RecordingService.StopRecording();
-        }
-
-        private void SubscribeToRecordingEvents()
-        {
-            RecordingService.OnRecordingStateChanged += async () => await InvokeAsync(StateHasChanged);
-        }
-
-        private void UnsubscribeFromRecordingEvents()
-        {
-            if (RecordingService != null)
-            {
-                RecordingService.OnRecordingStateChanged -= async () => await InvokeAsync(StateHasChanged);
-            }
-        }
-        #endregion
-
-        #region Audio Processing
-        [JSInvokable]
-        public async Task OnMixedAudioCaptured(string base64Data)
-        {
-            if (string.IsNullOrWhiteSpace(base64Data)) return;
-
-            try
-            {
-                byte[] data = Convert.FromBase64String(base64Data);
-
-                UpdateAudioStatistics(data);
-                RecordingService.AddAudioData(data);
-
-                if (monitoringSection != null)
-                    await monitoringSection.OnAudioCaptured(data);
-
-                if (!string.IsNullOrEmpty(currentBroadcastId))
-                {
-                    await WebSocketService.SendAudioDataAsync(currentBroadcastId, data);
-                }
-
-                if (_currentLoopbackSetting && _speakerModule != null)
-                    await _speakerModule.InvokeVoidAsync("feed", base64Data);
-
-                if (totalDataPackets % 100 == 0)
-                {
-                    await InvokeAsync(StateHasChanged);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"OnMixedAudioCaptured 오류: {ex.Message}");
-            }
-        }
-
-        private void UpdateAudioStatistics(byte[] data)
-        {
-            totalDataPackets++;
-            totalDataSize += data.Length / 1024.0;
-            audioLevel = CalculateAudioLevel(data);
-        }
-
-        private double CalculateAudioLevel(byte[] audioData)
-        {
-            if (audioData.Length < 2) return 0;
-
-            double sum = 0;
-            int sampleCount = audioData.Length / 2;
-
-            for (int i = 0; i < audioData.Length - 1; i += 2)
-            {
-                short sample = (short)(audioData[i] | (audioData[i + 1] << 8));
-                double normalized = sample / 32768.0;
-                sum += normalized * normalized;
-            }
-
-            double rms = Math.Sqrt(sum / sampleCount);
-            return Math.Min(100, rms * 100);
-        }
-
-        [JSInvokable]
-        public Task ShowMicHelp()
-        {
-            DialogService.Open<MicHelpDialog>("마이크 권한 해제 방법",
-                new Dictionary<string, object>(),
-                new DialogOptions { Width = "600px", Resizable = true });
-            return Task.CompletedTask;
         }
         #endregion
 
@@ -920,58 +603,6 @@ namespace WicsPlatform.Client.Pages
                 case "monitoring": monitoringPanelCollapsed = !monitoringPanelCollapsed; break;
             }
             return Task.CompletedTask;
-        }
-        #endregion
-
-        #region WebSocket Event Handlers
-        private void SubscribeToWebSocketEvents()
-        {
-            WebSocketService.OnBroadcastStatusReceived += OnBroadcastStatusReceived;
-            WebSocketService.OnConnectionStatusChanged += OnWebSocketConnectionStatusChanged;
-        }
-
-        private void UnsubscribeFromWebSocketEvents()
-        {
-            if (WebSocketService != null)
-            {
-                WebSocketService.OnBroadcastStatusReceived -= OnBroadcastStatusReceived;
-                WebSocketService.OnConnectionStatusChanged -= OnWebSocketConnectionStatusChanged;
-            }
-        }
-
-        private void OnBroadcastStatusReceived(string broadcastId, BroadcastStatus status)
-        {
-            if (broadcastId == currentBroadcastId)
-            {
-                _logger.LogDebug($"Broadcast status update - Packets: {status.PacketCount}, Bytes: {status.TotalBytes}");
-            }
-        }
-
-        private void OnWebSocketConnectionStatusChanged(string broadcastId, string status)
-        {
-            if (broadcastId != currentBroadcastId) return;
-
-            switch (status)
-            {
-                case "Connected":
-                    NotifySuccess("연결 성공", $"채널 {selectedChannel?.Name}의 실시간 방송이 시작되었습니다.");
-                    break;
-                case "Disconnected":
-                    HandleWebSocketDisconnection(broadcastId);
-                    break;
-            }
-        }
-
-        private void HandleWebSocketDisconnection(string broadcastId)
-        {
-            NotifyError("연결 끊김", new Exception($"채널 {selectedChannel?.Name}의 방송 연결이 끊어졌습니다."));
-
-            if (isBroadcasting && broadcastId == currentBroadcastId)
-            {
-                isBroadcasting = false;
-                currentBroadcastId = null;
-                InvokeAsync(StateHasChanged);
-            }
         }
         #endregion
 
@@ -1033,57 +664,10 @@ namespace WicsPlatform.Client.Pages
                     _logger.LogError(ex, "DB 업데이트 실패");
                 }
 
-                if (!string.IsNullOrEmpty(currentBroadcastId))
-                {
-                    var broadcastIdToStop = currentBroadcastId;
-                    currentBroadcastId = null;
+                await StopWebSocketBroadcast();
 
-                    try
-                    {
-                        await WebSocketService.StopBroadcastAsync(broadcastIdToStop);
-                        _logger.LogInformation($"WebSocket 종료 완료: {broadcastIdToStop}");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, $"WebSocket 종료 실패: {broadcastIdToStop}");
-                    }
-                }
-
-                if (_mixerModule != null)
-                {
-                    try
-                    {
-                        await _mixerModule.InvokeVoidAsync("dispose");
-                        await _mixerModule.DisposeAsync();
-                        _logger.LogInformation("믹서 모듈 DisposeAsync 완료");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "믹서 모듈 정리 실패");
-                    }
-                    finally
-                    {
-                        _mixerModule = null;
-                        _jsModule = null;
-                    }
-                }
-
-                if (_speakerModule != null)
-                {
-                    try
-                    {
-                        await _speakerModule.DisposeAsync();
-                        _logger.LogInformation("스피커 모듈 정리 완료");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "스피커 모듈 정리 실패");
-                    }
-                    finally
-                    {
-                        _speakerModule = null;
-                    }
-                }
+                // 마이크 정리는 Microphone 파일의 메서드 호출
+                await CleanupMicrophone();
 
                 _currentLoopbackSetting = false;
 
