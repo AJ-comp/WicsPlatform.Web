@@ -20,6 +20,34 @@ namespace WicsPlatform.Client.Pages
 
         #endregion
 
+        #region Public Microphone Status Methods
+
+        /// <summary>
+        /// 마이크가 현재 활성화되어 있는지 확인
+        /// </summary>
+        public async Task<bool> IsMicrophoneActive()
+        {
+            try
+            {
+                if (_mixerModule == null)
+                {
+                    _logger.LogDebug("Mixer module is null");
+                    return false;
+                }
+
+                var isActive = await _mixerModule.InvokeAsync<bool>("isMicrophoneEnabled");
+                _logger.LogDebug($"Microphone active status: {isActive}");
+                return isActive;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to check microphone status");
+                return false;
+            }
+        }
+
+        #endregion
+
         #region Audio Mixer Initialization
 
         /// <summary>
@@ -29,8 +57,16 @@ namespace WicsPlatform.Client.Pages
         {
             try
             {
+                // 마이크 상태 확인 함수 호출
+                if (await IsMicrophoneActive()) return true;
+
                 _dotNetRef = DotNetObjectReference.Create(this);
-                _mixerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/audiomixer.js");
+
+                // 믹서 모듈이 없을 때만 import
+                if (_mixerModule == null)
+                {
+                    _mixerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/audiomixer.js");
+                }
 
                 var configWithVolume = CreateMicrophoneConfig();
 
@@ -122,6 +158,14 @@ namespace WicsPlatform.Client.Pages
                 {
                     _logger.LogError("믹서 모듈이 초기화되지 않았습니다.");
                     return false;
+                }
+
+                // 마이크 상태 확인 함수 호출
+                if (await IsMicrophoneActive())
+                {
+                    _logger.LogInformation("마이크가 이미 활성화되어 있습니다.");
+                    LoggingService.AddLog("INFO", "마이크 이미 활성화됨");
+                    return true;
                 }
 
                 var micEnabled = await _mixerModule.InvokeAsync<bool>("enableMic");

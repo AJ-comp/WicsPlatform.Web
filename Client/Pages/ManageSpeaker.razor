@@ -1,4 +1,4 @@
-@page "/manage-speaker"
+﻿@page "/manage-speaker"
 @attribute [Authorize]
 @using WicsPlatform.Client.Dialogs
 @using Microsoft.AspNetCore.Components.Forms
@@ -6,76 +6,75 @@
 <PageTitle>스피커 관리</PageTitle>
 
 <RadzenStack>
-    <RadzenRow AlignItems="AlignItems.Center" Class="mb-4">
+    <RadzenRow AlignItems="AlignItems.Center" Class="page-header mb-3">
         <RadzenColumn Size="12">
-            <RadzenText Text="스피커 관리" TextStyle="TextStyle.DisplayH4" TagName="TagName.H1" Style="margin: 0; font-weight: 600; color: var(--rz-text-title-color);" />
-            <RadzenText Text="스피커와 그룹을 관리하고 채널에 할당합니다" TextStyle="TextStyle.Body1" Class="mb-0 mt-2" Style="color: var(--rz-text-secondary-color);" />
+            <RadzenText Text="스피커 관리" TextStyle="TextStyle.H5" TagName="TagName.H1" class="page-title" />
+            <RadzenText Text="스피커와 그룹을 관리하고 채널에 할당합니다" TextStyle="TextStyle.Caption" class="page-subtitle" />
         </RadzenColumn>
     </RadzenRow>
 
-    <RadzenRow Gap="1rem">
+    <RadzenRow Gap="0.75rem">
         <!-- 좌측: 스피커 그룹 -->
         <RadzenColumn Size="12" SizeLG="4">
-            <RadzenCard class="h-100" Style="min-height: calc(100vh - 200px); position: relative;">
+            <RadzenCard class="group-panel">
                 @if (isAddingToGroup)
                 {
                     <div class="processing-overlay">
                         <div class="processing-content">
-                            <RadzenText TextStyle="TextStyle.H6" class="mb-3" Style="color: white;">
+                            <RadzenText TextStyle="TextStyle.Body2" class="mb-2" Style="color: white;">
                                 스피커를 그룹에 추가하는 중...
                             </RadzenText>
                             <RadzenProgressBar Value="@AddProgressPercent" ShowValue="true" Max="100"
-                                               Style="width: 200px; height: 10px;" />
-                            <RadzenText TextStyle="TextStyle.Body2" class="mt-2" Style="color: white;">
+                                               Style="width: 180px; height: 6px;" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="mt-1" Style="color: rgba(255,255,255,0.8);">
                                 @addProgress / @addTotal
                             </RadzenText>
                         </div>
                     </div>
                 }
-                <RadzenStack Gap="1rem">
-                    <RadzenRow AlignItems="AlignItems.Center">
-                        <RadzenColumn Size="8">
-                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
-                                <RadzenIcon Icon="folder" Style="font-size: 1.75rem; color: var(--rz-primary);" />
-                                <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" class="mb-0" Style="font-weight: 600;">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenRow AlignItems="AlignItems.Center" class="section-header">
+                        <RadzenColumn Size="7">
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="folder_special" class="section-icon" />
+                                <RadzenText TextStyle="TextStyle.Body1" TagName="TagName.H3" class="section-title">
                                     스피커 그룹
                                 </RadzenText>
                             </RadzenStack>
                         </RadzenColumn>
-                        <RadzenColumn Size="4" class="text-end">
+                        <RadzenColumn Size="5" class="text-end">
                             <RadzenButton Icon="add" Text="추가" Click="@OpenAddSpeakerGroupDialog"
-                                          ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" />
+                                          ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" class="compact-button" />
                         </RadzenColumn>
                     </RadzenRow>
 
                     @if (isLoadingGroups)
                     {
-                        <div class="text-center py-5">
-                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 40%; height: 8px; margin: 0 auto;" />
-                            <RadzenText TextStyle="TextStyle.Body1" class="mt-3 mb-0">그룹 목록을 불러오는 중...</RadzenText>
+                        <div class="loading-container">
+                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="slim-progress" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="loading-text">그룹 목록을 불러오는 중...</RadzenText>
                         </div>
                     }
                     else if (!speakerGroups.Any())
                     {
-                        <div class="text-center py-5">
-                            <RadzenIcon Icon="folder_off" Style="width: 48px; height: 48px; font-size: 48px; color: var(--rz-text-disabled-color)" />
-                            <RadzenText Text="스피커 그룹이 없습니다" TextStyle="TextStyle.Body1" Style="margin: 1rem 0 0.5rem 0; opacity: 0.5" />
-                            <RadzenText Text="그룹 추가 버튼을 클릭하여 새 그룹을 만드세요" TextStyle="TextStyle.Body2" Style="opacity: 0.5" />
+                        <div class="empty-state">
+                            <RadzenIcon Icon="folder_off" class="empty-icon" />
+                            <RadzenText Text="스피커 그룹이 없습니다" TextStyle="TextStyle.Caption" class="empty-text" />
+                            <RadzenText Text="그룹 추가 버튼을 클릭하여 새 그룹을 만드세요" TextStyle="TextStyle.Caption" class="empty-subtext" />
                         </div>
                     }
                     else
                     {
-                        <RadzenStack Gap="0.5rem" Style="max-height: calc(100vh - 300px); overflow-y: auto;">
+                        <RadzenStack Gap="0.35rem" class="groups-container">
                             @foreach (var group in speakerGroups)
                             {
                                 var isExpanded = expandedGroups.Contains(group.Id);
                                 var groupSpeakerCount = GetSpeakerCountInGroup(group.Id);
-                                var groupCardClass = $"group-card {(selectedGroups?.Any(g => g.Id == group.Id) == true ? "selected" : "")} {(isDraggingOverGroup == group.Id ? "drag-over" : "")}";
+                                var groupCardClass = $"group-card compact {(selectedGroups?.Any(g => g.Id == group.Id) == true ? "selected" : "")} {(isDraggingOverGroup == group.Id ? "drag-over" : "")}";
 
                                 <div class="group-drop-zone" data-group-id="@group.Id">
-                                    <RadzenCard class="@groupCardClass"
-                                                Style="cursor: pointer; transition: all 0.2s ease;">
-                                        <RadzenStack Gap="0.5rem">
+                                    <RadzenCard class="@groupCardClass">
+                                        <RadzenStack Gap="0.35rem">
                                             <RadzenRow AlignItems="AlignItems.Center">
                                                 <RadzenColumn Size="8" @onclick="@(() => ToggleGroupExpansion(group.Id))">
                                                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
@@ -83,22 +82,22 @@
                                                                       ButtonStyle="ButtonStyle.Light"
                                                                       Variant="Variant.Flat"
                                                                       Size="ButtonSize.Small"
-                                                                      Style="min-width: 24px; padding: 4px;"
+                                                                      class="expand-button"
                                                                       @onclick:stopPropagation="true" />
-                                                        <RadzenIcon Icon="@(isExpanded ? "folder_open" : "folder")" />
-                                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-weight: 500;">@group.Name</RadzenText>
+                                                        <RadzenIcon Icon="@(isExpanded ? "folder_open" : "folder")" class="group-icon" />
+                                                        <RadzenText TextStyle="TextStyle.Caption" class="group-name">@group.Name</RadzenText>
                                                     </RadzenStack>
                                                 </RadzenColumn>
                                                 <RadzenColumn Size="4" class="text-end">
-                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.25rem">
-                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true" Text="@groupSpeakerCount.ToString()" />
+                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.15rem">
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Light" IsPill="true" Text="@groupSpeakerCount.ToString()" class="count-badge" />
                                                         <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
                                                                       Click="@(() => OpenEditGroupDialog(group))" Title="그룹 수정"
-                                                                      Style="min-width: 28px; padding: 4px;"
+                                                                      class="icon-button"
                                                                       @onclick:stopPropagation="true" />
-                                                        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Size="ButtonSize.Small"
+                                                        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
                                                                       Click="@(() => OpenDeleteGroupDialog(group))" Title="그룹 삭제"
-                                                                      Style="min-width: 28px; padding: 4px;"
+                                                                      class="icon-button delete"
                                                                       @onclick:stopPropagation="true" />
                                                     </RadzenStack>
                                                 </RadzenColumn>
@@ -114,28 +113,28 @@
                                                             }
                                                             @if (speakersInGroup.Any())
                                                             {
-                                                                <RadzenStack Gap="0.25rem" Style="max-height: 300px; overflow-y: auto;">
+                                                                <RadzenStack Gap="0.15rem" class="speakers-list">
                                                                     @foreach (var speaker in speakersInGroup)
                                                                     {
                                                                         <RadzenRow AlignItems="AlignItems.Center" class="speaker-item">
                                                                             <RadzenColumn Size="1">
-                                                                                <RadzenIcon Icon="speaker" Style="font-size: 0.875rem;" />
+                                                                                <RadzenIcon Icon="speaker" class="item-icon" />
                                                                             </RadzenColumn>
                                                                             <RadzenColumn Size="6">
-                                                                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0">@speaker.Name</RadzenText>
+                                                                                <RadzenText TextStyle="TextStyle.Caption" class="item-text">@speaker.Name</RadzenText>
                                                                             </RadzenColumn>
                                                                             <RadzenColumn Size="3" class="text-end">
                                                                                 <RadzenBadge BadgeStyle="@GetStatusBadgeStyle(speaker.State)"
                                                                                              IsPill="true"
                                                                                              Text="@GetStatusText(speaker.State)"
-                                                                                             Style="font-size: 0.75rem; padding: 2px 8px;" />
+                                                                                             class="status-badge" />
                                                                             </RadzenColumn>
                                                                             <RadzenColumn Size="2" class="text-end">
                                                                                 <RadzenButton Icon="clear"
-                                                                                              ButtonStyle="ButtonStyle.Danger"
+                                                                                              ButtonStyle="ButtonStyle.Light"
                                                                                               Variant="Variant.Flat"
                                                                                               Size="ButtonSize.Small"
-                                                                                              Style="min-width: 24px; padding: 4px;"
+                                                                                              class="remove-button"
                                                                                               Title="그룹에서 제거"
                                                                                               Click="@(() => OpenRemoveSpeakerFromGroupDialog(speaker, group))"
                                                                                               @onclick:stopPropagation="true" />
@@ -160,29 +159,32 @@
 
         <!-- 우측: 스피커 목록 -->
         <RadzenColumn Size="12" SizeLG="8">
-            <RadzenCard class="h-100" Style="min-height: calc(100vh - 200px);">
-                <RadzenStack Gap="1rem">
+            <RadzenCard class="speaker-panel">
+                <RadzenStack Gap="0.75rem">
                     <!-- 검색 필터 -->
                     <RadzenCard class="filter-card">
-                        <RadzenStack Gap="0.75rem">
+                        <RadzenStack Gap="0.5rem">
                             <RadzenRow AlignItems="AlignItems.Center">
-                                <RadzenColumn Size="8">
-                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="mb-0">검색 필터</RadzenText>
+                                <RadzenColumn Size="7">
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenIcon Icon="filter_list" class="filter-icon" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="filter-title">검색 필터</RadzenText>
+                                    </RadzenStack>
                                 </RadzenColumn>
-                                <RadzenColumn Size="4" class="text-end">
+                                <RadzenColumn Size="5" class="text-end">
                                     <RadzenButton Icon="add_circle" Text="스피커 추가" Click="@OpenAddSpeakerDialog"
-                                                  ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" />
+                                                  ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" class="primary-button" />
                                 </RadzenColumn>
                             </RadzenRow>
-                            <RadzenRow Gap="0.5rem">
+                            <RadzenRow Gap="0.35rem">
                                 <RadzenColumn Size="6" SizeMD="3">
-                                    <RadzenTextBox @bind-Value="@speakerNameFilter" Placeholder="스피커명" Change="@ApplyFilters" Style="width: 100%" />
+                                    <RadzenTextBox @bind-Value="@speakerNameFilter" Placeholder="스피커명" Change="@ApplyFilters" class="filter-input" />
                                 </RadzenColumn>
                                 <RadzenColumn Size="6" SizeMD="3">
-                                    <RadzenTextBox @bind-Value="@ipAddressFilter" Placeholder="IP 주소" Change="@ApplyFilters" Style="width: 100%" />
+                                    <RadzenTextBox @bind-Value="@ipAddressFilter" Placeholder="IP 주소" Change="@ApplyFilters" class="filter-input" />
                                 </RadzenColumn>
                                 <RadzenColumn Size="6" SizeMD="3">
-                                    <RadzenTextBox @bind-Value="@locationFilter" Placeholder="설치 위치" Change="@ApplyFilters" Style="width: 100%" />
+                                    <RadzenTextBox @bind-Value="@locationFilter" Placeholder="설치 위치" Change="@ApplyFilters" class="filter-input" />
                                 </RadzenColumn>
                                 <RadzenColumn Size="6" SizeMD="3">
                                     <RadzenDropDown @bind-Value="@channelFilter"
@@ -192,7 +194,7 @@
                                                     AllowClear="true"
                                                     Placeholder="채널 선택"
                                                     Change="@ApplyFilters"
-                                                    Style="width: 100%"
+                                                    class="filter-dropdown"
                                                     TValue="ulong?" />
                                 </RadzenColumn>
                             </RadzenRow>
@@ -202,14 +204,14 @@
                     <!-- 선택된 스피커 수 표시 -->
                     @if (selectedSpeakers.Any())
                     {
-                        <RadzenCard class="selected-info-card">
+                        <RadzenCard class="selection-info-card">
                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0">
-                                    <RadzenIcon Icon="check_circle" Style="color: var(--rz-info);" />
+                                <RadzenText TextStyle="TextStyle.Caption" class="selection-text">
+                                    <RadzenIcon Icon="check_circle" class="selection-icon" />
                                     @(selectedSpeakers.Count)개의 스피커가 선택되었습니다
                                 </RadzenText>
                                 <RadzenButton Text="선택 해제" Icon="clear" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                                              Click="@ClearSelection" />
+                                              Click="@ClearSelection" class="clear-button" />
                             </RadzenStack>
                         </RadzenCard>
                     }
@@ -217,52 +219,53 @@
                     <!-- 스피커 목록 -->
                     @if (isLoading)
                     {
-                        <div class="text-center py-5">
-                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 40%; height: 8px; margin: 0 auto;" />
-                            <RadzenText Text="스피커 목록을 불러오는 중입니다..." TextStyle="TextStyle.Body1" class="mt-3 mb-0" />
+                        <div class="loading-container">
+                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="slim-progress" />
+                            <RadzenText Text="스피커 목록을 불러오는 중입니다..." TextStyle="TextStyle.Caption" class="loading-text" />
                         </div>
                     }
                     else if (!speakers.Any())
                     {
-                        <div class="text-center py-5">
-                            <RadzenIcon Icon="speaker" Style="width: 48px; height: 48px; font-size: 48px; color: var(--rz-text-disabled-color)" />
-                            <RadzenText Text="스피커 목록이 비어 있습니다." TextStyle="TextStyle.Body1" Style="margin: 1rem 0 0.5rem 0; opacity: 0.5" />
-                            <RadzenText Text="새 스피커를 추가하려면 '스피커 추가' 버튼을 클릭하세요." TextStyle="TextStyle.Body2" Style="opacity: 0.5" />
+                        <div class="empty-state">
+                            <RadzenIcon Icon="speaker" class="empty-icon" />
+                            <RadzenText Text="스피커 목록이 비어 있습니다." TextStyle="TextStyle.Caption" class="empty-text" />
+                            <RadzenText Text="새 스피커를 추가하려면 '스피커 추가' 버튼을 클릭하세요." TextStyle="TextStyle.Caption" class="empty-subtext" />
                         </div>
                     }
                     else
                     {
-                        <RadzenStack Gap="0.75rem" Style="max-height: calc(100vh - 300px); overflow-y: auto;">
+                        <RadzenStack Gap="0.5rem" class="speakers-container">
                             @foreach (var speaker in speakers)
                             {
-                                var speakerCardClass = $"speaker-card {(IsSpeakerSelected(speaker) ? "selected" : "")} {(isDragging && IsSpeakerSelected(speaker) ? "dragging" : "")}";
+                                var speakerCardClass = $"speaker-card compact {(IsSpeakerSelected(speaker) ? "selected" : "")} {(isDragging && IsSpeakerSelected(speaker) ? "dragging" : "")}";
 
                                 <RadzenCard class="@speakerCardClass"
-                                            Style="cursor: pointer;"
                                             @onclick="@(() => ToggleSpeakerSelection(speaker))"
                                             draggable="@(IsSpeakerSelected(speaker) ? "true" : "false")"
                                             @ondragstart="@(() => HandleDragStart(speaker))"
                                             @ondragend="@HandleDragEnd"
                                             data-speaker-id="@speaker.Id">
-                                    <RadzenRow AlignItems="AlignItems.Center" Gap="0.5rem">
+                                    <RadzenRow AlignItems="AlignItems.Center" Gap="0.35rem">
                                         <RadzenColumn Size="1">
                                             <RadzenCheckBox Value="@IsSpeakerSelected(speaker)"
                                                             Change="@((bool value) => SpeakerSelectionChanged(value, speaker))"
-                                                            @onclick:stopPropagation="true" />
+                                                            @onclick:stopPropagation="true"
+                                                            class="speaker-checkbox" />
                                         </RadzenColumn>
                                         <RadzenColumn Size="8" SizeMD="8">
-                                            <RadzenStack Gap="0.25rem">
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenIcon Icon="speaker" />
-                                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-weight: 500;">@speaker.Name</RadzenText>
-                                                    <RadzenBadge BadgeStyle="@GetStatusBadgeStyle(speaker.State)" IsPill="true" Text="@GetStatusText(speaker.State)" />
+                                            <RadzenStack Gap="0.15rem">
+                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.35rem">
+                                                    <RadzenIcon Icon="speaker" class="speaker-main-icon" />
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="speaker-name">@speaker.Name</RadzenText>
+                                                    <RadzenBadge BadgeStyle="@GetStatusBadgeStyle(speaker.State)" IsPill="true"
+                                                                 Text="@GetStatusText(speaker.State)" class="status-badge-inline" />
                                                 </RadzenStack>
-                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Style="font-size: 0.875rem; color: var(--rz-text-secondary-color);">
-                                                    <span><RadzenIcon Icon="lan" Style="font-size: 1rem;" /> @speaker.Ip</span>
-                                                    <span><RadzenIcon Icon="location_on" Style="font-size: 1rem;" /> @speaker.Location</span>
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" class="speaker-meta">
+                                                    <span class="meta-item"><RadzenIcon Icon="lan" class="meta-icon" /> @speaker.Ip</span>
+                                                    <span class="meta-item"><RadzenIcon Icon="location_on" class="meta-icon" /> @speaker.Location</span>
                                                     @if (!string.IsNullOrEmpty(speaker.Model))
                                                     {
-                                                        <span><RadzenIcon Icon="devices" Style="font-size: 1rem;" /> @speaker.Model</span>
+                                                        <span class="meta-item"><RadzenIcon Icon="devices" class="meta-icon" /> @speaker.Model</span>
                                                     }
                                                 </RadzenStack>
                                             </RadzenStack>
@@ -270,9 +273,11 @@
                                         <RadzenColumn Size="3" SizeMD="3" class="text-end">
                                             <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
                                                           Click="@(() => OpenEditSpeakerDialog(speaker))"
+                                                          class="action-button"
                                                           @onclick:stopPropagation="true" />
-                                            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Size="ButtonSize.Small"
+                                            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
                                                           Click="@(() => OpenDeleteSpeakerDialog(speaker))"
+                                                          class="action-button delete"
                                                           @onclick:stopPropagation="true" />
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -287,10 +292,388 @@
 </RadzenStack>
 
 <style>
-    /* 카드 스타일 개선 */
-    .rz-card {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        border: 1px solid var(--rz-border-light);
+    /* 전문적이고 고급스러운 디자인 시스템 */
+    :root {
+        --professional-primary: #2c3e50;
+        --professional-secondary: #34495e;
+        --professional-accent: #3498db;
+        --professional-success: #27ae60;
+        --professional-danger: #e74c3c;
+        --professional-warning: #f39c12;
+        --professional-border: #dde2e6;
+        --professional-hover: #ecf0f1;
+        --professional-selected: #e8f4fd;
+    }
+
+    /* 페이지 헤더 */
+    .page-header {
+        border-bottom: 1px solid var(--professional-border);
+        padding-bottom: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .page-title {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+        letter-spacing: -0.5px;
+    }
+
+    .page-subtitle {
+        font-size: 0.75rem !important;
+        color: #6c757d !important;
+        margin-top: 0.25rem !important;
+        font-weight: 400;
+    }
+
+    /* 섹션 헤더 */
+    .section-header {
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #f0f0f0;
+        margin-bottom: 0.5rem;
+    }
+
+    .section-icon {
+        font-size: 1rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    .section-title {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+    }
+
+    /* 패널 스타일 */
+    .group-panel, .speaker-panel {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid var(--professional-border) !important;
+        border-radius: 6px !important;
+        background: white !important;
+        min-height: calc(100vh - 180px);
+        position: relative;
+    }
+
+    /* 필터 카드 */
+    .filter-card {
+        background: #fafbfc !important;
+        border: 1px solid #e1e4e8 !important;
+        padding: 0.65rem !important;
+        border-radius: 4px !important;
+    }
+
+    .filter-icon {
+        font-size: 0.875rem !important;
+        color: #6c757d !important;
+    }
+
+    .filter-title {
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-secondary) !important;
+        margin: 0 !important;
+    }
+
+    .filter-input, .filter-dropdown {
+        font-size: 0.75rem !important;
+        height: 32px !important;
+        border-color: #d0d7de !important;
+    }
+
+        .filter-input input, .filter-dropdown input {
+            font-size: 0.75rem !important;
+            padding: 0.35rem 0.5rem !important;
+        }
+
+    /* 그룹 카드 */
+    .group-card.compact {
+        padding: 0.5rem !important;
+        border: 1px solid #e1e4e8 !important;
+        border-radius: 4px !important;
+        transition: all 0.15s ease !important;
+        background: white !important;
+        cursor: pointer;
+    }
+
+        .group-card.compact:hover {
+            border-color: var(--professional-accent) !important;
+            background: var(--professional-hover) !important;
+        }
+
+        .group-card.compact.selected {
+            border-color: var(--professional-accent) !important;
+            background: var(--professional-selected) !important;
+        }
+
+        .group-card.compact.drag-over {
+            border-color: var(--professional-success) !important;
+            background: #d4edda !important;
+            transform: scale(1.01);
+        }
+
+    .group-icon {
+        font-size: 0.875rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    .group-name {
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+    }
+
+    /* 스피커 카드 */
+    .speaker-card.compact {
+        padding: 0.65rem !important;
+        border: 1px solid #e1e4e8 !important;
+        border-radius: 4px !important;
+        transition: all 0.15s ease !important;
+        background: white !important;
+        cursor: pointer;
+    }
+
+        .speaker-card.compact:hover {
+            border-color: var(--professional-accent) !important;
+            background: var(--professional-hover) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .speaker-card.compact.selected {
+            border-color: var(--professional-accent) !important;
+            background: var(--professional-selected) !important;
+        }
+
+        .speaker-card.compact.dragging {
+            opacity: 0.6;
+            cursor: grabbing;
+        }
+
+    .speaker-checkbox {
+        transform: scale(0.85);
+    }
+
+    .speaker-main-icon {
+        font-size: 0.875rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    .speaker-name {
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+    }
+
+    .speaker-meta {
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
+    }
+
+    .meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.15rem;
+    }
+
+    .meta-icon {
+        font-size: 0.75rem !important;
+        opacity: 0.7;
+    }
+
+    /* 버튼 스타일 */
+    .compact-button, .primary-button, .clear-button {
+        font-size: 0.75rem !important;
+        padding: 0.25rem 0.5rem !important;
+        height: 28px !important;
+        font-weight: 500 !important;
+    }
+
+    .primary-button {
+        background: var(--professional-accent) !important;
+        border-color: var(--professional-accent) !important;
+    }
+
+        .primary-button:hover {
+            background: #2980b9 !important;
+            border-color: #2980b9 !important;
+        }
+
+    .expand-button {
+        min-width: 20px !important;
+        padding: 2px !important;
+        height: 20px !important;
+    }
+
+        .expand-button .rz-button-icon {
+            font-size: 0.875rem !important;
+        }
+
+    .icon-button, .action-button {
+        min-width: 24px !important;
+        padding: 4px !important;
+        height: 24px !important;
+        opacity: 0.7;
+        transition: all 0.15s ease;
+    }
+
+        .icon-button:hover, .action-button:hover {
+            opacity: 1;
+            background: var(--professional-hover) !important;
+        }
+
+        .icon-button.delete:hover, .action-button.delete:hover {
+            color: var(--professional-danger) !important;
+            background: #fee !important;
+        }
+
+    .remove-button {
+        min-width: 20px !important;
+        padding: 2px !important;
+        height: 20px !important;
+        opacity: 0.6;
+    }
+
+        .remove-button:hover {
+            opacity: 1;
+            color: var(--professional-danger) !important;
+        }
+
+    /* 배지 스타일 */
+    .count-badge {
+        font-size: 0.65rem !important;
+        padding: 2px 6px !important;
+        font-weight: 500 !important;
+        background: #f0f0f0 !important;
+        color: var(--professional-secondary) !important;
+    }
+
+    .status-badge, .status-badge-inline {
+        font-size: 0.65rem !important;
+        padding: 2px 6px !important;
+        font-weight: 500 !important;
+    }
+
+    /* 그룹 내 스피커 목록 */
+    .group-speakers-list {
+        background: #f8f9fa !important;
+        border: 1px solid #e1e4e8 !important;
+        padding: 0.5rem !important;
+        margin-top: 0.35rem;
+        border-radius: 3px !important;
+    }
+
+    .speakers-list {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .speaker-item {
+        padding: 0.2rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        transition: background-color 0.15s ease;
+    }
+
+        .speaker-item:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+            border-radius: 2px;
+        }
+
+        .speaker-item:last-child {
+            border-bottom: none;
+        }
+
+    .item-icon {
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
+    }
+
+    .item-text {
+        font-size: 0.7rem !important;
+        color: var(--professional-secondary) !important;
+        margin: 0 !important;
+    }
+
+    /* 선택 정보 카드 */
+    .selection-info-card {
+        background: #e8f4fd !important;
+        border: 1px solid #b8daff !important;
+        padding: 0.5rem 0.75rem !important;
+        border-radius: 4px !important;
+    }
+
+    .selection-text {
+        font-size: 0.75rem !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .selection-icon {
+        font-size: 0.875rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    /* 로딩 상태 */
+    .loading-container {
+        text-align: center;
+        padding: 2rem 0;
+    }
+
+    .slim-progress {
+        width: 120px !important;
+        height: 4px !important;
+        margin: 0 auto !important;
+    }
+
+    .loading-text {
+        margin-top: 0.75rem !important;
+        font-size: 0.75rem !important;
+        color: #6c757d !important;
+    }
+
+    /* 빈 상태 */
+    .empty-state {
+        text-align: center;
+        padding: 2.5rem 0;
+    }
+
+    .empty-icon {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 32px !important;
+        color: #d0d7de !important;
+        margin-bottom: 0.75rem;
+    }
+
+    .empty-text {
+        font-size: 0.8rem !important;
+        color: var(--professional-secondary) !important;
+        margin: 0.5rem 0 0.25rem 0 !important;
+    }
+
+    .empty-subtext {
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
+        margin: 0 !important;
+    }
+
+    /* 컨테이너 스크롤 */
+    .groups-container {
+        max-height: calc(100vh - 280px);
+        overflow-y: auto;
+        padding-right: 0.25rem;
+    }
+
+    .speakers-container {
+        max-height: calc(100vh - 280px);
+        overflow-y: auto;
+        padding-right: 0.25rem;
     }
 
     /* 처리 중 오버레이 */
@@ -300,230 +683,63 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background-color: rgba(0, 0, 0, 0.7);
+        background-color: rgba(0, 0, 0, 0.85);
         display: flex;
         justify-content: center;
         align-items: center;
         z-index: 1000;
-        border-radius: var(--rz-border-radius);
+        border-radius: 6px;
     }
 
     .processing-content {
         text-align: center;
-        padding: 2rem;
-        background-color: rgba(0, 0, 0, 0.8);
-        border-radius: var(--rz-border-radius);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        padding: 1.5rem;
+        background-color: rgba(0, 0, 0, 0.9);
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
-    /* 드래그 중 시각적 피드백 추가 */
+    /* 스크롤바 스타일링 */
+    .groups-container::-webkit-scrollbar,
+    .speakers-container::-webkit-scrollbar,
+    .speakers-list::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .groups-container::-webkit-scrollbar-track,
+    .speakers-container::-webkit-scrollbar-track,
+    .speakers-list::-webkit-scrollbar-track {
+        background: #f0f0f0;
+        border-radius: 3px;
+    }
+
+    .groups-container::-webkit-scrollbar-thumb,
+    .speakers-container::-webkit-scrollbar-thumb,
+    .speakers-list::-webkit-scrollbar-thumb {
+        background: #c0c0c0;
+        border-radius: 3px;
+    }
+
+        .groups-container::-webkit-scrollbar-thumb:hover,
+        .speakers-container::-webkit-scrollbar-thumb:hover,
+        .speakers-list::-webkit-scrollbar-thumb:hover {
+            background: #a0a0a0;
+        }
+
+    /* 드래그 중 효과 */
     body.dragging {
         cursor: grabbing !important;
     }
 
-    .speaker-card.dragging {
-        opacity: 0.5;
-        cursor: grabbing;
-        transform: scale(0.95);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    }
-
-    /* 그룹 드롭 존 */
-    .group-drop-zone {
-        width: 100%;
-        min-height: 80px;
-        position: relative;
-        transition: all 0.3s ease;
-    }
-
-        /* 드래그 오버 시 드롭 존 표시 */
-        .group-drop-zone.drag-over {
-            background-color: rgba(76, 175, 80, 0.1);
-            border-radius: 8px;
-            outline: 2px dashed #4CAF50;
-            outline-offset: -2px;
+        body.dragging .group-card:not(.drag-over) {
+            opacity: 0.8;
         }
 
-    /* 드래그 중일 때 모든 그룹 카드에 시각적 힌트 추가 */
-    body.dragging .group-card:not(.drag-over) {
-        opacity: 0.7;
-    }
-
-    body.dragging .group-card {
-        border-style: dashed;
-    }
-
-    /* 그룹 카드 스타일 */
-    .group-card {
-        border: 1px solid var(--rz-border);
-        transition: all 0.2s ease;
-        padding: 0.75rem !important;
-        min-height: 48px;
-    }
-
-        .group-card:hover {
-            border-color: var(--rz-primary-lighter);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
+        body.dragging .group-card {
+            border-style: dashed;
         }
 
-        .group-card.selected {
-            border-color: var(--rz-primary);
-            background-color: var(--rz-primary-lighter);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-        }
-
-        .group-card.drag-over {
-            border-color: var(--rz-success);
-            background-color: var(--rz-success-lighter);
-            box-shadow: 0 4px 20px rgba(0, 255, 0, 0.2);
-            transform: scale(1.02);
-        }
-
-    /* 스피커 카드 스타일 */
-    .speaker-card {
-        border: 1px solid var(--rz-border);
-        transition: all 0.2s ease;
-        padding: 1rem !important;
-        cursor: move;
-    }
-
-        .speaker-card:hover {
-            border-color: var(--rz-primary-lighter);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            background-color: var(--rz-base-100);
-        }
-
-        .speaker-card.selected {
-            border-color: var(--rz-primary);
-            background-color: var(--rz-primary-lighter);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-        }
-
-    /* 선택 정보 카드 스타일 */
-    .selected-info-card {
-        background-color: var(--rz-info-lighter);
-        border-color: var(--rz-info);
-        padding: 0.75rem !important;
-    }
-
-    /* 필터 카드 스타일 */
-    .filter-card {
-        background-color: var(--rz-base-100);
-        border: 1px solid var(--rz-border);
-        padding: 1rem !important;
-    }
-
-    /* 배지 스타일 개선 */
-    .rz-badge {
-        font-weight: 500;
-        letter-spacing: 0.25px;
-    }
-
-    /* 버튼 호버 효과 */
-    .rz-button-icon-only:hover {
-        transform: scale(1.1);
-        transition: transform 0.2s ease;
-    }
-
-    /* 페이지 헤더 스타일 */
-    h1 {
-        background: linear-gradient(135deg, var(--rz-primary) 0%, var(--rz-primary-dark) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-
-    /* 선택된 스피커 액션 바 스타일 */
-    .bg-info.bg-opacity-10 {
-        background-color: rgba(var(--rz-info-rgb), 0.1) !important;
-        border: 1px solid var(--rz-info-lighter);
-    }
-
-    /* 스크롤바 스타일 */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: var(--rz-base-100);
-        border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: var(--rz-text-disabled-color);
-        border-radius: 4px;
-    }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--rz-text-secondary-color);
-        }
-
-    /* 그룹 내 스피커 목록 스크롤바 */
-    .group-speakers-list ::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .group-speakers-list ::-webkit-scrollbar-track {
-        background: var(--rz-base-200);
-        border-radius: 3px;
-    }
-
-    .group-speakers-list ::-webkit-scrollbar-thumb {
-        background: var(--rz-text-tertiary-color);
-        border-radius: 3px;
-    }
-
-    /* 아이콘 정렬 */
-    .rz-icon {
-        vertical-align: middle;
-    }
-
-    /* 그룹 내 스피커 목록 스타일 */
-    .group-speakers-list {
-        background-color: rgba(0, 0, 0, 0.05);
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        padding: 0.75rem !important;
-        margin-top: 0.5rem;
-        border-radius: 4px;
-    }
-
-    /* 다크 테마용 그룹 스피커 목록 */
-    :root[data-theme='dark'] .group-speakers-list {
-        background-color: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.1);
-    }
-
-    .speaker-item {
-        padding: 0.25rem 0;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-        transition: background-color 0.2s ease;
-    }
-
-        .speaker-item:hover {
-            background-color: rgba(0, 0, 0, 0.02);
-        }
-
-        .speaker-item:last-child {
-            border-bottom: none;
-        }
-
-    /* 다크 테마용 스피커 아이템 */
-    :root[data-theme='dark'] .speaker-item {
-        border-bottom-color: rgba(255, 255, 255, 0.05);
-    }
-
-        :root[data-theme='dark'] .speaker-item:hover {
-            background-color: rgba(255, 255, 255, 0.02);
-        }
-
-    /* 확장/축소 버튼 애니메이션 */
-    .rz-button-icon-only {
-        transition: transform 0.2s ease;
-    }
-
-    /* 드래그 중 커서 스타일 */
+    /* 드래그 가능 커서 */
     [draggable="true"] {
         cursor: grab;
     }
@@ -533,15 +749,48 @@
         }
 
     /* 다크 테마 지원 */
-    :root[data-theme='dark'] .group-card.drag-over {
-        background-color: rgba(var(--rz-success-rgb), 0.2);
+    :root[data-theme='dark'] .page-title {
+        color: #e1e4e8 !important;
     }
 
-    :root[data-theme='dark'] .speaker-card.selected {
-        background-color: rgba(var(--rz-primary-rgb), 0.2);
+    :root[data-theme='dark'] .page-subtitle,
+    :root[data-theme='dark'] .filter-title,
+    :root[data-theme='dark'] .group-name,
+    :root[data-theme='dark'] .speaker-name,
+    :root[data-theme='dark'] .item-text {
+        color: #c9d1d9 !important;
     }
 
-    :root[data-theme='dark'] .selected-info-card {
-        background-color: rgba(var(--rz-info-rgb), 0.2);
+    :root[data-theme='dark'] .group-panel,
+    :root[data-theme='dark'] .speaker-panel,
+    :root[data-theme='dark'] .group-card.compact,
+    :root[data-theme='dark'] .speaker-card.compact {
+        background: #0d1117 !important;
+        border-color: #30363d !important;
+    }
+
+    :root[data-theme='dark'] .filter-card {
+        background: #161b22 !important;
+        border-color: #30363d !important;
+    }
+
+    :root[data-theme='dark'] .group-speakers-list {
+        background: #161b22 !important;
+        border-color: #30363d !important;
+    }
+
+    :root[data-theme='dark'] .selection-info-card {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+    }
+
+    :root[data-theme='dark'] .group-card.compact:hover,
+    :root[data-theme='dark'] .speaker-card.compact:hover {
+        background: #161b22 !important;
+    }
+
+    :root[data-theme='dark'] .group-card.compact.selected,
+    :root[data-theme='dark'] .speaker-card.compact.selected {
+        background: #1f2937 !important;
     }
 </style>

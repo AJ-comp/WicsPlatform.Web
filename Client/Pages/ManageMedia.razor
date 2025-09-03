@@ -1,4 +1,4 @@
-@page "/manage-media"
+﻿@page "/manage-media"
 @attribute [Authorize]
 @using WicsPlatform.Client.Dialogs
 @using Microsoft.AspNetCore.Components.Forms
@@ -7,41 +7,46 @@
 <PageTitle>미디어 관리</PageTitle>
 
 <RadzenStack>
-    <!-- 파일 업로드 영역 -->
-    <RadzenRow>
-        <RadzenColumn SizeMD="12" Class="file-drop-zone-container">
-            <RadzenCard class="mb-4 rz-border-radius-4 rz-shadow-2 file-drop-zone"
-                        Style="position: relative; min-height: 120px;">
+    <!-- 페이지 헤더 -->
+    <RadzenRow AlignItems="AlignItems.Center" Class="page-header mb-3">
+        <RadzenColumn Size="12">
+            <RadzenText Text="미디어 관리" TextStyle="TextStyle.H5" TagName="TagName.H1" class="page-title" />
+            <RadzenText Text="오디오 파일을 업로드하고 플레이리스트를 관리합니다" TextStyle="TextStyle.Caption" class="page-subtitle" />
+        </RadzenColumn>
+    </RadzenRow>
 
+    <!-- 파일 업로드 영역 -->
+    <RadzenRow class="mb-3">
+        <RadzenColumn SizeMD="12">
+            <RadzenCard class="upload-zone-card">
                 <InputFile OnChange="@OnInputFileChange"
                            multiple
                            id="fileInput"
                            accept="audio/*"
                            @key="@fileInputKey"
-                           style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+                           style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 1;" />
 
                 <div @ondragenter="@OnDragEnter" @ondragleave="@OnDragLeave" @ondragover:preventDefault @ondrop="@OnDrop"
-                     class="drag-drop-area">
-
-                    <div class="text-center p-5">
-                        <RadzenIcon Icon="cloud_upload" Style="width: 48px; height: 48px; font-size: 48px; color: var(--rz-secondary);" />
-                        <RadzenText TextStyle="TextStyle.H6" class="mt-2 mb-0">
-                            <strong>파일을 끌어다 놓거나 클릭하여 업로드하세요</strong>
+                     class="upload-area">
+                    <div class="upload-content">
+                        <RadzenIcon Icon="cloud_upload" class="upload-icon" />
+                        <RadzenText TextStyle="TextStyle.Body2" class="upload-title">
+                            파일을 끌어다 놓거나 클릭하여 업로드하세요
                         </RadzenText>
-                        <RadzenText TextStyle="TextStyle.Body2" class="text-secondary mt-1 mb-3">
-                            오디오 파일(.mp3, .wav, .ogg, .flac)
+                        <RadzenText TextStyle="TextStyle.Caption" class="upload-subtitle">
+                            지원 형식: MP3, WAV, OGG, FLAC (최대 100MB)
                         </RadzenText>
-                        <RadzenButton Click="@(() => ClickFileInput())" class="file-select-button" Text="파일 선택"
-                                      Icon="file_upload" Style="min-width: 150px;" />
+                        <RadzenButton Click="@(() => ClickFileInput())" class="upload-button" Text="파일 선택"
+                                      Icon="file_upload" Size="ButtonSize.Small" />
                     </div>
                 </div>
 
                 @if (isDraggingOver)
                 {
-                    <div class="drag-over-overlay">
-                        <RadzenIcon Icon="file_download" Style="width: 64px; height: 64px; font-size: 64px; color: var(--rz-primary);" />
-                        <RadzenText TextStyle="TextStyle.H5" class="mt-2 mb-0 text-white">
-                            <strong>파일을 여기에 놓으세요</strong>
+                    <div class="drag-overlay">
+                        <RadzenIcon Icon="file_download" class="drag-icon" />
+                        <RadzenText TextStyle="TextStyle.Body1" class="drag-text">
+                            파일을 여기에 놓으세요
                         </RadzenText>
                     </div>
                 }
@@ -49,68 +54,69 @@
                 @if (isUploading)
                 {
                     <div class="upload-progress-overlay">
-                        <RadzenText TextStyle="TextStyle.H6" class="mb-3">
-                            <strong>파일 업로드 중...</strong>
-                        </RadzenText>
-                        <RadzenProgressBar Value="@uploadProgress" ShowValue="true" ProgressBarStyle="ProgressBarStyle.Primary"
-                                           Style="width: 70%; height: 12px;" Max="100" />
-                        <RadzenText TextStyle="TextStyle.Body1" class="mt-3">
-                            <span class="file-name">@uploadingFileName</span> (@uploadProgress% 완료)
-                        </RadzenText>
+                        <div class="progress-content">
+                            <RadzenText TextStyle="TextStyle.Body2" class="progress-title">
+                                파일 업로드 중...
+                            </RadzenText>
+                            <RadzenProgressBar Value="@uploadProgress" ShowValue="true" ProgressBarStyle="ProgressBarStyle.Primary"
+                                               Style="width: 200px; height: 6px;" Max="100" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="progress-info">
+                                @uploadingFileName (@uploadProgress%)
+                            </RadzenText>
+                        </div>
                     </div>
                 }
             </RadzenCard>
         </RadzenColumn>
     </RadzenRow>
 
-    <RadzenRow Gap="1rem">
-        <!-- 좌측: 플레이리스트 그룹 -->
+    <RadzenRow Gap="0.75rem">
+        <!-- 좌측: 플레이리스트 -->
         <RadzenColumn Size="12" SizeLG="4">
-            <RadzenCard class="h-100" Style="min-height: calc(100vh - 350px);">
-                <RadzenStack Gap="1rem">
-                    <RadzenRow AlignItems="AlignItems.Center">
-                        <RadzenColumn Size="8">
-                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
-                                <RadzenIcon Icon="folder" Style="font-size: 1.75rem; color: var(--rz-primary);" />
-                                <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" class="mb-0" Style="font-weight: 600;">
+            <RadzenCard class="playlist-panel">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenRow AlignItems="AlignItems.Center" class="section-header">
+                        <RadzenColumn Size="7">
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="queue_music" class="section-icon" />
+                                <RadzenText TextStyle="TextStyle.Body1" TagName="TagName.H3" class="section-title">
                                     플레이리스트
                                 </RadzenText>
                             </RadzenStack>
                         </RadzenColumn>
-                        <RadzenColumn Size="4" class="text-end">
+                        <RadzenColumn Size="5" class="text-end">
                             <RadzenButton Icon="add" Text="추가" Click="@OpenAddPlaylistDialog"
-                                          ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" />
+                                          ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" class="compact-button" />
                         </RadzenColumn>
                     </RadzenRow>
 
                     @if (isLoadingPlaylists)
                     {
-                        <div class="text-center py-5">
-                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 40%; height: 8px; margin: 0 auto;" />
-                            <RadzenText TextStyle="TextStyle.Body1" class="mt-3 mb-0">플레이리스트 목록을 불러오는 중...</RadzenText>
+                        <div class="loading-container">
+                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="slim-progress" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="loading-text">플레이리스트를 불러오는 중...</RadzenText>
                         </div>
                     }
                     else if (!playlists.Any())
                     {
-                        <div class="text-center py-5">
-                            <RadzenIcon Icon="folder_off" Style="width: 48px; height: 48px; font-size: 48px; color: var(--rz-text-disabled-color)" />
-                            <RadzenText Text="플레이리스트가 없습니다" TextStyle="TextStyle.Body1" Style="margin: 1rem 0 0.5rem 0; opacity: 0.5" />
-                            <RadzenText Text="플레이리스트 추가 버튼을 클릭하여 새 플레이리스트를 만드세요" TextStyle="TextStyle.Body2" Style="opacity: 0.5" />
+                        <div class="empty-state">
+                            <RadzenIcon Icon="folder_off" class="empty-icon" />
+                            <RadzenText Text="플레이리스트가 없습니다" TextStyle="TextStyle.Caption" class="empty-text" />
+                            <RadzenText Text="플레이리스트 추가 버튼을 클릭하여 새 플레이리스트를 만드세요" TextStyle="TextStyle.Caption" class="empty-subtext" />
                         </div>
                     }
                     else
                     {
-                        <RadzenStack Gap="0.5rem" Style="max-height: calc(100vh - 450px); overflow-y: auto;">
+                        <RadzenStack Gap="0.35rem" class="playlists-container">
                             @foreach (var playlist in playlists)
                             {
                                 var isExpanded = expandedPlaylists.Contains(playlist.Id);
                                 var playlistMediaCount = GetMediaCountInPlaylist(playlist.Id);
-                                var playlistCardClass = $"playlist-card {(selectedPlaylists?.Any(p => p.Id == playlist.Id) == true ? "selected" : "")} {(isDraggingOverPlaylist == playlist.Id ? "drag-over" : "")}";
+                                var playlistCardClass = $"playlist-card compact {(selectedPlaylists?.Any(p => p.Id == playlist.Id) == true ? "selected" : "")} {(isDraggingOverPlaylist == playlist.Id ? "drag-over" : "")}";
 
                                 <div class="playlist-drop-zone" data-playlist-id="@playlist.Id">
-                                    <RadzenCard class="@playlistCardClass"
-                                                Style="cursor: pointer; transition: all 0.2s ease;">
-                                        <RadzenStack Gap="0.5rem">
+                                    <RadzenCard class="@playlistCardClass">
+                                        <RadzenStack Gap="0.35rem">
                                             <RadzenRow AlignItems="AlignItems.Center">
                                                 <RadzenColumn Size="8" @onclick="@(() => TogglePlaylistExpansion(playlist.Id))">
                                                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
@@ -118,22 +124,22 @@
                                                                       ButtonStyle="ButtonStyle.Light"
                                                                       Variant="Variant.Flat"
                                                                       Size="ButtonSize.Small"
-                                                                      Style="min-width: 24px; padding: 4px;"
+                                                                      class="expand-button"
                                                                       @onclick:stopPropagation="true" />
-                                                        <RadzenIcon Icon="@(isExpanded ? "folder_open" : "folder")" />
-                                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-weight: 500;">@playlist.Name</RadzenText>
+                                                        <RadzenIcon Icon="@(isExpanded ? "folder_open" : "folder")" class="playlist-icon" />
+                                                        <RadzenText TextStyle="TextStyle.Caption" class="playlist-name">@playlist.Name</RadzenText>
                                                     </RadzenStack>
                                                 </RadzenColumn>
                                                 <RadzenColumn Size="4" class="text-end">
-                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.25rem">
-                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true" Text="@playlistMediaCount.ToString()" />
+                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.15rem">
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Light" IsPill="true" Text="@playlistMediaCount.ToString()" class="count-badge" />
                                                         <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
                                                                       Click="@(() => OpenEditPlaylistDialog(playlist))" Title="플레이리스트 수정"
-                                                                      Style="min-width: 28px; padding: 4px;"
+                                                                      class="icon-button"
                                                                       @onclick:stopPropagation="true" />
-                                                        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Size="ButtonSize.Small"
+                                                        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
                                                                       Click="@(() => OpenDeletePlaylistDialog(playlist))" Title="플레이리스트 삭제"
-                                                                      Style="min-width: 28px; padding: 4px;"
+                                                                      class="icon-button delete"
                                                                       @onclick:stopPropagation="true" />
                                                     </RadzenStack>
                                                 </RadzenColumn>
@@ -149,27 +155,27 @@
                                                             }
                                                             @if (mediaInPlaylist.Any())
                                                             {
-                                                                <RadzenStack Gap="0.25rem" Style="max-height: 300px; overflow-y: auto;">
+                                                                <RadzenStack Gap="0.15rem" class="media-list">
                                                                     @foreach (var media in mediaInPlaylist)
                                                                     {
                                                                         <RadzenRow AlignItems="AlignItems.Center" class="media-item">
                                                                             <RadzenColumn Size="1">
-                                                                                <RadzenIcon Icon="audio_file" Style="font-size: 0.875rem;" />
+                                                                                <RadzenIcon Icon="audio_file" class="item-icon" />
                                                                             </RadzenColumn>
-                                                                            <RadzenColumn Size="6">
-                                                                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0">@media.FileName</RadzenText>
+                                                                            <RadzenColumn Size="7">
+                                                                                <RadzenText TextStyle="TextStyle.Caption" class="item-text">@media.FileName</RadzenText>
                                                                             </RadzenColumn>
-                                                                            <RadzenColumn Size="3" class="text-end">
-                                                                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0">
+                                                                            <RadzenColumn Size="2" class="text-end">
+                                                                                <RadzenText TextStyle="TextStyle.Caption" class="item-date">
                                                                                     @media.CreatedAt.ToString("MM-dd")
                                                                                 </RadzenText>
                                                                             </RadzenColumn>
                                                                             <RadzenColumn Size="2" class="text-end">
                                                                                 <RadzenButton Icon="clear"
-                                                                                              ButtonStyle="ButtonStyle.Danger"
+                                                                                              ButtonStyle="ButtonStyle.Light"
                                                                                               Variant="Variant.Flat"
                                                                                               Size="ButtonSize.Small"
-                                                                                              Style="min-width: 24px; padding: 4px;"
+                                                                                              class="remove-button"
                                                                                               Title="플레이리스트에서 제거"
                                                                                               Click="@(() => OpenRemoveMediaFromPlaylistDialog(media, playlist))"
                                                                                               @onclick:stopPropagation="true" />
@@ -194,19 +200,22 @@
 
         <!-- 우측: 미디어 파일 목록 -->
         <RadzenColumn Size="12" SizeLG="8">
-            <RadzenCard class="h-100" Style="min-height: calc(100vh - 350px);">
-                <RadzenStack Gap="1rem">
+            <RadzenCard class="media-panel">
+                <RadzenStack Gap="0.75rem">
                     <!-- 검색 필터 -->
                     <RadzenCard class="filter-card">
-                        <RadzenStack Gap="0.75rem">
+                        <RadzenStack Gap="0.5rem">
                             <RadzenRow AlignItems="AlignItems.Center">
-                                <RadzenColumn Size="8">
-                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="mb-0">검색 필터</RadzenText>
+                                <RadzenColumn Size="12">
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenIcon Icon="filter_list" class="filter-icon" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="filter-title">검색 필터</RadzenText>
+                                    </RadzenStack>
                                 </RadzenColumn>
                             </RadzenRow>
-                            <RadzenRow Gap="0.5rem">
+                            <RadzenRow Gap="0.35rem">
                                 <RadzenColumn Size="6" SizeMD="4">
-                                    <RadzenTextBox @bind-Value="@mediaNameFilter" Placeholder="파일명" Change="@ApplyFilters" Style="width: 100%" />
+                                    <RadzenTextBox @bind-Value="@mediaNameFilter" Placeholder="파일명" Change="@ApplyFilters" class="filter-input" />
                                 </RadzenColumn>
                                 <RadzenColumn Size="6" SizeMD="4">
                                     <RadzenDropDown @bind-Value="@playlistFilter"
@@ -217,11 +226,13 @@
                                                     AllowFiltering="true"
                                                     Placeholder="플레이리스트 선택"
                                                     Change="@ApplyFilters"
-                                                    Style="width: 100%"
+                                                    class="filter-dropdown"
                                                     TValue="ulong?" />
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="4" Class="text-end">
-                                    <RadzenButton Text="필터 초기화" Click="@ResetFilters" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small" />
+                                    <RadzenButton Text="필터 초기화" Click="@ResetFilters"
+                                                  ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
+                                                  class="reset-button" />
                                 </RadzenColumn>
                             </RadzenRow>
                         </RadzenStack>
@@ -230,14 +241,14 @@
                     <!-- 선택된 미디어 수 표시 -->
                     @if (selectedMedia.Any())
                     {
-                        <RadzenCard class="selected-info-card">
+                        <RadzenCard class="selection-info-card">
                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0">
-                                    <RadzenIcon Icon="check_circle" Style="color: var(--rz-info);" />
+                                <RadzenText TextStyle="TextStyle.Caption" class="selection-text">
+                                    <RadzenIcon Icon="check_circle" class="selection-icon" />
                                     @(selectedMedia.Count())개의 미디어가 선택되었습니다
                                 </RadzenText>
                                 <RadzenButton Text="선택 해제" Icon="clear" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
-                                              Click="@ClearSelection" />
+                                              Click="@ClearSelection" class="clear-button" />
                             </RadzenStack>
                         </RadzenCard>
                     }
@@ -245,48 +256,48 @@
                     <!-- 미디어 목록 -->
                     @if (isLoading)
                     {
-                        <div class="text-center py-5">
-                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 40%; height: 8px; margin: 0 auto;" />
-                            <RadzenText Text="미디어 목록을 불러오는 중입니다..." TextStyle="TextStyle.Body1" class="mt-3 mb-0" />
+                        <div class="loading-container">
+                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="slim-progress" />
+                            <RadzenText Text="미디어 목록을 불러오는 중입니다..." TextStyle="TextStyle.Caption" class="loading-text" />
                         </div>
                     }
                     else if (!media.Any())
                     {
-                        <div class="text-center py-5">
-                            <RadzenIcon Icon="audio_file" Style="width: 48px; height: 48px; font-size: 48px; color: var(--rz-text-disabled-color)" />
-                            <RadzenText Text="미디어 파일이 없습니다." TextStyle="TextStyle.Body1" Style="margin: 1rem 0 0.5rem 0; opacity: 0.5" />
-                            <RadzenText Text="파일을 드래그하거나 '파일 선택' 버튼을 클릭하여 업로드하세요." TextStyle="TextStyle.Body2" Style="opacity: 0.5" />
+                        <div class="empty-state">
+                            <RadzenIcon Icon="audio_file" class="empty-icon" />
+                            <RadzenText Text="미디어 파일이 없습니다." TextStyle="TextStyle.Caption" class="empty-text" />
+                            <RadzenText Text="파일을 드래그하거나 '파일 선택' 버튼을 클릭하여 업로드하세요." TextStyle="TextStyle.Caption" class="empty-subtext" />
                         </div>
                     }
                     else
                     {
-                        <RadzenStack Gap="0.75rem" Style="max-height: calc(100vh - 450px); overflow-y: auto;">
+                        <RadzenStack Gap="0.5rem" class="media-container">
                             @foreach (var mediaFile in media)
                             {
-                                var mediaCardClass = $"media-card {(IsMediaSelected(mediaFile) ? "selected" : "")} {(isDragging && IsMediaSelected(mediaFile) ? "dragging" : "")}";
+                                var mediaCardClass = $"media-card compact {(IsMediaSelected(mediaFile) ? "selected" : "")} {(isDragging && IsMediaSelected(mediaFile) ? "dragging" : "")}";
 
                                 <RadzenCard class="@mediaCardClass"
-                                            Style="cursor: pointer;"
                                             @onclick="@(() => ToggleMediaSelection(mediaFile))"
                                             draggable="@(IsMediaSelected(mediaFile) ? "true" : "false")"
                                             data-media-id="@mediaFile.Id">
-                                    <RadzenRow AlignItems="AlignItems.Center" Gap="0.5rem">
+                                    <RadzenRow AlignItems="AlignItems.Center" Gap="0.35rem">
                                         <RadzenColumn Size="1">
                                             <RadzenCheckBox Value="@IsMediaSelected(mediaFile)"
                                                             Change="@((bool value) => MediaSelectionChanged(value, mediaFile))"
-                                                            @onclick:stopPropagation="true" />
+                                                            @onclick:stopPropagation="true"
+                                                            class="media-checkbox" />
                                         </RadzenColumn>
                                         <RadzenColumn Size="8" SizeMD="8">
-                                            <RadzenStack Gap="0.25rem">
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenIcon Icon="audio_file" />
-                                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-weight: 500;">@mediaFile.FileName</RadzenText>
+                                            <RadzenStack Gap="0.15rem">
+                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.35rem">
+                                                    <RadzenIcon Icon="audio_file" class="media-main-icon" />
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="media-name">@mediaFile.FileName</RadzenText>
                                                 </RadzenStack>
-                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Style="font-size: 0.875rem; color: var(--rz-text-secondary-color);">
-                                                    <span><RadzenIcon Icon="calendar_today" Style="font-size: 1rem;" /> @mediaFile.CreatedAt.ToString("yyyy-MM-dd")</span>
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" class="media-meta">
+                                                    <span class="meta-item"><RadzenIcon Icon="calendar_today" class="meta-icon" /> @mediaFile.CreatedAt.ToString("yyyy-MM-dd")</span>
                                                     @if (mediaFile.MapMediaGroups != null && mediaFile.MapMediaGroups.Any(mg => mg.Group != null))
                                                     {
-                                                        <span><RadzenIcon Icon="playlist_play" Style="font-size: 1rem;" /> @string.Join(", ", mediaFile.MapMediaGroups.Where(mg => mg.Group != null).Select(mg => mg.Group.Name))</span>
+                                                        <span class="meta-item"><RadzenIcon Icon="playlist_play" class="meta-icon" /> @string.Join(", ", mediaFile.MapMediaGroups.Where(mg => mg.Group != null).Select(mg => mg.Group.Name))</span>
                                                     }
                                                 </RadzenStack>
                                             </RadzenStack>
@@ -294,12 +305,15 @@
                                         <RadzenColumn Size="3" SizeMD="3" class="text-end">
                                             <RadzenButton Icon="play_arrow" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Small"
                                                           Click="@(() => PlayMedia(mediaFile))"
+                                                          class="action-button play"
                                                           @onclick:stopPropagation="true" />
                                             <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
                                                           Click="@(() => OpenEditMediaDialog(mediaFile))"
+                                                          class="action-button"
                                                           @onclick:stopPropagation="true" />
-                                            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Size="ButtonSize.Small"
+                                            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
                                                           Click="@(() => OpenDeleteMediaDialog(mediaFile))"
+                                                          class="action-button delete"
                                                           @onclick:stopPropagation="true" />
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -314,198 +328,542 @@
 </RadzenStack>
 
 <style>
-    /* 파일 업로드 영역 스타일 */
-    .file-drop-zone-container {
-        transition: all 0.3s ease;
+    /* 전문적이고 고급스러운 디자인 시스템 */
+    :root {
+        --professional-primary: #2c3e50;
+        --professional-secondary: #34495e;
+        --professional-accent: #3498db;
+        --professional-success: #27ae60;
+        --professional-danger: #e74c3c;
+        --professional-warning: #f39c12;
+        --professional-border: #dde2e6;
+        --professional-hover: #ecf0f1;
+        --professional-selected: #e8f4fd;
     }
 
-    .file-drop-zone {
-        transition: all 0.3s ease;
-        border: 2px dashed var(--rz-secondary-light) !important;
+    /* 페이지 헤더 */
+    .page-header {
+        border-bottom: 1px solid var(--professional-border);
+        padding-bottom: 0.75rem;
+        margin-bottom: 1rem;
     }
 
-    .drag-drop-area {
+    .page-title {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+        letter-spacing: -0.5px;
+    }
+
+    .page-subtitle {
+        font-size: 0.75rem !important;
+        color: #6c757d !important;
+        margin-top: 0.25rem !important;
+        font-weight: 400;
+    }
+
+    /* 업로드 영역 */
+    .upload-zone-card {
+        border: 2px dashed #d0d7de !important;
+        background: #fafbfc !important;
+        min-height: 80px !important;
+        position: relative;
+        transition: all 0.2s ease;
+        border-radius: 6px !important;
+    }
+
+        .upload-zone-card:hover {
+            border-color: var(--professional-accent) !important;
+            background: var(--professional-hover) !important;
+        }
+
+    .upload-area {
         width: 100%;
         height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .drag-over-overlay {
+    .upload-content {
+        text-align: center;
+        padding: 1.5rem;
+    }
+
+    .upload-icon {
+        font-size: 2rem !important;
+        color: var(--professional-accent) !important;
+        margin-bottom: 0.5rem;
+    }
+
+    .upload-title {
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        color: var(--professional-primary) !important;
+        margin: 0.25rem 0 !important;
+    }
+
+    .upload-subtitle {
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
+        margin: 0.25rem 0 0.75rem 0 !important;
+    }
+
+    .upload-button {
+        font-size: 0.75rem !important;
+        padding: 0.35rem 0.75rem !important;
+        background: var(--professional-accent) !important;
+        border-color: var(--professional-accent) !important;
+        font-weight: 500 !important;
+    }
+
+        .upload-button:hover {
+            background: #2980b9 !important;
+            border-color: #2980b9 !important;
+        }
+
+    /* 드래그 오버레이 */
+    .drag-overlay, .upload-progress-overlay {
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background-color: rgba(var(--rz-primary-darker-rgb), 0.8);
+        background: rgba(52, 152, 219, 0.95);
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         z-index: 10;
-        border-radius: 4px;
+        border-radius: 6px;
     }
 
     .upload-progress-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(var(--rz-black-rgb), 0.85);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        z-index: 10;
-        border-radius: 4px;
+        background: rgba(44, 62, 80, 0.95);
     }
 
-    .file-select-button {
-        background-color: var(--rz-primary) !important;
+    .drag-icon {
+        font-size: 2.5rem !important;
         color: white !important;
-        border: none !important;
-        transition: all 0.2s ease;
+        margin-bottom: 0.5rem;
     }
 
-        .file-select-button:hover {
-            background-color: var(--rz-primary-dark) !important;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16) !important;
-        }
-
-    .file-name {
+    .drag-text {
+        font-size: 0.875rem !important;
+        color: white !important;
         font-weight: 500;
-        color: var(--rz-primary-light);
     }
 
-    /* 카드 스타일 개선 */
-    .rz-card {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        border: 1px solid var(--rz-border-light);
+    .progress-content {
+        text-align: center;
     }
 
-    /* 플레이리스트 드롭 존 */
-    .playlist-drop-zone {
-        width: 100%;
-        min-height: 80px;
-        position: relative;
+    .progress-title {
+        font-size: 0.8rem !important;
+        color: white !important;
+        margin-bottom: 0.5rem !important;
     }
 
-        .playlist-drop-zone.drag-over {
-            background-color: rgba(76, 175, 80, 0.1);
-            border-radius: 8px;
-            outline: 2px dashed #4CAF50;
-            outline-offset: -2px;
-        }
-
-    /* 플레이리스트 카드 스타일 */
-    .playlist-card {
-        border: 1px solid var(--rz-border);
-        transition: all 0.2s ease;
-        padding: 0.75rem !important;
-        min-height: 48px;
+    .progress-info {
+        font-size: 0.7rem !important;
+        color: rgba(255, 255, 255, 0.8) !important;
+        margin-top: 0.5rem !important;
     }
 
-        .playlist-card:hover {
-            border-color: var(--rz-primary-lighter);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
-        }
-
-        .playlist-card.selected {
-            border-color: var(--rz-primary);
-            background-color: var(--rz-primary-lighter);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-        }
-
-        .playlist-card.drag-over {
-            border-color: var(--rz-success);
-            background-color: var(--rz-success-lighter);
-            box-shadow: 0 4px 20px rgba(0, 255, 0, 0.2);
-            transform: scale(1.02);
-        }
-
-    /* 미디어 카드 스타일 */
-    .media-card {
-        border: 1px solid var(--rz-border);
-        transition: all 0.2s ease;
-        padding: 1rem !important;
-        cursor: move;
+    /* 섹션 헤더 */
+    .section-header {
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #f0f0f0;
+        margin-bottom: 0.5rem;
     }
 
-        .media-card:hover {
-            border-color: var(--rz-primary-lighter);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            background-color: var(--rz-base-100);
+    .section-icon {
+        font-size: 1rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    .section-title {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+    }
+
+    /* 패널 스타일 */
+    .playlist-panel, .media-panel {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid var(--professional-border) !important;
+        border-radius: 6px !important;
+        background: white !important;
+        min-height: calc(100vh - 240px);
+    }
+
+    /* 필터 카드 */
+    .filter-card {
+        background: #fafbfc !important;
+        border: 1px solid #e1e4e8 !important;
+        padding: 0.65rem !important;
+        border-radius: 4px !important;
+    }
+
+    .filter-icon {
+        font-size: 0.875rem !important;
+        color: #6c757d !important;
+    }
+
+    .filter-title {
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-secondary) !important;
+        margin: 0 !important;
+    }
+
+    .filter-input, .filter-dropdown {
+        font-size: 0.75rem !important;
+        height: 32px !important;
+        border-color: #d0d7de !important;
+    }
+
+        .filter-input input, .filter-dropdown input {
+            font-size: 0.75rem !important;
+            padding: 0.35rem 0.5rem !important;
         }
 
-        .media-card.selected {
-            border-color: var(--rz-primary);
-            background-color: var(--rz-primary-lighter);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    .reset-button {
+        font-size: 0.7rem !important;
+        padding: 0.25rem 0.5rem !important;
+        height: 28px !important;
+    }
+
+    /* 플레이리스트 카드 */
+    .playlist-card.compact {
+        padding: 0.5rem !important;
+        border: 1px solid #e1e4e8 !important;
+        border-radius: 4px !important;
+        transition: all 0.15s ease !important;
+        background: white !important;
+        cursor: pointer;
+    }
+
+        .playlist-card.compact:hover {
+            border-color: var(--professional-accent) !important;
+            background: var(--professional-hover) !important;
         }
 
-        .media-card.dragging {
-            opacity: 0.5;
+        .playlist-card.compact.selected {
+            border-color: var(--professional-accent) !important;
+            background: var(--professional-selected) !important;
+        }
+
+        .playlist-card.compact.drag-over {
+            border-color: var(--professional-success) !important;
+            background: #d4edda !important;
+            transform: scale(1.01);
+        }
+
+    .playlist-icon {
+        font-size: 0.875rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    .playlist-name {
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+    }
+
+    /* 미디어 카드 */
+    .media-card.compact {
+        padding: 0.65rem !important;
+        border: 1px solid #e1e4e8 !important;
+        border-radius: 4px !important;
+        transition: all 0.15s ease !important;
+        background: white !important;
+        cursor: pointer;
+    }
+
+        .media-card.compact:hover {
+            border-color: var(--professional-accent) !important;
+            background: var(--professional-hover) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .media-card.compact.selected {
+            border-color: var(--professional-accent) !important;
+            background: var(--professional-selected) !important;
+        }
+
+        .media-card.compact.dragging {
+            opacity: 0.6;
             cursor: grabbing;
         }
 
-    /* 선택 정보 카드 스타일 */
-    .selected-info-card {
-        background-color: var(--rz-info-lighter);
-        border-color: var(--rz-info);
-        padding: 0.75rem !important;
+    .media-checkbox {
+        transform: scale(0.85);
     }
 
-    /* 필터 카드 스타일 */
-    .filter-card {
-        background-color: var(--rz-base-100);
-        border: 1px solid var(--rz-border);
-        padding: 1rem !important;
+    .media-main-icon {
+        font-size: 0.875rem !important;
+        color: var(--professional-accent) !important;
     }
 
-    /* 플레이리스트 내 미디어 목록 스타일 */
+    .media-name {
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+    }
+
+    .media-meta {
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
+    }
+
+    .meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.15rem;
+    }
+
+    .meta-icon {
+        font-size: 0.75rem !important;
+        opacity: 0.7;
+    }
+
+    /* 버튼 스타일 */
+    .compact-button, .clear-button {
+        font-size: 0.75rem !important;
+        padding: 0.25rem 0.5rem !important;
+        height: 28px !important;
+        font-weight: 500 !important;
+    }
+
+    .expand-button {
+        min-width: 20px !important;
+        padding: 2px !important;
+        height: 20px !important;
+    }
+
+        .expand-button .rz-button-icon {
+            font-size: 0.875rem !important;
+        }
+
+    .icon-button, .action-button {
+        min-width: 24px !important;
+        padding: 4px !important;
+        height: 24px !important;
+        opacity: 0.7;
+        transition: all 0.15s ease;
+    }
+
+        .icon-button:hover, .action-button:hover {
+            opacity: 1;
+            background: var(--professional-hover) !important;
+        }
+
+        .icon-button.delete:hover, .action-button.delete:hover {
+            color: var(--professional-danger) !important;
+            background: #fee !important;
+        }
+
+        .action-button.play:hover {
+            color: white !important;
+            background: var(--professional-success) !important;
+        }
+
+    .remove-button {
+        min-width: 20px !important;
+        padding: 2px !important;
+        height: 20px !important;
+        opacity: 0.6;
+    }
+
+        .remove-button:hover {
+            opacity: 1;
+            color: var(--professional-danger) !important;
+        }
+
+    /* 배지 스타일 */
+    .count-badge {
+        font-size: 0.65rem !important;
+        padding: 2px 6px !important;
+        font-weight: 500 !important;
+        background: #f0f0f0 !important;
+        color: var(--professional-secondary) !important;
+    }
+
+    /* 플레이리스트 내 미디어 목록 */
     .playlist-media-list {
-        background-color: rgba(0, 0, 0, 0.05);
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        padding: 0.75rem !important;
-        margin-top: 0.5rem;
-        border-radius: 4px;
+        background: #f8f9fa !important;
+        border: 1px solid #e1e4e8 !important;
+        padding: 0.5rem !important;
+        margin-top: 0.35rem;
+        border-radius: 3px !important;
     }
 
-    /* 다크 테마용 플레이리스트 미디어 목록 */
-    :root[data-theme='dark'] .playlist-media-list {
-        background-color: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.1);
+    .media-list {
+        max-height: 200px;
+        overflow-y: auto;
     }
 
     .media-item {
-        padding: 0.25rem 0;
+        padding: 0.2rem 0;
         border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-        transition: background-color 0.2s ease;
+        transition: background-color 0.15s ease;
     }
 
         .media-item:hover {
             background-color: rgba(0, 0, 0, 0.02);
+            border-radius: 2px;
         }
 
         .media-item:last-child {
             border-bottom: none;
         }
 
-    /* 다크 테마용 미디어 아이템 */
-    :root[data-theme='dark'] .media-item {
-        border-bottom-color: rgba(255, 255, 255, 0.05);
+    .item-icon {
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
     }
 
-        :root[data-theme='dark'] .media-item:hover {
-            background-color: rgba(255, 255, 255, 0.02);
+    .item-text {
+        font-size: 0.7rem !important;
+        color: var(--professional-secondary) !important;
+        margin: 0 !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .item-date {
+        font-size: 0.65rem !important;
+        color: #6c757d !important;
+        margin: 0 !important;
+    }
+
+    /* 선택 정보 카드 */
+    .selection-info-card {
+        background: #e8f4fd !important;
+        border: 1px solid #b8daff !important;
+        padding: 0.5rem 0.75rem !important;
+        border-radius: 4px !important;
+    }
+
+    .selection-text {
+        font-size: 0.75rem !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .selection-icon {
+        font-size: 0.875rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    /* 로딩 상태 */
+    .loading-container {
+        text-align: center;
+        padding: 2rem 0;
+    }
+
+    .slim-progress {
+        width: 120px !important;
+        height: 4px !important;
+        margin: 0 auto !important;
+    }
+
+    .loading-text {
+        margin-top: 0.75rem !important;
+        font-size: 0.75rem !important;
+        color: #6c757d !important;
+    }
+
+    /* 빈 상태 */
+    .empty-state {
+        text-align: center;
+        padding: 2.5rem 0;
+    }
+
+    .empty-icon {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 32px !important;
+        color: #d0d7de !important;
+        margin-bottom: 0.75rem;
+    }
+
+    .empty-text {
+        font-size: 0.8rem !important;
+        color: var(--professional-secondary) !important;
+        margin: 0.5rem 0 0.25rem 0 !important;
+    }
+
+    .empty-subtext {
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
+        margin: 0 !important;
+    }
+
+    /* 컨테이너 스크롤 */
+    .playlists-container {
+        max-height: calc(100vh - 320px);
+        overflow-y: auto;
+        padding-right: 0.25rem;
+    }
+
+    .media-container {
+        max-height: calc(100vh - 360px);
+        overflow-y: auto;
+        padding-right: 0.25rem;
+    }
+
+        /* 스크롤바 스타일링 */
+        .playlists-container::-webkit-scrollbar,
+        .media-container::-webkit-scrollbar,
+        .media-list::-webkit-scrollbar {
+            width: 5px;
         }
 
-    /* 확장/축소 버튼 애니메이션 */
-    .rz-button-icon-only {
-        transition: transform 0.2s ease;
+        .playlists-container::-webkit-scrollbar-track,
+        .media-container::-webkit-scrollbar-track,
+        .media-list::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border-radius: 3px;
+        }
+
+        .playlists-container::-webkit-scrollbar-thumb,
+        .media-container::-webkit-scrollbar-thumb,
+        .media-list::-webkit-scrollbar-thumb {
+            background: #c0c0c0;
+            border-radius: 3px;
+        }
+
+            .playlists-container::-webkit-scrollbar-thumb:hover,
+            .media-container::-webkit-scrollbar-thumb:hover,
+            .media-list::-webkit-scrollbar-thumb:hover {
+                background: #a0a0a0;
+            }
+
+    /* 드래그 중 효과 */
+    body.dragging {
+        cursor: grabbing !important;
     }
 
-    /* 드래그 중 커서 스타일 */
+        body.dragging .playlist-card:not(.drag-over) {
+            opacity: 0.8;
+        }
+
+        body.dragging .playlist-card {
+            border-style: dashed;
+        }
+
+    /* 드래그 가능 커서 */
     [draggable="true"] {
         cursor: grab;
     }
@@ -515,62 +873,57 @@
         }
 
     /* 다크 테마 지원 */
-    :root[data-theme='dark'] .playlist-card.drag-over {
-        background-color: rgba(var(--rz-success-rgb), 0.2);
+    :root[data-theme='dark'] .page-title {
+        color: #e1e4e8 !important;
     }
 
-    :root[data-theme='dark'] .media-card.selected {
-        background-color: rgba(var(--rz-primary-rgb), 0.2);
+    :root[data-theme='dark'] .page-subtitle,
+    :root[data-theme='dark'] .filter-title,
+    :root[data-theme='dark'] .playlist-name,
+    :root[data-theme='dark'] .media-name,
+    :root[data-theme='dark'] .item-text {
+        color: #c9d1d9 !important;
     }
 
-    :root[data-theme='dark'] .selected-info-card {
-        background-color: rgba(var(--rz-info-rgb), 0.2);
+    :root[data-theme='dark'] .playlist-panel,
+    :root[data-theme='dark'] .media-panel,
+    :root[data-theme='dark'] .playlist-card.compact,
+    :root[data-theme='dark'] .media-card.compact {
+        background: #0d1117 !important;
+        border-color: #30363d !important;
     }
 
-    :root[data-theme='dark'] .file-drop-zone {
-        background-color: rgba(var(--rz-black-rgb), 0.2) !important;
-        border-color: var(--rz-secondary) !important;
+    :root[data-theme='dark'] .upload-zone-card {
+        background: #161b22 !important;
+        border-color: #30363d !important;
     }
 
-    :root[data-theme='dark'] .text-secondary {
-        color: var(--rz-text-secondary-color) !important;
+    :root[data-theme='dark'] .filter-card {
+        background: #161b22 !important;
+        border-color: #30363d !important;
     }
 
-    :root[data-theme='light'] .file-drop-zone {
-        background-color: var(--rz-base-100) !important;
-        border-color: var(--rz-secondary-light) !important;
+    :root[data-theme='dark'] .playlist-media-list {
+        background: #161b22 !important;
+        border-color: #30363d !important;
     }
 
-    :root[data-theme='light'] .upload-progress-overlay {
-        background-color: rgba(var(--rz-base-400-rgb), 0.9);
+    :root[data-theme='dark'] .selection-info-card {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
     }
 
-    :root[data-theme='light'] .file-name {
-        color: var(--rz-primary);
+    :root[data-theme='dark'] .playlist-card.compact:hover,
+    :root[data-theme='dark'] .media-card.compact:hover {
+        background: #161b22 !important;
     }
 
-    /* 스크롤바 스타일 */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+    :root[data-theme='dark'] .playlist-card.compact.selected,
+    :root[data-theme='dark'] .media-card.compact.selected {
+        background: #1f2937 !important;
     }
 
-    ::-webkit-scrollbar-track {
-        background: var(--rz-base-100);
-        border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: var(--rz-text-disabled-color);
-        border-radius: 4px;
-    }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--rz-text-secondary-color);
-        }
-
-    /* 아이콘 정렬 */
-    .rz-icon {
-        vertical-align: middle;
+    :root[data-theme='dark'] .upload-zone-card:hover {
+        background: #1f2937 !important;
     }
 </style>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -43,7 +43,6 @@ namespace WicsPlatform.Client.Pages
         [Inject]
         protected wicsService WicsService { get; set; }
 
-        protected RadzenDataGrid<WicsPlatform.Server.Models.wics.Tt> ttsGrid;
         protected IEnumerable<WicsPlatform.Server.Models.wics.Tt> ttsList;
         protected IList<WicsPlatform.Server.Models.wics.Tt> selectedTts = new List<WicsPlatform.Server.Models.wics.Tt>();
         protected bool selectAllChecked = false;
@@ -53,6 +52,10 @@ namespace WicsPlatform.Client.Pages
         // 검색 필터
         protected string searchFilter = "";
         protected DateTime? dateFilter = null;
+
+        // 페이지네이션
+        protected int currentPage = 0;
+        protected int pageSize = 10;
 
         protected override async Task OnInitializedAsync()
         {
@@ -67,7 +70,7 @@ namespace WicsPlatform.Client.Pages
 
                 var result = await WicsService.GetTts(new Query
                 {
-                    Filter = "DeleteYn eq 'N'",
+                    Filter = "DeleteYn eq 'N' or DeleteYn eq null",
                     OrderBy = "CreatedAt desc"
                 });
 
@@ -116,15 +119,38 @@ namespace WicsPlatform.Client.Pages
                 filteredTtsList = filteredTtsList.Where(t => t.CreatedAt >= startDate && t.CreatedAt < endDate);
             }
 
-            // 그리드 업데이트
-            ttsGrid?.Reload();
+            // 페이지네이션을 위한 처리
+            if (filteredTtsList.Count() > pageSize)
+            {
+                filteredTtsList = filteredTtsList
+                    .Skip(currentPage * pageSize)
+                    .Take(pageSize);
+            }
+
+            StateHasChanged();
         }
 
         protected void ResetFilters()
         {
             searchFilter = "";
             dateFilter = null;
+            currentPage = 0;
             ApplyFilters();
+        }
+
+        // TTS 선택 토글
+        protected void ToggleTtsSelection(WicsPlatform.Server.Models.wics.Tt tts)
+        {
+            if (IsTtsSelected(tts))
+            {
+                selectedTts = selectedTts.Where(t => t.Id != tts.Id).ToList();
+            }
+            else
+            {
+                selectedTts.Add(tts);
+            }
+            UpdateSelectAllCheckbox();
+            StateHasChanged();
         }
 
         // 선택 여부 확인
@@ -139,25 +165,25 @@ namespace WicsPlatform.Client.Pages
             {
                 if (!IsTtsSelected(tts))
                 {
-                    ((List<WicsPlatform.Server.Models.wics.Tt>)selectedTts).Add(tts);
+                    selectedTts.Add(tts);
                 }
             }
             else
             {
-                if (IsTtsSelected(tts))
-                {
-                    ((List<WicsPlatform.Server.Models.wics.Tt>)selectedTts).RemoveAll(t => t.Id == tts.Id);
-                }
+                selectedTts = selectedTts.Where(t => t.Id != tts.Id).ToList();
             }
 
             UpdateSelectAllCheckbox();
+            StateHasChanged();
         }
 
         protected void SelectAllTtsChanged(bool selected)
         {
             if (selected)
             {
-                selectedTts = ttsList.ToList();
+                // 현재 페이지의 항목만 선택
+                var currentPageItems = filteredTtsList ?? ttsList;
+                selectedTts = currentPageItems.ToList();
             }
             else
             {
@@ -169,14 +195,39 @@ namespace WicsPlatform.Client.Pages
 
         protected void UpdateSelectAllCheckbox()
         {
-            if (ttsList != null && selectedTts != null)
+            var currentPageItems = filteredTtsList ?? ttsList;
+            if (currentPageItems != null && selectedTts != null)
             {
-                selectAllChecked = ttsList.Count() > 0 && selectedTts.Count() == ttsList.Count();
+                selectAllChecked = currentPageItems.Any() &&
+                    currentPageItems.All(t => selectedTts.Any(s => s.Id == t.Id));
             }
             else
             {
                 selectAllChecked = false;
             }
+        }
+
+        // 선택 초기화
+        protected void ClearSelection()
+        {
+            selectedTts.Clear();
+            selectAllChecked = false;
+            StateHasChanged();
+        }
+
+        // 페이지네이션
+        protected void OnPageChanged(PagerEventArgs args)
+        {
+            currentPage = args.PageIndex;
+            ApplyFilters();
+        }
+
+        protected string GetPagingSummaryFormat()
+        {
+            var total = ttsList?.Count() ?? 0;
+            var start = currentPage * pageSize + 1;
+            var end = Math.Min(start + pageSize - 1, total);
+            return $"{start}-{end} / 총 {total}개";
         }
 
         protected async Task OpenAddTtsDialog()
@@ -194,6 +245,7 @@ namespace WicsPlatform.Client.Pages
             if (result == true)
             {
                 await LoadTts();
+                ClearSelection();
             }
         }
 
@@ -239,7 +291,7 @@ namespace WicsPlatform.Client.Pages
                 var softDeleteRequest = new
                 {
                     DeleteYn = "Y",
-                    UpdatedAt = DateTime.UtcNow
+                    UpdatedAt = DateTime.Now
                 };
 
                 // PATCH 메서드를 사용해 DeleteYn 필드만 업데이트
@@ -254,6 +306,12 @@ namespace WicsPlatform.Client.Pages
                         Detail = $"'{tts.Name}' TTS가 삭제되었습니다.",
                         Duration = 4000
                     });
+
+                    // 선택 목록에서 제거
+                    if (IsTtsSelected(tts))
+                    {
+                        selectedTts = selectedTts.Where(t => t.Id != tts.Id).ToList();
+                    }
 
                     await LoadTts();
                 }
@@ -280,27 +338,36 @@ namespace WicsPlatform.Client.Pages
             }
         }
 
-        protected void ViewTtsDetails(WicsPlatform.Server.Models.wics.Tt tts)
-        {
-            // TTS의 상세 정보 (필요 시 구현)
-        }
-
         protected async Task PlayTts(WicsPlatform.Server.Models.wics.Tt tts)
         {
             try
             {
-                // TTS 재생 테스트
-                // 현재 브라우저에서 TTS 플레이백을 실행합니다
+                // TTS 재생 - Web Speech API 사용
+                await JSRuntime.InvokeVoidAsync("eval", $@"
+                    if ('speechSynthesis' in window) {{
+                        // 기존 재생 중지
+                        window.speechSynthesis.cancel();
+                        
+                        // 새 음성 생성 및 재생
+                        const utterance = new SpeechSynthesisUtterance('{tts.Content.Replace("'", "\\'")}');
+                        utterance.lang = 'ko-KR';
+                        utterance.rate = 1.0;
+                        utterance.pitch = 1.0;
+                        utterance.volume = 1.0;
+                        
+                        window.speechSynthesis.speak(utterance);
+                    }} else {{
+                        alert('이 브라우저는 TTS를 지원하지 않습니다.');
+                    }}
+                ");
+
                 NotificationService.Notify(new NotificationMessage
                 {
                     Severity = NotificationSeverity.Info,
                     Summary = "TTS 재생",
                     Detail = $"'{tts.Name}' TTS를 재생합니다.",
-                    Duration = 3000
+                    Duration = 2000
                 });
-
-                // JavaScript 함수를 호출하여 Web Speech API 활용 (필요 시 구현)
-                await JSRuntime.InvokeVoidAsync("playTTS", tts.Content);
             }
             catch (Exception ex)
             {
@@ -313,7 +380,6 @@ namespace WicsPlatform.Client.Pages
                 });
             }
         }
-
 
         protected async Task OpenAddTtsToChannelDialog()
         {
@@ -339,13 +405,12 @@ namespace WicsPlatform.Client.Pages
                     Width = "600px",
                     Height = "auto",
                     Resizable = false,
-                    Draggable = false
+                    Draggable = true
                 });
 
             if (result == true)
             {
-                selectedTts.Clear();
-                selectAllChecked = false;
+                ClearSelection();
                 await LoadTts();
             }
         }

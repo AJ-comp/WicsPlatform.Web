@@ -361,6 +361,16 @@ class AudioMixer {
     async enableMic() {
         try {
             const timestamp = this.getTimestamp();
+
+            // 이미 마이크가 활성화되어 있는지 확인
+            if (this.micStream && this.micSource) {
+                const tracks = this.micStream.getAudioTracks();
+                if (tracks.length > 0 && tracks[0].enabled && tracks[0].readyState === 'live') {
+                    console.log(`[${timestamp}] 🎤 마이크가 이미 활성화되어 있습니다. 스킵합니다.`);
+                    return true;
+                }
+            }
+
             const constraints = {
                 audio: {
                     sampleRate: { ideal: this.config.sampleRate },
@@ -519,9 +529,43 @@ let mixerInstance = null;
 
 // ==== 외부 진입점 (C#에서 호출) ====
 
+// 🔥 마이크 활성화 상태 확인 함수 추가
+export function isMicrophoneEnabled() {
+    const timestamp = new Date().toISOString().substr(11, 12);
+
+    if (!mixerInstance) {
+        console.log(`[${timestamp}] 🎤 마이크 상태: 믹서 없음 (false)`);
+        return false;
+    }
+
+    if (!mixerInstance.micStream) {
+        console.log(`[${timestamp}] 🎤 마이크 상태: 스트림 없음 (false)`);
+        return false;
+    }
+
+    const tracks = mixerInstance.micStream.getAudioTracks();
+    const isEnabled = tracks.length > 0 &&
+        tracks.some(track => track.enabled && track.readyState === 'live');
+
+    console.log(`[${timestamp}] 🎤 마이크 상태 확인: ${isEnabled ? 'ACTIVE' : 'INACTIVE'}`);
+    return isEnabled;
+}
+
 export async function createMixer(dotNetRef, config) {
     const timestamp = new Date().toISOString().substr(11, 12);
     console.log(`[${timestamp}] 🚀 createMixer 호출됨 (타이머 없는 버전)`, config);
+
+    // 이미 믹서가 있고 마이크가 활성화되어 있으면 스킵
+    if (mixerInstance && isMicrophoneEnabled()) {
+        console.log(`[${timestamp}] 🎤 믹서와 마이크가 이미 활성화되어 있습니다. 기존 인스턴스 유지`);
+
+        // 볼륨 설정만 업데이트
+        if (config.micVolume !== undefined) {
+            mixerInstance.setVolumes(config.micVolume, config.mediaVolume || 1.0, config.ttsVolume || 1.0);
+        }
+
+        return true;
+    }
 
     if (mixerInstance) {
         await mixerInstance.dispose();
@@ -533,7 +577,12 @@ export async function createMixer(dotNetRef, config) {
 }
 
 export async function enableMic() {
-    return mixerInstance ? await mixerInstance.enableMic() : false;
+    if (!mixerInstance) {
+        console.log(`[${new Date().toISOString().substr(11, 12)}] ❌ enableMic: 믹서 인스턴스가 없습니다`);
+        return false;
+    }
+
+    return await mixerInstance.enableMic();
 }
 
 export function setVolumes(mic, media, tts) {
@@ -579,6 +628,9 @@ window.mixerDebug = {
     getInstance: () => mixerInstance,
     getStatus: () => mixerInstance ? mixerInstance.getBufferStatus() : null,
 
+    // 마이크 상태 확인 추가
+    isMicEnabled: () => isMicrophoneEnabled(),
+
     // 통계 보기
     getStats: () => {
         if (!mixerInstance) return null;
@@ -615,3 +667,4 @@ console.log('[audiomixer.js] 📊 모듈 로드 완료 - 타이머 없는 즉시
 console.log('  mixerDebug.getStatus() - 현재 상태');
 console.log('  mixerDebug.getStats() - 간단 통계');
 console.log('  mixerDebug.printStats() - 상세 통계');
+console.log('  mixerDebug.isMicEnabled() - 마이크 활성화 상태');

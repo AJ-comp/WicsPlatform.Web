@@ -1,297 +1,793 @@
-@page "/"
+﻿@page "/"
 @attribute [Authorize]
 
 <PageTitle>홈 - WICS 방송 관리 시스템</PageTitle>
 
 <RadzenStack>
     <!-- 헤더 섹션 -->
-    <RadzenRow class="mb-4">
-        <RadzenColumn Size="12">
-            <RadzenText Text="WICS 방송 관리 시스템" TextStyle="TextStyle.DisplayH4" TagName="TagName.H1"
-                        Style="margin: 0; font-weight: 600; color: var(--rz-text-title-color);" />
-            <RadzenText Text="@($"안녕하세요, {Security.User?.Name ?? "사용자"}님. 오늘도 좋은 하루 되세요!")"
-                        TextStyle="TextStyle.H6" Class="mb-0 mt-2" Style="color: var(--rz-text-secondary-color);" />
-        </RadzenColumn>
-    </RadzenRow>
+    <div class="elegant-header">
+        <h1 class="main-title">WICS 방송 관리 시스템</h1>
+        <div class="welcome-message">
+            <span class="greeting-text">환영합니다, </span>
+            <span class="user-name">@(Security.User?.Name ?? "손님")</span>
+        </div>
+        <div class="decorative-line"></div>
+    </div>
 
     <!-- 통계 카드 섹션 -->
-    <RadzenRow Gap="1rem" class="mb-4">
+    <RadzenRow Gap="1rem" class="statistics-section">
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard class="stats-card">
-                <RadzenStack Gap="0.5rem">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                        <RadzenIcon Icon="settings_input_antenna" Style="font-size: 2.5rem; color: var(--rz-primary);" />
-                        <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="활성" />
-                    </RadzenStack>
-                    <RadzenText TextStyle="TextStyle.H4" class="mb-0">@totalChannels</RadzenText>
-                    <RadzenText TextStyle="TextStyle.Body2" class="text-muted mb-0">전체 채널</RadzenText>
-                </RadzenStack>
-            </RadzenCard>
+            <div class="elegant-stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon-frame">
+                        <RadzenIcon Icon="settings_input_antenna" class="stat-icon" />
+                    </div>
+                </div>
+                <div class="stat-body">
+                    <h3 class="stat-number">@totalChannels</h3>
+                    <p class="stat-title">전체 채널</p>
+                    <span class="stat-status active">● 활성</span>
+                </div>
+                <div class="card-decoration"></div>
+            </div>
         </RadzenColumn>
 
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard class="stats-card">
-                <RadzenStack Gap="0.5rem">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                        <RadzenIcon Icon="speaker" Style="font-size: 2.5rem; color: var(--rz-info);" />
-                        <RadzenText TextStyle="TextStyle.Caption" class="text-success">
-                            @onlineSpeakers 온라인
-                        </RadzenText>
-                    </RadzenStack>
-                    <RadzenText TextStyle="TextStyle.H4" class="mb-0">@totalSpeakers</RadzenText>
-                    <RadzenText TextStyle="TextStyle.Body2" class="text-muted mb-0">전체 스피커</RadzenText>
-                </RadzenStack>
-            </RadzenCard>
+            <div class="elegant-stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon-frame">
+                        <RadzenIcon Icon="speaker" class="stat-icon" />
+                    </div>
+                </div>
+                <div class="stat-body">
+                    <h3 class="stat-number">@totalSpeakers</h3>
+                    <p class="stat-title">전체 스피커</p>
+                    <span class="stat-status online">● @onlineSpeakers 온라인</span>
+                </div>
+                <div class="card-decoration"></div>
+            </div>
         </RadzenColumn>
 
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard class="stats-card">
-                <RadzenStack Gap="0.5rem">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                        <RadzenIcon Icon="audio_file" Style="font-size: 2.5rem; color: var(--rz-warning);" />
-                        <RadzenText TextStyle="TextStyle.Caption" class="text-muted">
-                            @totalSize
-                        </RadzenText>
-                    </RadzenStack>
-                    <RadzenText TextStyle="TextStyle.H4" class="mb-0">@totalMedia</RadzenText>
-                    <RadzenText TextStyle="TextStyle.Body2" class="text-muted mb-0">미디어 파일</RadzenText>
-                </RadzenStack>
-            </RadzenCard>
+            <div class="elegant-stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon-frame">
+                        <RadzenIcon Icon="audio_file" class="stat-icon" />
+                    </div>
+                </div>
+                <div class="stat-body">
+                    <h3 class="stat-number">@totalMedia</h3>
+                    <p class="stat-title">미디어 파일</p>
+                    <span class="stat-status storage">◆ @totalSize</span>
+                </div>
+                <div class="card-decoration"></div>
+            </div>
         </RadzenColumn>
 
         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-            <RadzenCard class="stats-card">
-                <RadzenStack Gap="0.5rem">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                        <RadzenIcon Icon="record_voice_over" Style="font-size: 2.5rem; color: var(--rz-success);" />
-                        <RadzenIcon Icon="trending_up" Style="color: var(--rz-success);" />
-                    </RadzenStack>
-                    <RadzenText TextStyle="TextStyle.H4" class="mb-0">@totalTts</RadzenText>
-                    <RadzenText TextStyle="TextStyle.Body2" class="text-muted mb-0">TTS 메시지</RadzenText>
-                </RadzenStack>
-            </RadzenCard>
+            <div class="elegant-stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon-frame">
+                        <RadzenIcon Icon="record_voice_over" class="stat-icon" />
+                    </div>
+                </div>
+                <div class="stat-body">
+                    <h3 class="stat-number">@totalTts</h3>
+                    <p class="stat-title">음성 메시지</p>
+                    <span class="stat-status trending">▲ 증가중</span>
+                </div>
+                <div class="card-decoration"></div>
+            </div>
         </RadzenColumn>
     </RadzenRow>
 
     <!-- 퀵 액션 섹션 -->
-    <RadzenRow Gap="1rem" class="mb-4">
-        <RadzenColumn Size="12">
-            <RadzenCard>
-                <RadzenText TextStyle="TextStyle.H6" class="mb-3">
-                    <RadzenIcon Icon="flash_on" class="me-2" />
-                    빠른 작업
-                </RadzenText>
-                <RadzenRow Gap="1rem">
-                    <RadzenColumn Size="6" SizeMD="3">
-                        <RadzenButton Text="방송 시작"
-                                      Icon="play_circle"
-                                      ButtonStyle="ButtonStyle.Primary"
-                                      Size="ButtonSize.Large"
-                                      Style="width: 100%; height: 80px;"
-                                      Click="@(() => NavigationManager.NavigateTo("/manage-broad-cast"))" />
-                    </RadzenColumn>
-                    <RadzenColumn Size="6" SizeMD="3">
-                        <RadzenButton Text="스피커 추가"
-                                      Icon="add_circle"
-                                      ButtonStyle="ButtonStyle.Secondary"
-                                      Size="ButtonSize.Large"
-                                      Style="width: 100%; height: 80px;"
-                                      Click="@(() => NavigationManager.NavigateTo("/manage-speaker"))" />
-                    </RadzenColumn>
-                    <RadzenColumn Size="6" SizeMD="3">
-                        <RadzenButton Text="미디어 업로드"
-                                      Icon="cloud_upload"
-                                      ButtonStyle="ButtonStyle.Info"
-                                      Size="ButtonSize.Large"
-                                      Style="width: 100%; height: 80px;"
-                                      Click="@(() => NavigationManager.NavigateTo("/manage-media"))" />
-                    </RadzenColumn>
-                    <RadzenColumn Size="6" SizeMD="3">
-                        <RadzenButton Text="TTS 생성"
-                                      Icon="mic"
-                                      ButtonStyle="ButtonStyle.Success"
-                                      Size="ButtonSize.Large"
-                                      Style="width: 100%; height: 80px;"
-                                      Click="@(() => NavigationManager.NavigateTo("/manage-tts"))" />
-                    </RadzenColumn>
-                </RadzenRow>
-            </RadzenCard>
-        </RadzenColumn>
-    </RadzenRow>
+    <div class="quick-actions-section">
+        <div class="section-header-elegant">
+            <span class="section-ornament">❖</span>
+            <h2 class="section-title-elegant">빠른 실행</h2>
+            <span class="section-ornament">❖</span>
+        </div>
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="6" SizeMD="3">
+                <button class="elegant-action-btn broadcast" @onclick="@(() => NavigationManager.NavigateTo("/manage-broad-cast"))">
+                    <div class="btn-inner">
+                        <div class="btn-icon-wrapper">
+                            <RadzenIcon Icon="play_circle" class="btn-icon" />
+                        </div>
+                        <span class="btn-label">방송 시작</span>
+                        <span class="btn-sublabel">실시간 송출 시작</span>
+                    </div>
+                </button>
+            </RadzenColumn>
+            <RadzenColumn Size="6" SizeMD="3">
+                <button class="elegant-action-btn speaker" @onclick="@(() => NavigationManager.NavigateTo("/manage-speaker"))">
+                    <div class="btn-inner">
+                        <div class="btn-icon-wrapper">
+                            <RadzenIcon Icon="add_circle" class="btn-icon" />
+                        </div>
+                        <span class="btn-label">스피커 추가</span>
+                        <span class="btn-sublabel">새 장치 등록</span>
+                    </div>
+                </button>
+            </RadzenColumn>
+            <RadzenColumn Size="6" SizeMD="3">
+                <button class="elegant-action-btn media" @onclick="@(() => NavigationManager.NavigateTo("/manage-media"))">
+                    <div class="btn-inner">
+                        <div class="btn-icon-wrapper">
+                            <RadzenIcon Icon="cloud_upload" class="btn-icon" />
+                        </div>
+                        <span class="btn-label">미디어 업로드</span>
+                        <span class="btn-sublabel">오디오 파일 추가</span>
+                    </div>
+                </button>
+            </RadzenColumn>
+            <RadzenColumn Size="6" SizeMD="3">
+                <button class="elegant-action-btn tts" @onclick="@(() => NavigationManager.NavigateTo("/manage-tts"))">
+                    <div class="btn-inner">
+                        <div class="btn-icon-wrapper">
+                            <RadzenIcon Icon="mic" class="btn-icon" />
+                        </div>
+                        <span class="btn-label">음성 생성</span>
+                        <span class="btn-sublabel">TTS 메시지 작성</span>
+                    </div>
+                </button>
+            </RadzenColumn>
+        </RadzenRow>
+    </div>
 
     <!-- 최근 활동 및 시스템 상태 -->
-    <RadzenRow Gap="1rem">
+    <RadzenRow Gap="1rem" class="content-section">
         <!-- 최근 방송 활동 -->
         <RadzenColumn Size="12" SizeMD="8">
-            <RadzenCard class="h-100">
-                <RadzenText TextStyle="TextStyle.H6" class="mb-3">
-                    <RadzenIcon Icon="history" class="me-2" />
-                    최근 방송 활동
-                </RadzenText>
-                @if (isLoadingActivities)
-                {
-                    <div class="text-center py-4">
-                        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
-                                           Style="width: 60%; height: 6px; margin: 0 auto;" />
-                    </div>
-                }
-                else if (recentActivities.Any())
-                {
-                    <RadzenDataGrid Data="@recentActivities"
-                                    TItem="RecentActivity"
-                                    AllowAlternatingRows="false"
-                                    AllowPaging="false"
-                                    PageSize="5"
-                                    GridLines="Radzen.DataGridGridLines.None">
-                        <Columns>
-                            <RadzenDataGridColumn TItem="RecentActivity" Width="50px" TextAlign="TextAlign.Center">
-                                <Template Context="activity">
-                                    <RadzenIcon Icon="@GetActivityIcon(activity.Type)"
-                                                Style="@($"color: {GetActivityColor(activity.Type)};")" />
-                                </Template>
-                            </RadzenDataGridColumn>
-                            <RadzenDataGridColumn TItem="RecentActivity" Property="Description" Title="활동 내용" />
-                            <RadzenDataGridColumn TItem="RecentActivity" Property="User" Title="사용자" Width="120px" />
-                            <RadzenDataGridColumn TItem="RecentActivity" Property="Timestamp" Title="시간" Width="150px"
-                                                  FormatString="{0:yyyy-MM-dd HH:mm}" />
-                        </Columns>
-                    </RadzenDataGrid>
-                }
-                else
-                {
-                    <div class="text-center py-5">
-                        <RadzenIcon Icon="event_note" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
-                        <RadzenText TextStyle="TextStyle.Body1" class="mt-2 mb-0">
-                            최근 활동이 없습니다
-                        </RadzenText>
-                    </div>
-                }
-            </RadzenCard>
+            <div class="elegant-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">최근 활동</h2>
+                    <div class="panel-subtitle">방송 기록 및 이벤트</div>
+                </div>
+                <div class="panel-content">
+                    @if (isLoadingActivities)
+                    {
+                        <div class="elegant-loading">
+                            <div class="loading-spinner"></div>
+                            <p class="loading-text">활동 내역을 불러오는 중...</p>
+                        </div>
+                    }
+                    else if (recentActivities.Any())
+                    {
+                        <div class="activity-timeline">
+                            @foreach (var activity in recentActivities.Take(5))
+                            {
+                                <div class="timeline-item">
+                                    <div class="timeline-marker @activity.Type">
+                                        <RadzenIcon Icon="@GetActivityIcon(activity.Type)" class="timeline-icon" />
+                                    </div>
+                                    <div class="timeline-content">
+                                        <h4 class="timeline-title">@activity.Description</h4>
+                                        <div class="timeline-meta">
+                                            <span class="meta-user">작성자: @activity.User</span>
+                                            <span class="meta-separator">•</span>
+                                            <span class="meta-time">@activity.Timestamp.ToString("yyyy년 MM월 dd일 HH:mm")</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="elegant-empty">
+                            <div class="empty-icon-wrapper">
+                                <RadzenIcon Icon="event_note" class="empty-icon" />
+                            </div>
+                            <p class="empty-message">최근 활동이 없습니다</p>
+                            <p class="empty-submessage">방송 이벤트가 여기에 표시됩니다</p>
+                        </div>
+                    }
+                </div>
+            </div>
         </RadzenColumn>
 
         <!-- 시스템 상태 -->
         <RadzenColumn Size="12" SizeMD="4">
-            <RadzenCard class="h-100">
-                <RadzenText TextStyle="TextStyle.H6" class="mb-3">
-                    <RadzenIcon Icon="monitor_heart" class="me-2" />
-                    시스템 상태
-                </RadzenText>
-                <RadzenStack Gap="1rem">
-                    <!-- 서버 상태 -->
-                    <RadzenCard class="system-status-item">
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                <RadzenIcon Icon="dns" />
-                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0">서버 상태</RadzenText>
-                            </RadzenStack>
-                            <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="정상" />
-                        </RadzenStack>
-                    </RadzenCard>
+            <div class="elegant-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">시스템 상태</h2>
+                    <div class="panel-subtitle">인프라 상태 모니터링</div>
+                </div>
+                <div class="panel-content">
+                    <div class="status-grid">
+                        <!-- 서버 상태 -->
+                        <div class="status-card">
+                            <div class="status-icon-box">
+                                <RadzenIcon Icon="dns" class="status-icon" />
+                            </div>
+                            <div class="status-details">
+                                <span class="status-name">서버</span>
+                                <span class="status-value operational">정상 작동</span>
+                            </div>
+                        </div>
 
-                    <!-- 데이터베이스 상태 -->
-                    <RadzenCard class="system-status-item">
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                <RadzenIcon Icon="storage" />
-                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0">데이터베이스</RadzenText>
-                            </RadzenStack>
-                            <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="정상" />
-                        </RadzenStack>
-                    </RadzenCard>
+                        <!-- 데이터베이스 상태 -->
+                        <div class="status-card">
+                            <div class="status-icon-box">
+                                <RadzenIcon Icon="storage" class="status-icon" />
+                            </div>
+                            <div class="status-details">
+                                <span class="status-name">데이터베이스</span>
+                                <span class="status-value operational">양호</span>
+                            </div>
+                        </div>
 
-                    <!-- 네트워크 상태 -->
-                    <RadzenCard class="system-status-item">
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                <RadzenIcon Icon="wifi" />
-                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0">네트워크</RadzenText>
-                            </RadzenStack>
-                            <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="연결됨" />
-                        </RadzenStack>
-                    </RadzenCard>
+                        <!-- 네트워크 상태 -->
+                        <div class="status-card">
+                            <div class="status-icon-box">
+                                <RadzenIcon Icon="wifi" class="status-icon" />
+                            </div>
+                            <div class="status-details">
+                                <span class="status-name">네트워크</span>
+                                <span class="status-value connected">연결됨</span>
+                            </div>
+                        </div>
 
-                    <!-- 스토리지 사용량 -->
-                    <RadzenCard class="system-status-item">
-                        <RadzenStack Gap="0.5rem">
-                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                    <RadzenIcon Icon="folder" />
-                                    <RadzenText TextStyle="TextStyle.Body2" class="mb-0">스토리지</RadzenText>
-                                </RadzenStack>
-                                <RadzenText TextStyle="TextStyle.Caption" class="mb-0">@storageUsage%</RadzenText>
-                            </RadzenStack>
-                            <RadzenProgressBar Value="@storageUsage" ShowValue="false"
-                                               ProgressBarStyle="@(storageUsage > 80 ? ProgressBarStyle.Danger : ProgressBarStyle.Primary)" />
-                        </RadzenStack>
-                    </RadzenCard>
-                </RadzenStack>
-            </RadzenCard>
+                        <!-- 스토리지 사용량 -->
+                        <div class="status-card storage-card">
+                            <div class="status-icon-box">
+                                <RadzenIcon Icon="folder" class="status-icon" />
+                            </div>
+                            <div class="status-details">
+                                <span class="status-name">스토리지</span>
+                                <span class="status-value">@storageUsage% 사용중</span>
+                            </div>
+                            <div class="elegant-progress-bar">
+                                <div class="progress-fill" style="width: @(storageUsage)%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </RadzenColumn>
     </RadzenRow>
 </RadzenStack>
 
 <style>
-    /* 통계 카드 스타일 */
-    .stats-card {
+    /* 고풍스럽고 우아한 디자인 시스템 */
+    :root {
+        --elegant-primary: #1a2332;
+        --elegant-secondary: #2c3e50;
+        --elegant-gold: #b8860b;
+        --elegant-silver: #c0c0c0;
+        --elegant-bronze: #cd7f32;
+        --elegant-cream: #f5f2e8;
+        --elegant-border: #d4c5a0;
+        --elegant-shadow: rgba(0, 0, 0, 0.1);
+    }
+
+    /* 우아한 헤더 */
+    .elegant-header {
+        text-align: center;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        background: linear-gradient(to bottom, white, #fafaf8);
+        border-bottom: 2px solid var(--elegant-border);
+    }
+
+    .main-title {
+        font-size: 1.75rem;
+        font-weight: 300;
+        letter-spacing: 2px;
+        color: var(--elegant-primary);
+        margin: 0 0 0.5rem 0;
+        font-family: 'Nanum Myeongjo', 'Georgia', serif;
+    }
+
+    .welcome-message {
+        font-size: 0.875rem;
+        color: var(--elegant-secondary);
+        margin-bottom: 1rem;
+    }
+
+    .greeting-text {
+        font-style: italic;
+        opacity: 0.8;
+    }
+
+    .user-name {
+        font-weight: 600;
+        color: var(--elegant-gold);
+    }
+
+    .decorative-line {
+        width: 80px;
+        height: 1px;
+        background: linear-gradient(to right, transparent, var(--elegant-gold), transparent);
+        margin: 1rem auto 0;
+    }
+
+    /* 통계 카드 */
+    .statistics-section {
+        margin-bottom: 2rem;
+    }
+
+    .elegant-stat-card {
+        background: white;
+        border: 1px solid var(--elegant-border);
+        border-radius: 8px;
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
         transition: all 0.3s ease;
-        border: 1px solid var(--rz-border-light);
+        box-shadow: 0 2px 8px var(--elegant-shadow);
     }
 
-        .stats-card:hover {
+        .elegant-stat-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 24px var(--elegant-shadow);
         }
 
-    /* 시스템 상태 아이템 스타일 */
-    .system-status-item {
-        background-color: var(--rz-base-100);
-        border: 1px solid var(--rz-border-lighter);
-        padding: 0.75rem !important;
+    .stat-header {
+        text-align: center;
+        margin-bottom: 1rem;
     }
 
-    /* 퀵 액션 버튼 스타일 개선 */
-    .rz-button-lg {
-        font-size: 1rem;
+    .stat-icon-frame {
+        display: inline-block;
+        width: 48px;
+        height: 48px;
+        border: 2px solid var(--elegant-gold);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--elegant-cream);
+    }
+
+    .stat-icon {
+        font-size: 1.25rem !important;
+        color: var(--elegant-primary);
+    }
+
+    .stat-body {
+        text-align: center;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 300;
+        color: var(--elegant-primary);
+        margin: 0.5rem 0;
+        font-family: 'Nanum Myeongjo', 'Georgia', serif;
+    }
+
+    .stat-title {
+        font-size: 0.75rem;
+        letter-spacing: 1px;
+        color: var(--elegant-secondary);
+        margin: 0.25rem 0;
         font-weight: 500;
-        transition: all 0.2s ease;
     }
 
-        .rz-button-lg:hover {
+    .stat-status {
+        font-size: 0.7rem;
+        color: var(--elegant-secondary);
+        font-style: italic;
+    }
+
+        .stat-status.active {
+            color: #2ecc71;
+        }
+
+        .stat-status.online {
+            color: #3498db;
+        }
+
+        .stat-status.storage {
+            color: var(--elegant-bronze);
+        }
+
+        .stat-status.trending {
+            color: #27ae60;
+        }
+
+    .card-decoration {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, var(--elegant-gold) 0%, transparent 50%);
+        opacity: 0.1;
+    }
+
+    /* 퀵 액션 섹션 */
+    .quick-actions-section {
+        margin-bottom: 2rem;
+        padding: 2rem;
+        background: var(--elegant-cream);
+        border-radius: 8px;
+        border: 1px solid var(--elegant-border);
+    }
+
+    .section-header-elegant {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .section-title-elegant {
+        font-size: 1.25rem;
+        font-weight: 300;
+        letter-spacing: 1px;
+        color: var(--elegant-primary);
+        margin: 0;
+        font-family: 'Nanum Myeongjo', 'Georgia', serif;
+    }
+
+    .section-ornament {
+        color: var(--elegant-gold);
+        font-size: 1rem;
+    }
+
+    /* 우아한 액션 버튼 */
+    .elegant-action-btn {
+        width: 100%;
+        height: 100px;
+        background: white;
+        border: 1px solid var(--elegant-border);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-family: inherit;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .elegant-action-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 6px 20px var(--elegant-shadow);
         }
 
-        .rz-button-lg .rz-button-icon {
-            font-size: 1.5rem !important;
-            margin-bottom: 0.25rem;
+        .elegant-action-btn.broadcast:hover {
+            border-color: #3498db;
+            background: linear-gradient(to bottom, white, #ebf5fb);
         }
 
-    /* 헤더 그라디언트 효과 */
-    h1 {
-        background: linear-gradient(135deg, var(--rz-primary) 0%, var(--rz-primary-dark) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        .elegant-action-btn.speaker:hover {
+            border-color: #9b59b6;
+            background: linear-gradient(to bottom, white, #f4ecf7);
+        }
+
+        .elegant-action-btn.media:hover {
+            border-color: #f39c12;
+            background: linear-gradient(to bottom, white, #fef5e7);
+        }
+
+        .elegant-action-btn.tts:hover {
+            border-color: #27ae60;
+            background: linear-gradient(to bottom, white, #e8f6f3);
+        }
+
+    .btn-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        gap: 0.25rem;
     }
 
-    /* 데이터그리드 스타일 개선 */
-    .rz-datatable-data td {
-        padding: 0.75rem 1rem !important;
-        border-bottom: 1px solid var(--rz-border-lighter) !important;
+    .btn-icon-wrapper {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--elegant-cream);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.25rem;
     }
 
-    /* 다크 테마 지원 */
-    :root[data-theme='dark'] .stats-card {
-        background-color: var(--rz-base-100);
-        border-color: var(--rz-border);
+    .btn-icon {
+        font-size: 1.25rem !important;
+        color: var(--elegant-primary);
     }
 
-    :root[data-theme='dark'] .system-status-item {
-        background-color: var(--rz-base-200);
-        border-color: var(--rz-border);
+    .btn-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--elegant-primary);
+        letter-spacing: 0.5px;
     }
 
-    :root[data-theme='dark'] .stats-card:hover {
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    .btn-sublabel {
+        font-size: 0.65rem;
+        color: var(--elegant-secondary);
+        font-style: italic;
+        opacity: 0.8;
     }
+
+    /* 우아한 패널 */
+    .elegant-panel {
+        background: white;
+        border: 1px solid var(--elegant-border);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px var(--elegant-shadow);
+        height: 100%;
+    }
+
+    .panel-header {
+        background: linear-gradient(to right, var(--elegant-cream), white);
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--elegant-border);
+    }
+
+    .panel-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--elegant-primary);
+        margin: 0;
+        font-family: 'Nanum Myeongjo', 'Georgia', serif;
+        letter-spacing: 0.5px;
+    }
+
+    .panel-subtitle {
+        font-size: 0.7rem;
+        color: var(--elegant-secondary);
+        font-style: italic;
+        margin-top: 0.25rem;
+    }
+
+    .panel-content {
+        padding: 1.5rem;
+    }
+
+    /* 타임라인 스타일 */
+    .activity-timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+
+        .activity-timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.75rem;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: var(--elegant-border);
+        }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: -1.5rem;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: white;
+        border: 2px solid var(--elegant-gold);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .timeline-marker.broadcast {
+            border-color: #3498db;
+        }
+
+        .timeline-marker.speaker {
+            border-color: #9b59b6;
+        }
+
+        .timeline-marker.media {
+            border-color: #f39c12;
+        }
+
+        .timeline-marker.tts {
+            border-color: #27ae60;
+        }
+
+    .timeline-icon {
+        font-size: 0.75rem !important;
+        color: var(--elegant-primary);
+    }
+
+    .timeline-content {
+        padding-left: 0.5rem;
+    }
+
+    .timeline-title {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--elegant-primary);
+        margin: 0 0 0.25rem 0;
+    }
+
+    .timeline-meta {
+        font-size: 0.65rem;
+        color: var(--elegant-secondary);
+        font-style: italic;
+    }
+
+    .meta-separator {
+        margin: 0 0.25rem;
+        opacity: 0.5;
+    }
+
+    /* 시스템 상태 그리드 */
+    .status-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .status-card {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: var(--elegant-cream);
+        border-radius: 6px;
+        border: 1px solid var(--elegant-border);
+    }
+
+    .status-icon-box {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: white;
+        border: 1px solid var(--elegant-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .status-icon {
+        font-size: 1rem !important;
+        color: var(--elegant-primary);
+    }
+
+    .status-details {
+        flex: 1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .status-name {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--elegant-primary);
+        letter-spacing: 0.5px;
+    }
+
+    .status-value {
+        font-size: 0.7rem;
+        font-style: italic;
+        color: var(--elegant-secondary);
+    }
+
+        .status-value.operational {
+            color: #2ecc71;
+        }
+
+        .status-value.connected {
+            color: #3498db;
+        }
+
+    .storage-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+        .storage-card .status-details {
+            margin-bottom: 0.5rem;
+        }
+
+    /* 우아한 프로그레스 바 */
+    .elegant-progress-bar {
+        width: 100%;
+        height: 4px;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(to right, var(--elegant-gold), var(--elegant-bronze));
+        transition: width 0.3s ease;
+    }
+
+    /* 로딩 상태 */
+    .elegant-loading {
+        text-align: center;
+        padding: 3rem 0;
+    }
+
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--elegant-border);
+        border-top-color: var(--elegant-gold);
+        border-radius: 50%;
+        margin: 0 auto 1rem;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        to
+
+    {
+        transform: rotate(360deg);
+    }
+
+    }
+
+    .loading-text {
+        font-size: 0.75rem;
+        color: var(--elegant-secondary);
+        font-style: italic;
+    }
+
+    /* 빈 상태 */
+    .elegant-empty {
+        text-align: center;
+        padding: 3rem 0;
+    }
+
+    .empty-icon-wrapper {
+        width: 48px;
+        height: 48px;
+        margin: 0 auto 1rem;
+        border: 2px solid var(--elegant-border);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .empty-icon {
+        font-size: 1.5rem !important;
+        color: var(--elegant-silver);
+    }
+
+    .empty-message {
+        font-size: 0.875rem;
+        color: var(--elegant-primary);
+        margin: 0.5rem 0;
+        font-weight: 500;
+    }
+
+    .empty-submessage {
+        font-size: 0.7rem;
+        color: var(--elegant-secondary);
+        font-style: italic;
+    }
+
+    /* 다크 테마는 고풍스러운 느낌과 맞지 않으므로 최소한의 지원만 */
+    :root[data-theme='dark'] {
+        --elegant-primary: #e1e4e8;
+        --elegant-secondary: #8b949e;
+        --elegant-gold: #ffd700;
+        --elegant-cream: #1f2937;
+        --elegant-border: #30363d;
+    }
+
+        :root[data-theme='dark'] .elegant-stat-card,
+        :root[data-theme='dark'] .elegant-panel,
+        :root[data-theme='dark'] .elegant-action-btn {
+            background: #0d1117;
+        }
+
+        :root[data-theme='dark'] .quick-actions-section {
+            background: #161b22;
+        }
 </style>

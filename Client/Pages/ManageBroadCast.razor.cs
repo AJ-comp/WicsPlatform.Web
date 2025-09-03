@@ -265,7 +265,8 @@ namespace WicsPlatform.Client.Pages
                 LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
                 await SaveSelectedTtsToChannel();
 
-                // 마이크 초기화 (Microphone 파일의 메서드 호출)
+                // 마이크 초기화 - InitializeAudioMixer 내부에서 상태 확인
+                _logger.LogInformation("2단계: 오디오 믹서 초기화 (필요시)");
                 if (!await InitializeAudioMixer())
                     return;
 
@@ -275,8 +276,8 @@ namespace WicsPlatform.Client.Pages
                 if (!await InitializeWebSocketBroadcast(onlineGroups))
                     return;
 
-                // 마이크 활성화 (Microphone 파일의 메서드 호출)
-                _logger.LogInformation("4단계: 마이크 활성화");
+                // 마이크 활성화 - EnableMicrophone 내부에서 상태 확인
+                _logger.LogInformation("4단계: 마이크 활성화 (필요시)");
                 if (!await EnableMicrophone())
                 {
                     await CleanupFailedBroadcast();
