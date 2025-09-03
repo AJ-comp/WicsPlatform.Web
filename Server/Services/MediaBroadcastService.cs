@@ -97,7 +97,7 @@ namespace WicsPlatform.Server.Services
                 // 5. 결과 반환
                 var result = new MediaPlaybackResult
                 {
-                    SessionId = Guid.NewGuid().ToString(),
+                    SessionId = broadcastId,
                     Success = true,
                     Message = $"Started playback of {mediaToPlay.Count} files"
                 };

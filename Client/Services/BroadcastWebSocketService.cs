@@ -28,7 +28,7 @@ namespace WicsPlatform.Client.Services
         {
             try
             {
-                var broadcastId = Guid.NewGuid().ToString();
+                var broadcastId = channelId.ToString();
                 var wsUrl = GetWebSocketUrl($"broadcast/{channelId}");
 
                 var channelWs = new ChannelWebSocket

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Net.WebSockets;
 using System.Text;
@@ -98,7 +98,7 @@ namespace WicsPlatform.Server.Services
                 return new StartBroadcastResponse { Success = false, Error = "Channel not found" };
             }
 
-            var id = Guid.NewGuid().ToString();
+            var id = request.ChannelId.ToString();
             var session = new BroadcastSession
             {
                 BroadcastId = id,
