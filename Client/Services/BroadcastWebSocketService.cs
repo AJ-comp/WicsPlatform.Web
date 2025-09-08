@@ -13,10 +13,10 @@ namespace WicsPlatform.Client.Services
     {
         private readonly NavigationManager _navigationManager;
         private readonly ILogger<BroadcastWebSocketService> _logger;
-        private readonly Dictionary<string, ChannelWebSocket> _channelWebSockets = new();
+        private readonly Dictionary<ulong, ChannelWebSocket> _channelWebSockets = new();
 
-        public event Action<string, BroadcastStatus> OnBroadcastStatusReceived;
-        public event Action<string, string> OnConnectionStatusChanged;
+        public event Action<ulong, BroadcastStatus> OnBroadcastStatusReceived;
+        public event Action<ulong, string> OnConnectionStatusChanged;
 
         public BroadcastWebSocketService(NavigationManager navigationManager, ILogger<BroadcastWebSocketService> logger)
         {
@@ -28,7 +28,7 @@ namespace WicsPlatform.Client.Services
         {
             try
             {
-                var broadcastId = channelId.ToString();
+                var broadcastId = channelId;
                 var wsUrl = GetWebSocketUrl($"broadcast/{channelId}");
 
                 var channelWs = new ChannelWebSocket
@@ -77,7 +77,7 @@ namespace WicsPlatform.Client.Services
             }
         }
 
-        public async Task<StopBroadcastResponse> StopBroadcastAsync(string broadcastId)
+        public async Task<StopBroadcastResponse> StopBroadcastAsync(ulong broadcastId)
         {
             try
             {
@@ -116,7 +116,7 @@ namespace WicsPlatform.Client.Services
             }
         }
 
-        public async Task SendAudioDataAsync(string broadcastId, byte[] audioData)
+        public async Task SendAudioDataAsync(ulong broadcastId, byte[] audioData)
         {
             if (_channelWebSockets.TryGetValue(broadcastId, out var channelWs))
             {
@@ -141,7 +141,7 @@ namespace WicsPlatform.Client.Services
             await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
         }
 
-        private async Task ReceiveLoop(string broadcastId, ChannelWebSocket channelWs)
+        private async Task ReceiveLoop(ulong broadcastId, ChannelWebSocket channelWs)
         {
             var buffer = new ArraySegment<byte>(new byte[4096]);
 
@@ -173,7 +173,7 @@ namespace WicsPlatform.Client.Services
             }
         }
 
-        private void ProcessMessage(string broadcastId, string message)
+        private void ProcessMessage(ulong broadcastId, string message)
         {
             try
             {
@@ -222,7 +222,7 @@ namespace WicsPlatform.Client.Services
 
         private class ChannelWebSocket
         {
-            public string BroadcastId { get; set; }
+            public ulong BroadcastId { get; set; }
             public ulong ChannelId { get; set; }
             public List<ulong> SelectedGroupIds { get; set; }
             public ClientWebSocket WebSocket { get; set; }
@@ -240,7 +240,7 @@ namespace WicsPlatform.Client.Services
     public class StartBroadcastResponse
     {
         public bool Success { get; set; }
-        public string BroadcastId { get; set; }
+        public ulong BroadcastId { get; set; }
         public string Error { get; set; }
     }
 
@@ -252,7 +252,7 @@ namespace WicsPlatform.Client.Services
 
     public class BroadcastStatus
     {
-        public string BroadcastId { get; set; }
+        public ulong BroadcastId { get; set; }
         public long PacketCount { get; set; }
         public long TotalBytes { get; set; }
         public TimeSpan Duration { get; set; }

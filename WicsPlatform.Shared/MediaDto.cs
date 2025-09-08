@@ -9,7 +9,7 @@ namespace WicsPlatform.Shared
     // Request/Response DTOs
     public class MediaPlayRequest
     {
-        public string BroadcastId { get; set; }
+        public ulong BroadcastId { get; set; }
         public List<ulong> MediaIds { get; set; }
     }
 
@@ -30,7 +30,7 @@ namespace WicsPlatform.Shared
 
     public class MediaStopRequest
     {
-        public string BroadcastId { get; set; }
+        public ulong BroadcastId { get; set; }
     }
 
     public class MediaStopResponse

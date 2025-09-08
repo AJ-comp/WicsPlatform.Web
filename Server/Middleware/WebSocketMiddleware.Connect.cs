@@ -13,7 +13,7 @@ namespace WicsPlatform.Server.Middleware
         private async Task HandleConnectAsync(WebSocket webSocket, string connectionId, ulong channelId, JsonElement root)
         {
             var req = JsonSerializer.Deserialize<ConnectBroadcastRequest>(root);
-            if (req is null || string.IsNullOrWhiteSpace(req.BroadcastId)) return;
+            if (req is null) return;
 
             var broadcastId = req.BroadcastId;
             var selectedGroupIds = req.SelectedGroupIds;
@@ -65,49 +65,11 @@ namespace WicsPlatform.Server.Middleware
                 await audioMixingService.SetVolume(broadcastId, AudioSource.Microphone, channel.MicVolume);
                 await audioMixingService.SetVolume(broadcastId, AudioSource.Media, channel.MediaVolume);
                 await audioMixingService.SetVolume(broadcastId, AudioSource.TTS, channel.TtsVolume);
-                await audioMixingService.SetVolume(broadcastId, AudioSource.Master, channel.Volume);
 
-                logger.LogInformation(
-                    $"Applied saved volume settings from DB - " +
-                    $"Mic: {channel.MicVolume:P0}, Media: {channel.MediaVolume:P0}, " +
-                    $"TTS: {channel.TtsVolume:P0}, Master: {channel.Volume:P0}"
-                );
-            }
-            else
-            {
-                logger.LogWarning($"Channel {channelId} not found in DB, using default volumes");
-                // 기본값은 MixerSession 생성 시 이미 설정됨 (1.0, 0.7, 0.8, 1.0)
+                logger.LogInformation($"Volume settings applied: Mic={channel.MicVolume:F2}, Media={channel.MediaVolume:F2}, TTS={channel.TtsVolume:F2}");
             }
 
-            await StartBroadCastAsync(channelId);
-
-            // 연결 확인 메시지 전송 (볼륨 정보 추가)
-            var response = new
-            {
-                type = "connected",
-                broadcastId = broadcastId,
-                channelId = channelId,
-                onlineSpeakerCount = onlineSpeakers.Count,
-                selectedMediaCount = selectedMedia.Count,
-                selectedTtsCount = selectedTts.Count,
-                status = "ok",
-                // 볼륨 정보 추가 (클라이언트가 UI 업데이트할 수 있도록)
-                volumes = channel != null ? new
-                {
-                    microphone = channel.MicVolume,
-                    media = channel.MediaVolume,
-                    tts = channel.TtsVolume,
-                    master = channel.Volume
-                } : new
-                {
-                    microphone = 1.0f,
-                    media = 0.7f,
-                    tts = 0.8f,
-                    master = 1.0f
-                }
-            };
-
-            await SendMessageAsync(webSocket, JsonSerializer.Serialize(response));
+            logger.LogInformation($"Broadcast session created: {broadcastId}");
         }
 
         private async Task HandleDisconnectAsync(JsonElement root)

@@ -7,16 +7,16 @@ namespace WicsPlatform.Server.Contracts
     public interface ITtsBroadcastService
     {
         Task<TtsPlaybackResult> HandlePlayRequestAsync(
-            string broadcastId,
+            ulong broadcastId,
             JsonElement requestData,
             List<TtsInfo> availableTts,
             List<SpeakerInfo> onlineSpeakers,
             ulong channelId);
 
-        Task<bool> StopTtsByBroadcastIdAsync(string broadcastId);
-        Task<TtsPlaybackStatus> GetStatusByBroadcastIdAsync(string broadcastId);
+        Task<bool> StopTtsByBroadcastIdAsync(ulong broadcastId);
+        Task<TtsPlaybackStatus> GetStatusByBroadcastIdAsync(ulong broadcastId);
 
-        public event Action<string> OnPlaybackCompleted;
+        public event Action<ulong> OnPlaybackCompleted;
 
         void Dispose();
     }

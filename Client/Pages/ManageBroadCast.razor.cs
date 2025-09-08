@@ -48,7 +48,7 @@ namespace WicsPlatform.Client.Pages
 
         // 방송 상태
         protected bool isBroadcasting = false;
-        protected string currentBroadcastId = null;
+        protected ulong? currentBroadcastId = null;
         protected DateTime broadcastStartTime = DateTime.Now;
         protected string broadcastDuration = "00:00:00";
         protected int totalDataPackets = 0;

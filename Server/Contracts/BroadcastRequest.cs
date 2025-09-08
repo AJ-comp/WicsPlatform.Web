@@ -6,7 +6,7 @@ namespace WicsPlatform.Server.Contracts
     public abstract class BaseBroadcastRequest
     {
         [JsonPropertyName("broadcastId")]
-        public required string BroadcastId { get; init; }
+        public required ulong BroadcastId { get; init; }
     }
 
     // Connect request

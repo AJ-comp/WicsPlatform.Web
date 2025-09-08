@@ -274,9 +274,9 @@ namespace WicsPlatform.Client.Pages
         /// </summary>
         private async Task SendToWebSocket(byte[] audioData)
         {
-            if (!string.IsNullOrEmpty(currentBroadcastId))
+            if (currentBroadcastId.HasValue)
             {
-                await WebSocketService.SendAudioDataAsync(currentBroadcastId, audioData);
+                await WebSocketService.SendAudioDataAsync(currentBroadcastId.Value, audioData);
             }
         }
 

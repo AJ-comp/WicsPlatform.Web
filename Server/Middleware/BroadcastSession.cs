@@ -7,7 +7,7 @@ namespace WicsPlatform.Server.Middleware
     {
         private class BroadcastSession
         {
-            public string BroadcastId { get; set; }
+            public ulong BroadcastId { get; set; }
             public ulong ChannelId { get; set; }
             public string ConnectionId { get; set; }
             public DateTime StartTime { get; set; }

@@ -34,7 +34,7 @@ namespace WicsPlatform.Server.Services
 
         private async Task ProcessSocketAsync(WebSocket socket)
         {
-            string? broadcastId = null;
+            ulong? broadcastId = null;
             var buffer = new byte[8192];
 
             while (socket.State == WebSocketState.Open)
@@ -60,21 +60,21 @@ namespace WicsPlatform.Server.Services
                             await SendAsync(socket, response);
                             break;
                         case "StopBroadcast":
-                            var stopId = root.GetProperty("BroadcastId").GetString();
+                            var stopId = root.GetProperty("BroadcastId").GetUInt64();
                             var stopResp = StopBroadcast(stopId);
                             await SendAsync(socket, stopResp);
                             break;
                     }
                 }
-                else if (result.MessageType == WebSocketMessageType.Binary && broadcastId != null)
+                else if (result.MessageType == WebSocketMessageType.Binary && broadcastId.HasValue)
                 {
-                    if (_sessions.TryGetValue(broadcastId, out var session))
+                    if (_sessions.TryGetValue(broadcastId.Value.ToString(), out var session))
                     {
                         session.PacketCount++;
                         session.TotalBytes += result.Count;
                         var status = new BroadcastStatus
                         {
-                            BroadcastId = broadcastId,
+                            BroadcastId = broadcastId.Value,
                             PacketCount = session.PacketCount,
                             TotalBytes = session.TotalBytes,
                             Duration = DateTime.UtcNow - session.StartTime
@@ -84,9 +84,9 @@ namespace WicsPlatform.Server.Services
                 }
             }
 
-            if (broadcastId != null)
+            if (broadcastId.HasValue)
             {
-                _sessions.TryRemove(broadcastId, out _);
+                _sessions.TryRemove(broadcastId.Value.ToString(), out _);
             }
         }
 
@@ -109,12 +109,12 @@ namespace WicsPlatform.Server.Services
             };
             _sessions[id] = session;
             _logger.LogInformation($"Broadcast started {id}");
-            return new StartBroadcastResponse { Success = true, BroadcastId = id };
+            return new StartBroadcastResponse { Success = true, BroadcastId = request.ChannelId };
         }
 
-        private StopBroadcastResponse StopBroadcast(string id)
+        private StopBroadcastResponse StopBroadcast(ulong id)
         {
-            if (_sessions.TryRemove(id, out var _))
+            if (_sessions.TryRemove(id.ToString(), out var _))
             {
                 _logger.LogInformation($"Broadcast stopped {id}");
                 return new StopBroadcastResponse { Success = true };

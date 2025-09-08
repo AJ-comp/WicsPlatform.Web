@@ -11,14 +11,14 @@ namespace WicsPlatform.Server.Services
     {
         private readonly ILogger<MediaBroadcastService> logger;
         private readonly IAudioMixingService audioMixingService;
-        private readonly ConcurrentDictionary<string, MediaSession> _sessions = new();
+        private readonly ConcurrentDictionary<ulong, MediaSession> _sessions = new();
         private bool _bassInitialized = false;
 
-        public event Action<string> OnPlaybackCompleted;
+        public event Action<ulong> OnPlaybackCompleted;
 
         private class MediaSession
         {
-            public string BroadcastId { get; set; }
+            public ulong BroadcastId { get; set; }
             public List<MediaInfo> MediaFiles { get; set; }
             public int CurrentIndex { get; set; }
             public int CurrentStream { get; set; }
@@ -56,7 +56,7 @@ namespace WicsPlatform.Server.Services
         }
 
         public async Task<MediaPlaybackResult> HandlePlayRequestAsync(
-            string broadcastId,
+            ulong broadcastId,
             JsonElement requestData,
             List<MediaInfo> availableMedia,
             List<SpeakerInfo> onlineSpeakers,
@@ -97,7 +97,7 @@ namespace WicsPlatform.Server.Services
                 // 5. 결과 반환
                 var result = new MediaPlaybackResult
                 {
-                    SessionId = broadcastId,
+                    SessionId = broadcastId.ToString(),
                     Success = true,
                     Message = $"Started playback of {mediaToPlay.Count} files"
                 };
@@ -125,7 +125,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        private async Task PlayNextFile(string broadcastId)
+        private async Task PlayNextFile(ulong broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsPlaying)
                 return;
@@ -135,6 +135,7 @@ namespace WicsPlatform.Server.Services
                 // 플레이리스트 종료
                 logger.LogInformation($"Playlist completed for broadcast {broadcastId}");
                 await StopMediaByBroadcastIdAsync(broadcastId);
+                OnPlaybackCompleted?.Invoke(broadcastId);
                 return;
             }
 
@@ -177,7 +178,7 @@ namespace WicsPlatform.Server.Services
             logger.LogInformation($"Playing: {media.FileName} ({session.CurrentIndex + 1}/{session.MediaFiles.Count})");
         }
 
-        public async Task<bool> StopMediaByBroadcastIdAsync(string broadcastId)
+        public async Task<bool> StopMediaByBroadcastIdAsync(ulong broadcastId)
         {
             try
             {
@@ -209,7 +210,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        public async Task<MediaPlaybackStatus> GetStatusByBroadcastIdAsync(string broadcastId)
+        public async Task<MediaPlaybackStatus> GetStatusByBroadcastIdAsync(ulong broadcastId)
         {
             if (_sessions.TryGetValue(broadcastId, out var session) && session.IsPlaying)
             {
@@ -230,7 +231,7 @@ namespace WicsPlatform.Server.Services
 
                 return new MediaPlaybackStatus
                 {
-                    SessionId = broadcastId,
+                    SessionId = broadcastId.ToString(),
                     IsPlaying = true,
                     CurrentTrackIndex = session.CurrentIndex,
                     CurrentPosition = currentPosition,
@@ -240,7 +241,7 @@ namespace WicsPlatform.Server.Services
 
             return new MediaPlaybackStatus
             {
-                SessionId = broadcastId,
+                SessionId = broadcastId.ToString(),
                 IsPlaying = false
             };
         }

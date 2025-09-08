@@ -2,7 +2,7 @@
 {
     public class TtsPlayRequest
     {
-        public string BroadcastId { get; set; }
+        public ulong BroadcastId { get; set; }
         public List<ulong> TtsIds { get; set; }
     }
 
@@ -23,7 +23,7 @@
 
     public class TtsStopRequest
     {
-        public string BroadcastId { get; set; }
+        public ulong BroadcastId { get; set; }
     }
 
     public class TtsStopResponse

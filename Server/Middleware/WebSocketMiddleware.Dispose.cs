@@ -7,7 +7,7 @@ namespace WicsPlatform.Server.Middleware;
 public partial class WebSocketMiddleware
 {
     // 미디어/TTS 재생 완료 시 처리 (통합)
-    private async void OnPlaybackCompleted(string broadcastId)
+    private async void OnPlaybackCompleted(ulong broadcastId)
     {
         try
         {
@@ -54,7 +54,7 @@ public partial class WebSocketMiddleware
     /// <param name="forceCleanup">강제 정리 여부 (true: 미디어/TTS 상관없이 정리)</param>
     /// <param name="updateDatabase">DB 업데이트 여부 (기본값: true)</param>
     /// <returns>정리 성공 여부</returns>
-    private async Task<bool> CleanupBroadcastSessionAsync(string broadcastId, bool forceCleanup = false, bool updateDatabase = true)
+    private async Task<bool> CleanupBroadcastSessionAsync(ulong broadcastId, bool forceCleanup = false, bool updateDatabase = true)
     {
         try
         {

@@ -17,7 +17,7 @@ namespace WicsPlatform.Server.Services
         private readonly ILogger<AudioMixingService> logger;
         private readonly IUdpBroadcastService udpService;
         private readonly IServiceScopeFactory serviceScopeFactory;
-        private readonly ConcurrentDictionary<string, MixerSession> _sessions = new();
+        private readonly ConcurrentDictionary<ulong, MixerSession> _sessions = new();
         private bool _bassInitialized = false;
 
         private class MainMixerConfig
@@ -87,7 +87,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        public async Task<bool> InitializeMixer(string broadcastId, ulong channelId, List<SpeakerInfo> speakers)
+        public async Task<bool> InitializeMixer(ulong broadcastId, ulong channelId, List<SpeakerInfo> speakers)
         {
             if (!_bassInitialized)
             {
@@ -222,7 +222,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        public async Task AddMicrophoneData(string broadcastId, byte[] pcmData)
+        public async Task AddMicrophoneData(ulong broadcastId, byte[] pcmData)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
             {
@@ -258,7 +258,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        private async Task ProcessMixedOutput(string broadcastId)
+        private async Task ProcessMixedOutput(ulong broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
                 return;
@@ -303,7 +303,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        public async Task AddMediaStream(string broadcastId, string mediaPath)
+        public async Task AddMediaStream(ulong broadcastId, string mediaPath)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
             {
@@ -362,7 +362,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        public async Task RemoveMediaStream(string broadcastId)
+        public async Task RemoveMediaStream(ulong broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
                 return;
@@ -378,7 +378,7 @@ namespace WicsPlatform.Server.Services
         }
 
         // ★ TTS 스트림 추가 메서드
-        public async Task<int> AddTtsStream(string broadcastId, string ttsPath)
+        public async Task<int> AddTtsStream(ulong broadcastId, string ttsPath)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsActive)
             {
@@ -435,7 +435,7 @@ namespace WicsPlatform.Server.Services
         }
 
         // ★ TTS 스트림 제거 메서드
-        public async Task RemoveTtsStream(string broadcastId, int ttsStreamId)
+        public async Task RemoveTtsStream(ulong broadcastId, int ttsStreamId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
                 return;
@@ -451,7 +451,7 @@ namespace WicsPlatform.Server.Services
         }
 
         // ★ 모든 TTS 스트림 제거 메서드
-        public async Task RemoveAllTtsStreams(string broadcastId)
+        public async Task RemoveAllTtsStreams(ulong broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
                 return;
@@ -468,7 +468,7 @@ namespace WicsPlatform.Server.Services
         }
 
         // ★ OpusCodec 설정 업데이트 메서드 (새로 추가)
-        public async Task UpdateCodecSettings(string broadcastId, int sampleRate, int channels, int bitrate)
+        public async Task UpdateCodecSettings(ulong broadcastId, int sampleRate, int channels, int bitrate)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
             {
@@ -480,7 +480,7 @@ namespace WicsPlatform.Server.Services
             logger.LogInformation($"Updated OpusCodec settings for broadcast {broadcastId}: {sampleRate}Hz, {channels}ch, {bitrate}bps");
         }
 
-        public async Task SetVolume(string broadcastId, AudioSource source, float volume)
+        public async Task SetVolume(ulong broadcastId, AudioSource source, float volume)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
                 return;
@@ -520,7 +520,7 @@ namespace WicsPlatform.Server.Services
             logger.LogDebug($"Volume set for {source}: {volume:F2}");
         }
 
-        public async Task<bool> StopMixer(string broadcastId)
+        public async Task<bool> StopMixer(ulong broadcastId)
         {
             if (_sessions.TryRemove(broadcastId, out var session))
             {
@@ -561,7 +561,7 @@ namespace WicsPlatform.Server.Services
             return false;
         }
 
-        public async Task RemoveMicrophoneStream(string broadcastId)
+        public async Task RemoveMicrophoneStream(ulong broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
             {
@@ -586,7 +586,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        public bool HasActiveMediaStream(string broadcastId)
+        public bool HasActiveMediaStream(ulong broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
                 return false;
@@ -594,7 +594,7 @@ namespace WicsPlatform.Server.Services
             return session.MediaStream != 0 && session.IsActive;
         }
 
-        public bool HasActiveTtsStream(string broadcastId)
+        public bool HasActiveTtsStream(ulong broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
                 return false;
@@ -602,7 +602,7 @@ namespace WicsPlatform.Server.Services
             return session.TtsStreams.Any() && session.IsActive;
         }
 
-        public async Task<bool> InitializeMicStream(string broadcastId)
+        public async Task<bool> InitializeMicStream(ulong broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session))
             {
@@ -653,7 +653,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        public bool IsMixerActive(string broadcastId)
+        public bool IsMixerActive(ulong broadcastId)
         {
             return _sessions.TryGetValue(broadcastId, out var session) && session.IsActive;
         }

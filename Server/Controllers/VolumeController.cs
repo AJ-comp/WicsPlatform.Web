@@ -36,10 +36,10 @@ namespace WicsPlatform.Server.Controllers
 
                 // 2. 방송 중이면 실시간 볼륨 조절
                 // BroadcastId가 없거나 세션이 없으면 SetVolume 내부에서 무시됨
-                if (!string.IsNullOrEmpty(request.BroadcastId))
+                if (request.BroadcastId.HasValue && request.BroadcastId.Value != 0)
                 {
                     await _audioMixingService.SetVolume(
-                        request.BroadcastId,
+                        request.BroadcastId.Value,
                         request.Source,
                         request.Volume
                     );
@@ -57,17 +57,17 @@ namespace WicsPlatform.Server.Controllers
                     );
                 }
 
-                return Ok(new
+                return Ok(new VolumeSetResponse
                 {
-                    success = true,
-                    message = request.BroadcastId != null
+                    Success = true,
+                    Message = request.BroadcastId.HasValue
                         ? "Volume updated successfully"
                         : "Volume settings saved",
-                    broadcastId = request.BroadcastId,
-                    channelId = request.ChannelId,
-                    source = request.Source.ToString(),
-                    volume = request.Volume,
-                    savedToDb = true
+                    BroadcastId = request.BroadcastId,
+                    ChannelId = request.ChannelId,
+                    Source = request.Source.ToString(),
+                    Volume = request.Volume,
+                    SavedToDb = true
                 });
             }
             catch (Exception ex)

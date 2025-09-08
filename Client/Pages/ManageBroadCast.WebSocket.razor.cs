@@ -24,7 +24,7 @@ namespace WicsPlatform.Client.Pages
             }
         }
 
-        private void OnBroadcastStatusReceived(string broadcastId, BroadcastStatus status)
+        private void OnBroadcastStatusReceived(ulong broadcastId, BroadcastStatus status)
         {
             if (broadcastId == currentBroadcastId)
             {
@@ -32,7 +32,7 @@ namespace WicsPlatform.Client.Pages
             }
         }
 
-        private void OnWebSocketConnectionStatusChanged(string broadcastId, string status)
+        private void OnWebSocketConnectionStatusChanged(ulong broadcastId, string status)
         {
             if (broadcastId != currentBroadcastId) return;
 
@@ -47,7 +47,7 @@ namespace WicsPlatform.Client.Pages
             }
         }
 
-        private void HandleWebSocketDisconnection(string broadcastId)
+        private void HandleWebSocketDisconnection(ulong broadcastId)
         {
             NotifyError("연결 끊김", new Exception($"채널 {selectedChannel?.Name}의 방송 연결이 끊어졌습니다."));
 
@@ -78,9 +78,9 @@ namespace WicsPlatform.Client.Pages
 
         private async Task StopWebSocketBroadcast()
         {
-            if (!string.IsNullOrEmpty(currentBroadcastId))
+            if (currentBroadcastId.HasValue)
             {
-                var broadcastIdToStop = currentBroadcastId;
+                var broadcastIdToStop = currentBroadcastId.Value;
                 currentBroadcastId = null;
 
                 try

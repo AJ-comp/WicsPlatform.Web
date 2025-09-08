@@ -19,7 +19,7 @@ public partial class WebSocketMiddleware
     private readonly IMediaBroadcastService mediaBroadcastService;
     private readonly ITtsBroadcastService ttsBroadcastService;
     private readonly IAudioMixingService audioMixingService;
-    private static readonly ConcurrentDictionary<string, BroadcastSession> _broadcastSessions = new();
+    private static readonly ConcurrentDictionary<ulong, BroadcastSession> _broadcastSessions = new();
 
     private readonly ushort MaxBuffer = 10000; // 최대 패킷 크기
 

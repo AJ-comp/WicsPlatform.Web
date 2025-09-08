@@ -14,15 +14,15 @@ namespace WicsPlatform.Server.Services
     {
         private readonly ILogger<TtsBroadcastService> logger;
         private readonly IAudioMixingService audioMixingService;
-        private readonly ConcurrentDictionary<string, TtsSession> _sessions = new();
+        private readonly ConcurrentDictionary<ulong, TtsSession> _sessions = new();
         private readonly string _ttsFilePath;
         private bool _bassInitialized = false;
 
-        public event Action<string> OnPlaybackCompleted;
+        public event Action<ulong> OnPlaybackCompleted;
 
         private class TtsSession
         {
-            public string BroadcastId { get; set; }
+            public ulong BroadcastId { get; set; }
             public List<TtsInfo> TtsItems { get; set; }
             public List<string> GeneratedFiles { get; set; } = new();
             public Dictionary<int, string> StreamToFileMap { get; set; } = new(); // 스트림 ID와 파일 경로 매핑
@@ -74,7 +74,7 @@ namespace WicsPlatform.Server.Services
         }
 
         public async Task<TtsPlaybackResult> HandlePlayRequestAsync(
-            string broadcastId,
+            ulong broadcastId,
             JsonElement requestData,
             List<TtsInfo> availableTts,
             List<SpeakerInfo> onlineSpeakers,
@@ -162,7 +162,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        private async Task<string> ConvertTextToSpeech(ulong ttsId, string text, string broadcastId)
+        private async Task<string> ConvertTextToSpeech(ulong ttsId, string text, ulong broadcastId)
         {
             try
             {
@@ -202,7 +202,7 @@ namespace WicsPlatform.Server.Services
             }
         }
 
-        private async Task PlayNextFile(string broadcastId)
+        private async Task PlayNextFile(ulong broadcastId)
         {
             if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsPlaying)
                 return;
@@ -279,7 +279,7 @@ namespace WicsPlatform.Server.Services
             logger.LogInformation($"Playing TTS: {currentTtsInfo.Name} ({session.CurrentIndex + 1}/{session.GeneratedFiles.Count})");
         }
 
-        public async Task<bool> StopTtsByBroadcastIdAsync(string broadcastId)
+        public async Task<bool> StopTtsByBroadcastIdAsync(ulong broadcastId)
         {
             try
             {
@@ -349,13 +349,13 @@ namespace WicsPlatform.Server.Services
             session.StreamToFileMap.Clear();
         }
 
-        public async Task<TtsPlaybackStatus> GetStatusByBroadcastIdAsync(string broadcastId)
+        public async Task<TtsPlaybackStatus> GetStatusByBroadcastIdAsync(ulong broadcastId)
         {
             if (_sessions.TryGetValue(broadcastId, out var session) && session.IsPlaying)
             {
                 return new TtsPlaybackStatus
                 {
-                    SessionId = broadcastId,
+                    SessionId = broadcastId.ToString(),
                     IsPlaying = true,
                     CurrentIndex = session.CurrentIndex,
                     TotalCount = session.TtsItems.Count
@@ -364,7 +364,7 @@ namespace WicsPlatform.Server.Services
 
             return new TtsPlaybackStatus
             {
-                SessionId = broadcastId,
+                SessionId = broadcastId.ToString(),
                 IsPlaying = false
             };
         }

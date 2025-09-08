@@ -8,7 +8,7 @@ public partial class WebSocketMiddleware
     private async Task HandleAudioDataAsync(WebSocket webSocket, JsonElement root)
     {
         if (!root.TryGetProperty("broadcastId", out var broadcastIdElement)) return;
-        var broadcastId = broadcastIdElement.GetString();
+        var broadcastId = broadcastIdElement.GetUInt64();
         if (!_broadcastSessions.TryGetValue(broadcastId, out var session)) return;
 
         session.PacketCount++;

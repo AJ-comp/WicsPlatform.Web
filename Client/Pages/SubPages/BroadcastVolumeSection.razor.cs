@@ -111,28 +111,28 @@ namespace WicsPlatform.Client.Pages.SubPages
                 {
                     new VolumeRequest
                     {
-                        BroadcastId = CurrentBroadcastId, // 방송 중이면 실시간 적용
+                        BroadcastId = string.IsNullOrWhiteSpace(CurrentBroadcastId) ? null : ulong.Parse(CurrentBroadcastId), // 방송 중이면 실시간 적용
                         ChannelId = Channel.Id,
                         Source = AudioSource.Microphone,
                         Volume = micVolume / 100f
                     },
                     new VolumeRequest
                     {
-                        BroadcastId = CurrentBroadcastId,
+                        BroadcastId = string.IsNullOrWhiteSpace(CurrentBroadcastId) ? null : ulong.Parse(CurrentBroadcastId),
                         ChannelId = Channel.Id,
                         Source = AudioSource.TTS,
                         Volume = ttsVolume / 100f
                     },
                     new VolumeRequest
                     {
-                        BroadcastId = CurrentBroadcastId,
+                        BroadcastId = string.IsNullOrWhiteSpace(CurrentBroadcastId) ? null : ulong.Parse(CurrentBroadcastId),
                         ChannelId = Channel.Id,
                         Source = AudioSource.Media,
                         Volume = mediaVolume / 100f
                     },
                     new VolumeRequest
                     {
-                        BroadcastId = CurrentBroadcastId,
+                        BroadcastId = string.IsNullOrWhiteSpace(CurrentBroadcastId) ? null : ulong.Parse(CurrentBroadcastId),
                         ChannelId = Channel.Id,
                         Source = AudioSource.Master,
                         Volume = globalVolume / 100f
@@ -224,16 +224,5 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             _debounceTimer?.Dispose();
         }
-    }
-
-    public class VolumeSetResponse
-    {
-        public bool Success { get; set; }
-        public string Message { get; set; }
-        public string BroadcastId { get; set; }
-        public ulong ChannelId { get; set; }
-        public string Source { get; set; }
-        public float Volume { get; set; }
-        public bool SavedToDb { get; set; }
     }
 }

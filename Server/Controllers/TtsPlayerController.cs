@@ -36,7 +36,7 @@ namespace WicsPlatform.Server.Controllers
             try
             {
                 // 요청 유효성 검사
-                if (string.IsNullOrWhiteSpace(request.BroadcastId))
+                if (request.BroadcastId == 0)
                 {
                     return BadRequest(new TtsPlayResponse
                     {
@@ -132,7 +132,7 @@ namespace WicsPlatform.Server.Controllers
             try
             {
                 // 요청 유효성 검사
-                if (string.IsNullOrWhiteSpace(request.BroadcastId))
+                if (request.BroadcastId == 0)
                 {
                     return BadRequest(new TtsStopResponse
                     {
@@ -178,11 +178,11 @@ namespace WicsPlatform.Server.Controllers
         /// <param name="broadcastId">방송 ID</param>
         /// <returns>재생 상태 정보</returns>
         [HttpGet("status/{broadcastId}")]
-        public async Task<IActionResult> GetStatus(string broadcastId)
+        public async Task<IActionResult> GetStatus(ulong broadcastId)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(broadcastId))
+                if (broadcastId == 0)
                 {
                     return BadRequest(new { success = false, message = "BroadcastId is required" });
                 }

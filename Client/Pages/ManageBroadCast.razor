@@ -389,20 +389,20 @@
         <!-- 볼륨 설정 패널 -->
         <BroadcastVolumeSection Channel="@selectedChannel"
                                 @bind-IsCollapsed="@volumePanelCollapsed"
-                                CurrentBroadcastId="@currentBroadcastId" />
+                                CurrentBroadcastId="@currentBroadcastId?.ToString()" />
 
         <!-- TTS 설정 패널 -->
         <BroadcastTtsSection Channel="@selectedChannel"
                              @bind-IsCollapsed="@ttsPanelCollapsed"
                              IsBroadcasting="@isBroadcasting"
-                             BroadcastId="@currentBroadcastId"
+                             BroadcastId="@currentBroadcastId?.ToString()"
                              @ref="ttsSection" />
 
         <!-- 플레이리스트 설정 패널 -->
         <BroadcastPlaylistSection Channel="@selectedChannel"
                                   @bind-IsCollapsed="@playlistPanelCollapsed"
                                   IsBroadcasting="@isBroadcasting"
-                                  BroadcastId="@currentBroadcastId"
+                                  BroadcastId="@currentBroadcastId?.ToString()"
                                   @ref="playlistSection" />
     }
 </RadzenStack>

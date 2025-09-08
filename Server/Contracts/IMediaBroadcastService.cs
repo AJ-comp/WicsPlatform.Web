@@ -9,16 +9,16 @@ namespace WicsPlatform.Server.Contracts
     {
         // 간소화된 메서드 - BroadcastSession을 직접 받음
         Task<MediaPlaybackResult> HandlePlayRequestAsync(
-            string broadcastId,
+            ulong broadcastId,
             JsonElement requestData,
             List<MediaInfo> availableMedia,
             List<SpeakerInfo> onlineSpeakers,
             ulong channelId);
 
-        Task<bool> StopMediaByBroadcastIdAsync(string broadcastId);
-        Task<MediaPlaybackStatus> GetStatusByBroadcastIdAsync(string broadcastId);
+        Task<bool> StopMediaByBroadcastIdAsync(ulong broadcastId);
+        Task<MediaPlaybackStatus> GetStatusByBroadcastIdAsync(ulong broadcastId);
 
-        public event Action<string> OnPlaybackCompleted;
+        public event Action<ulong> OnPlaybackCompleted;
 
         void Dispose();
     }

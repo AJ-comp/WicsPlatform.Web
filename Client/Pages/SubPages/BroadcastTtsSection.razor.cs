@@ -154,7 +154,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 // TtsPlayerController의 play 엔드포인트 호출
                 var request = new TtsPlayRequest
                 {
-                    BroadcastId = BroadcastId,
+                    BroadcastId = string.IsNullOrWhiteSpace(BroadcastId) ? 0 : ulong.Parse(BroadcastId),
                     TtsIds = ttsIds
                 };
 
@@ -207,7 +207,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 // TtsPlayerController의 stop 엔드포인트 호출
                 var request = new TtsStopRequest
                 {
-                    BroadcastId = BroadcastId
+                    BroadcastId = string.IsNullOrWhiteSpace(BroadcastId) ? 0 : ulong.Parse(BroadcastId)
                 };
 
                 var response = await Http.PostAsJsonAsync("api/ttsplayer/stop", request);
