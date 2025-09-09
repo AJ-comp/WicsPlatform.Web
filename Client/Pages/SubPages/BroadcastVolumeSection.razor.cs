@@ -220,6 +220,58 @@ namespace WicsPlatform.Client.Pages.SubPages
             });
         }
 
+        // 프리셋 적용 메서드 추가
+        private void ApplyPreset(string presetType)
+        {
+            switch (presetType)
+            {
+                case "music":
+                    micVolume = 30;
+                    ttsVolume = 40;
+                    mediaVolume = 80;
+                    globalVolume = 70;
+                    break;
+                case "voice":
+                    micVolume = 80;
+                    ttsVolume = 70;
+                    mediaVolume = 40;
+                    globalVolume = 70;
+                    break;
+                case "balanced":
+                    micVolume = 50;
+                    ttsVolume = 50;
+                    mediaVolume = 50;
+                    globalVolume = 50;
+                    break;
+                case "quiet":
+                    micVolume = 30;
+                    ttsVolume = 30;
+                    mediaVolume = 30;
+                    globalVolume = 30;
+                    break;
+            }
+
+            _hasUnsavedChanges = true;
+            StateHasChanged();
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Info,
+                Summary = "프리셋 적용",
+                Detail = $"{GetPresetName(presetType)} 프리셋이 적용되었습니다.",
+                Duration = 2000
+            });
+        }
+
+        private string GetPresetName(string presetType) => presetType switch
+        {
+            "music" => "음악 모드",
+            "voice" => "음성 모드",
+            "balanced" => "균형 모드",
+            "quiet" => "조용히",
+            _ => "사용자 정의"
+        };
+
         public void Dispose()
         {
             _debounceTimer?.Dispose();

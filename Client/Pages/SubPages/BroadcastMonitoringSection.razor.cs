@@ -327,6 +327,20 @@ namespace WicsPlatform.Client.Pages.SubPages
             };
         }
 
+        // 로그 레벨에 따른 CSS 클래스 반환
+        private string GetLogClass(string level)
+        {
+            return level?.ToUpper() switch
+            {
+                "ERROR" => "log-error",
+                "WARN" => "log-warn",
+                "INFO" => "log-info",
+                "SUCCESS" => "log-success",
+                "DEBUG" => "log-debug",
+                _ => "log-default"
+            };
+        }
+
         // 로그 추가 (LoggingService 사용)
         private void AddLog(string level, string message)
         {

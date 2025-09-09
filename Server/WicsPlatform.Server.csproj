@@ -34,6 +34,7 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Mythosia.Azure" Version="1.2.0" />
+		<PackageReference Include="NAudio" Version="2.2.1" />
 		<PackageReference Include="Radzen.Blazor" Version="*" />
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.19" />
 		<PackageReference Include="System.Speech" Version="9.0.8" />

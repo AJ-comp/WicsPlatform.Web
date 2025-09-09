@@ -1,46 +1,41 @@
-@using WicsPlatform.Server.Models.wics
+﻿@using WicsPlatform.Server.Models.wics
 @implements IDisposable
 
-<RadzenCard class="mt-3 collapsible-panel-container">
-    <!-- 클릭 가능한 커스텀 헤더 -->
-    <div @onclick="TogglePanel"
-         style="background-color: var(--rz-sidebar-background-color); padding: 0.75rem 1rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
+<RadzenCard class="mt-2 professional-panel">
+    <!-- 패널 헤더 -->
+    <div @onclick="TogglePanel" class="panel-header">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
-                <RadzenIcon Icon="volume_up" Style="font-size: 1.25rem; color: var(--rz-primary);" />
-                <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-size: 0.95rem;">
+                <RadzenIcon Icon="volume_up" class="panel-icon primary" />
+                <RadzenText TextStyle="TextStyle.Body1" class="panel-title">
                     @(Channel?.Name ?? "채널") - 볼륨 설정
                 </RadzenText>
                 @if (_hasUnsavedChanges)
                 {
-                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" IsPill="true" Text="저장 필요"
-                                 Style="font-size: 0.6rem; padding: 2px 6px;" />
+                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" IsPill="true" Text="저장 필요" class="unsaved-badge" />
                 }
             </RadzenStack>
-            <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")"
-                        Style="font-size: 1.25rem; transition: transform 0.3s ease;"
-                        class="@(IsCollapsed ? "rotate-icon" : "")" />
+            <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")" class="expand-icon" />
         </RadzenStack>
     </div>
 
     <!-- 패널 내용 -->
     @if (!IsCollapsed)
     {
-        <div class="panel-content" Style="padding: 1rem;">
-            <RadzenStack Gap="1rem">
-                <!-- 볼륨 컨트롤 영역 -->
-                <RadzenRow Gap="1rem">
+        <div class="panel-content">
+            <RadzenStack Gap="0.75rem">
+                <!-- 볼륨 컨트롤 그리드 -->
+                <RadzenRow Gap="0.5rem">
                     <!-- 마이크 볼륨 -->
                     <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-                        <RadzenCard class="volume-control-card" Style="padding: 0.75rem;">
-                            <RadzenStack Gap="0.625rem">
+                        <RadzenCard class="volume-card">
+                            <RadzenStack Gap="0.375rem">
                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
-                                        <RadzenIcon Icon="mic" Style="font-size: 1rem; color: var(--rz-info);" />
-                                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">마이크 볼륨</RadzenText>
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                        <RadzenIcon Icon="mic" class="volume-icon info" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="volume-title">마이크</RadzenText>
                                     </RadzenStack>
-                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true" Text="@($"{micVolume}%")"
-                                                 Style="font-size: 0.7rem; padding: 2px 8px;" />
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true" Text="@($"{micVolume}%")" class="volume-badge" />
                                 </RadzenStack>
 
                                 <RadzenSlider @bind-Value="@micVolume"
@@ -49,11 +44,11 @@
                                               Max="100"
                                               Step="1"
                                               Change="@((int value) => UpdateVolume("mic", value))"
-                                              Style="width: 100%; height: 6px;" />
+                                              class="volume-slider" />
 
                                 <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
-                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.65rem;">0%</RadzenText>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.65rem;">100%</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="volume-label">0%</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="volume-label">100%</RadzenText>
                                 </RadzenStack>
                             </RadzenStack>
                         </RadzenCard>
@@ -61,15 +56,14 @@
 
                     <!-- TTS 볼륨 -->
                     <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-                        <RadzenCard class="volume-control-card" Style="padding: 0.75rem;">
-                            <RadzenStack Gap="0.625rem">
+                        <RadzenCard class="volume-card">
+                            <RadzenStack Gap="0.375rem">
                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
-                                        <RadzenIcon Icon="record_voice_over" Style="font-size: 1rem; color: var(--rz-success);" />
-                                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">TTS 볼륨</RadzenText>
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                        <RadzenIcon Icon="record_voice_over" class="volume-icon success" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="volume-title">TTS</RadzenText>
                                     </RadzenStack>
-                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="@($"{ttsVolume}%")"
-                                                 Style="font-size: 0.7rem; padding: 2px 8px;" />
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="@($"{ttsVolume}%")" class="volume-badge" />
                                 </RadzenStack>
 
                                 <RadzenSlider @bind-Value="@ttsVolume"
@@ -78,11 +72,11 @@
                                               Max="100"
                                               Step="1"
                                               Change="@((int value) => UpdateVolume("tts", value))"
-                                              Style="width: 100%; height: 6px;" />
+                                              class="volume-slider" />
 
                                 <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
-                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.65rem;">0%</RadzenText>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.65rem;">100%</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="volume-label">0%</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="volume-label">100%</RadzenText>
                                 </RadzenStack>
                             </RadzenStack>
                         </RadzenCard>
@@ -90,15 +84,14 @@
 
                     <!-- 미디어 볼륨 -->
                     <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-                        <RadzenCard class="volume-control-card" Style="padding: 0.75rem;">
-                            <RadzenStack Gap="0.625rem">
+                        <RadzenCard class="volume-card">
+                            <RadzenStack Gap="0.375rem">
                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
-                                        <RadzenIcon Icon="library_music" Style="font-size: 1rem; color: var(--rz-warning);" />
-                                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">미디어 볼륨</RadzenText>
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                        <RadzenIcon Icon="library_music" class="volume-icon warning" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="volume-title">미디어</RadzenText>
                                     </RadzenStack>
-                                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" IsPill="true" Text="@($"{mediaVolume}%")"
-                                                 Style="font-size: 0.7rem; padding: 2px 8px;" />
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" IsPill="true" Text="@($"{mediaVolume}%")" class="volume-badge" />
                                 </RadzenStack>
 
                                 <RadzenSlider @bind-Value="@mediaVolume"
@@ -107,11 +100,11 @@
                                               Max="100"
                                               Step="1"
                                               Change="@((int value) => UpdateVolume("media", value))"
-                                              Style="width: 100%; height: 6px;" />
+                                              class="volume-slider" />
 
                                 <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
-                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.65rem;">0%</RadzenText>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.65rem;">100%</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="volume-label">0%</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="volume-label">100%</RadzenText>
                                 </RadzenStack>
                             </RadzenStack>
                         </RadzenCard>
@@ -119,15 +112,14 @@
 
                     <!-- 전체 볼륨 -->
                     <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-                        <RadzenCard class="volume-control-card" Style="padding: 0.75rem;">
-                            <RadzenStack Gap="0.625rem">
+                        <RadzenCard class="volume-card master">
+                            <RadzenStack Gap="0.375rem">
                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
-                                        <RadzenIcon Icon="volume_up" Style="font-size: 1rem; color: var(--rz-primary);" />
-                                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.875rem;">전체 볼륨</RadzenText>
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                        <RadzenIcon Icon="volume_up" class="volume-icon primary" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="volume-title">마스터</RadzenText>
                                     </RadzenStack>
-                                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" IsPill="true" Text="@($"{globalVolume}%")"
-                                                 Style="font-size: 0.7rem; padding: 2px 8px;" />
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" IsPill="true" Text="@($"{globalVolume}%")" class="volume-badge" />
                                 </RadzenStack>
 
                                 <RadzenSlider @bind-Value="@globalVolume"
@@ -136,41 +128,79 @@
                                               Max="100"
                                               Step="1"
                                               Change="@((int value) => UpdateVolume("global", value))"
-                                              Style="width: 100%; height: 6px;" />
+                                              class="volume-slider master" />
 
                                 <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
-                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.65rem;">0%</RadzenText>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.65rem;">100%</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="volume-label">0%</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="volume-label">100%</RadzenText>
                                 </RadzenStack>
                             </RadzenStack>
                         </RadzenCard>
                     </RadzenColumn>
                 </RadzenRow>
 
-                <!-- 저장 버튼 영역 -->
-                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.75rem" class="mt-2">
-                    <RadzenButton Text="기본값으로 재설정"
+                <!-- 미리 설정된 프리셋 -->
+                <RadzenCard class="preset-card">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenText TextStyle="TextStyle.Caption" class="preset-title">빠른 프리셋</RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.375rem">
+                            <RadzenButton Text="음악 모드"
+                                          Icon="music_note"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Size="ButtonSize.Small"
+                                          class="preset-button"
+                                          Click="@(() => ApplyPreset("music"))" />
+                            <RadzenButton Text="음성 모드"
+                                          Icon="mic"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Size="ButtonSize.Small"
+                                          class="preset-button"
+                                          Click="@(() => ApplyPreset("voice"))" />
+                            <RadzenButton Text="균형 모드"
+                                          Icon="equalizer"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Size="ButtonSize.Small"
+                                          class="preset-button"
+                                          Click="@(() => ApplyPreset("balanced"))" />
+                            <RadzenButton Text="조용히"
+                                          Icon="volume_down"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Size="ButtonSize.Small"
+                                          class="preset-button"
+                                          Click="@(() => ApplyPreset("quiet"))" />
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+
+                <!-- 액션 버튼 -->
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                    <RadzenButton Text="초기화"
                                   Icon="refresh"
                                   ButtonStyle="ButtonStyle.Light"
                                   Size="ButtonSize.Small"
-                                  Style="height: 32px; font-size: 0.875rem;"
+                                  class="action-button"
                                   Click="@ResetVolumes" />
-                    <RadzenButton Text="볼륨 설정 저장"
+                    <RadzenButton Text="설정 저장"
                                   Icon="save"
                                   ButtonStyle="@(_hasUnsavedChanges ? ButtonStyle.Warning : ButtonStyle.Primary)"
                                   Size="ButtonSize.Small"
-                                  Style="height: 32px; font-size: 0.875rem;"
+                                  class="action-button primary"
                                   Click="@SaveVolumes"
                                   IsBusy="@isSavingVolumes" />
                 </RadzenStack>
 
                 @if (_hasUnsavedChanges)
                 {
-                    <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" Icon="warning" 
-                                 Style="margin-top: 0.5rem; padding: 0.5rem;">
-                        <RadzenText TextStyle="TextStyle.Caption" Style="font-size: 0.75rem;">
-                            볼륨 설정이 변경되었습니다. '볼륨 설정 저장' 버튼을 클릭하여 변경사항을 저장하세요.
-                        </RadzenText>
+                    <RadzenAlert AlertStyle="AlertStyle.Warning"
+                                 Variant="Variant.Flat"
+                                 Size="AlertSize.Small"
+                                 class="unsaved-alert">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+                            <RadzenIcon Icon="warning" class="alert-icon" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="alert-text">
+                                볼륨 설정이 변경되었습니다. 변경사항을 저장하려면 '설정 저장' 버튼을 클릭하세요.
+                            </RadzenText>
+                        </RadzenStack>
                     </RadzenAlert>
                 }
             </RadzenStack>
@@ -179,74 +209,267 @@
 </RadzenCard>
 
 <style>
-    .volume-control-card {
-        transition: all 0.3s ease;
-        height: 100%;
+    /* 전문적인 패널 디자인 */
+    .professional-panel {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid #dde2e6 !important;
+        border-radius: 6px !important;
+        background: white !important;
+        overflow: hidden;
     }
 
-        .volume-control-card:hover {
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    .panel-header {
+        background: #fafbfc;
+        padding: 0.625rem 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-bottom: 1px solid #e1e4e8;
+        user-select: none;
+    }
+
+        .panel-header:hover {
+            background: #f5f6f8;
         }
 
-        /* 슬라이더 스타일 커스터마이징 */
-        .volume-control-card .rz-slider {
-            margin: 0.5rem 0;
-        }
+    .panel-icon.primary {
+        font-size: 1rem !important;
+        color: #3498db !important;
+    }
 
-        .volume-control-card .rz-slider-horizontal .rz-slider-track {
-            height: 6px !important;
-            background-color: var(--rz-base-300);
-        }
+    .panel-title {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        color: #2c3e50 !important;
+        margin: 0 !important;
+    }
 
-        .volume-control-card .rz-slider-horizontal .rz-slider-range {
-            height: 6px !important;
-        }
+    .unsaved-badge {
+        font-size: 0.6rem !important;
+        padding: 2px 5px !important;
+    }
 
-        .volume-control-card .rz-slider-handle {
-            width: 16px !important;
-            height: 16px !important;
-            top: -5px !important;
-        }
-
-    .collapsible-panel-container {
-        overflow: hidden;
-        transition: all 0.3s ease;
+    .expand-icon {
+        font-size: 1rem !important;
+        color: #6c757d !important;
+        transition: transform 0.2s ease;
     }
 
     .panel-content {
-        animation: slideDown 0.3s ease-out;
-        background-color: var(--rz-base-background-color);
-        border-radius: 0 0 var(--rz-border-radius) var(--rz-border-radius);
-        border: 1px solid var(--rz-border-color);
-        border-top: none;
+        padding: 0.875rem;
+        animation: slideDown 0.2s ease-out;
     }
 
+    /* 볼륨 카드 */
+    .volume-card {
+        padding: 0.625rem !important;
+        background: #fafbfc !important;
+        border: 1px solid #e1e4e8 !important;
+        height: 100%;
+        transition: all 0.2s ease;
+    }
+
+        .volume-card:hover {
+            background: white !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .volume-card.master {
+            background: white !important;
+            border-color: #3498db !important;
+        }
+
+    .volume-icon {
+        font-size: 0.875rem !important;
+    }
+
+        .volume-icon.info {
+            color: #3498db !important;
+        }
+
+        .volume-icon.success {
+            color: #27ae60 !important;
+        }
+
+        .volume-icon.warning {
+            color: #f39c12 !important;
+        }
+
+        .volume-icon.primary {
+            color: #3498db !important;
+        }
+
+    .volume-title {
+        font-size: 0.7rem !important;
+        font-weight: 600 !important;
+        color: #2c3e50 !important;
+        margin: 0 !important;
+    }
+
+    .volume-badge {
+        font-size: 0.65rem !important;
+        padding: 2px 6px !important;
+        font-weight: 600 !important;
+    }
+
+    /* 볼륨 슬라이더 */
+    .volume-slider {
+        margin: 0.375rem 0 !important;
+    }
+
+        .volume-slider .rz-slider-horizontal .rz-slider-track {
+            height: 5px !important;
+            background-color: #e1e4e8 !important;
+        }
+
+        .volume-slider .rz-slider-horizontal .rz-slider-range {
+            height: 5px !important;
+            background-color: #3498db !important;
+        }
+
+        .volume-slider.master .rz-slider-horizontal .rz-slider-range {
+            background-color: #2c3e50 !important;
+        }
+
+        .volume-slider .rz-slider-handle {
+            width: 14px !important;
+            height: 14px !important;
+            top: -5px !important;
+            background-color: white !important;
+            border: 2px solid #3498db !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+        }
+
+        .volume-slider.master .rz-slider-handle {
+            border-color: #2c3e50 !important;
+        }
+
+    .volume-label {
+        font-size: 0.6rem !important;
+        color: #6c757d !important;
+        margin: 0 !important;
+    }
+
+    /* 프리셋 카드 */
+    .preset-card {
+        padding: 0.625rem !important;
+        background: #f8f9fa !important;
+        border: 1px solid #e1e4e8 !important;
+    }
+
+    .preset-title {
+        font-size: 0.7rem !important;
+        font-weight: 600 !important;
+        color: #2c3e50 !important;
+        margin: 0 !important;
+    }
+
+    .preset-button {
+        font-size: 0.65rem !important;
+        padding: 0.25rem 0.5rem !important;
+        height: 26px !important;
+    }
+
+        .preset-button .rz-button-icon {
+            font-size: 0.75rem !important;
+        }
+
+    /* 액션 버튼 */
+    .action-button {
+        font-size: 0.7rem !important;
+        padding: 0.25rem 0.75rem !important;
+        height: 28px !important;
+    }
+
+        .action-button.primary {
+            background: #3498db !important;
+            border-color: #3498db !important;
+            color: white !important;
+            font-weight: 500 !important;
+        }
+
+            .action-button.primary:hover {
+                background: #2980b9 !important;
+                border-color: #2980b9 !important;
+            }
+
+    /* 경고 알림 */
+    .unsaved-alert {
+        padding: 0.5rem 0.75rem !important;
+        background-color: #fff3cd !important;
+        border: 1px solid #ffc107 !important;
+    }
+
+    .alert-icon {
+        font-size: 0.875rem !important;
+        color: #f39c12 !important;
+    }
+
+    .alert-text {
+        font-size: 0.7rem !important;
+        color: #856404 !important;
+        margin: 0 !important;
+    }
+
+    /* 애니메이션 */
     @@keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
+        from
 
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+    {
+        opacity: 0;
+        transform: translateY(-5px);
     }
 
-    .rotate-icon {
-        transform: rotate(-90deg);
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 
-    /* 다크 테마 지원 */
-    :root[data-theme='dark'] .volume-control-card {
-        background-color: var(--rz-base-100);
     }
 
-        :root[data-theme='dark'] .volume-control-card:hover {
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    /* 다크 테마 */
+    :root[data-theme='dark'] .professional-panel {
+        background: #0d1117 !important;
+        border-color: #30363d !important;
+    }
+
+    :root[data-theme='dark'] .panel-header {
+        background: #161b22;
+        border-bottom-color: #30363d;
+    }
+
+        :root[data-theme='dark'] .panel-header:hover {
+            background: #1f2937;
         }
 
-    :root[data-theme='dark'] .text-muted {
-        color: var(--rz-text-secondary-color) !important;
+    :root[data-theme='dark'] .volume-card {
+        background: #161b22 !important;
+        border-color: #30363d !important;
+    }
+
+        :root[data-theme='dark'] .volume-card:hover {
+            background: #1f2937 !important;
+        }
+
+        :root[data-theme='dark'] .volume-card.master {
+            background: #1f2937 !important;
+            border-color: #3498db !important;
+        }
+
+    :root[data-theme='dark'] .preset-card {
+        background: #161b22 !important;
+        border-color: #30363d !important;
+    }
+
+    :root[data-theme='dark'] .volume-slider .rz-slider-horizontal .rz-slider-track {
+        background-color: #30363d !important;
+    }
+
+    :root[data-theme='dark'] .unsaved-alert {
+        background-color: #1f2937 !important;
+        border-color: #374151 !important;
+    }
+
+    :root[data-theme='dark'] .alert-text {
+        color: #fbbf24 !important;
     }
 </style>

@@ -28,6 +28,12 @@ namespace WicsPlatform.Client.Pages.SubPages
 
         private IEnumerable<WicsPlatform.Server.Models.wics.MapSpeakerGroup> speakerGroupMappings = new List<WicsPlatform.Server.Models.wics.MapSpeakerGroup>();
 
+        // 확장된 그룹 추적
+        private HashSet<ulong> expandedGroups = new HashSet<ulong>();
+
+        // 현재 보고 있는 그룹
+        private WicsPlatform.Server.Models.wics.Group viewingGroup = null;
+
         protected override async Task OnInitializedAsync()
         {
             Logger.LogInformation("BroadcastSpeakerSection OnInitializedAsync 시작");
@@ -55,10 +61,9 @@ namespace WicsPlatform.Client.Pages.SubPages
                 isLoadingGroups = true;
                 StateHasChanged();
 
-                // ManageSpeaker와 동일한 쿼리 사용
                 var query = new Radzen.Query
                 {
-                    Filter = "DeleteYn eq 'N' or DeleteYn eq null"  // Type eq 0 조건 제거
+                    Filter = "DeleteYn eq 'N' or DeleteYn eq null"
                 };
 
                 Logger.LogInformation($"스피커 그룹 쿼리: {query.Filter}");
@@ -101,10 +106,9 @@ namespace WicsPlatform.Client.Pages.SubPages
                 isLoadingSpeakers = true;
                 StateHasChanged();
 
-                // ManageSpeaker와 동일한 쿼리 사용
                 var query = new Radzen.Query
                 {
-                    Expand = "Channel",  // Channel 정보도 포함
+                    Expand = "Channel",
                     Filter = "DeleteYn eq 'N' or DeleteYn eq null"
                 };
 
@@ -137,11 +141,10 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             try
             {
-                // ManageSpeaker와 동일한 쿼리 사용
                 var query = new Radzen.Query
                 {
                     Expand = "Group,Speaker",
-                    Filter = "LastYn eq 'Y'"  // 활성 매핑만
+                    Filter = "LastYn eq 'Y'"
                 };
 
                 Logger.LogInformation($"스피커 그룹 매핑 쿼리: {query.Filter}");
@@ -164,7 +167,49 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
         }
 
-        // 그룹 선택/해제
+        // 그룹 선택 변경
+        private void OnGroupSelectionChanged(ulong groupId, bool isSelected)
+        {
+            if (isSelected)
+            {
+                if (!selectedGroups.Contains(groupId))
+                {
+                    selectedGroups.Add(groupId);
+                    Logger.LogInformation($"그룹 선택: {groupId}");
+                }
+            }
+            else
+            {
+                selectedGroups.Remove(groupId);
+                Logger.LogInformation($"그룹 선택 해제: {groupId}");
+            }
+
+            StateHasChanged();
+        }
+
+        // 그룹 상세 보기
+        private void ViewGroupDetails(WicsPlatform.Server.Models.wics.Group group)
+        {
+            viewingGroup = group;
+            Logger.LogInformation($"그룹 상세 보기: {group.Name} (ID: {group.Id})");
+            StateHasChanged();
+        }
+
+        // 그룹 확장/축소 토글
+        private void ToggleGroupExpansion(ulong groupId)
+        {
+            if (expandedGroups.Contains(groupId))
+            {
+                expandedGroups.Remove(groupId);
+            }
+            else
+            {
+                expandedGroups.Add(groupId);
+            }
+            StateHasChanged();
+        }
+
+        // 그룹 선택/해제 (public으로 유지 - ManageBroadCast에서 호출)
         public async Task ToggleGroupSelection(ulong groupId)
         {
             if (selectedGroups.Contains(groupId))
@@ -198,6 +243,19 @@ namespace WicsPlatform.Client.Pages.SubPages
 
             Logger.LogDebug($"그룹 {groupId}의 스피커 수: {count}");
             return count;
+        }
+
+        // 그룹 내 온라인 스피커 수 가져오기
+        protected int GetOnlineSpeakerCount(ulong groupId)
+        {
+            var speakerIds = speakerGroupMappings
+                .Where(m => m.GroupId == groupId && m.LastYn == "Y")
+                .Select(m => m.SpeakerId)
+                .Distinct();
+
+            return allSpeakers
+                .Where(s => speakerIds.Contains(s.Id) && s.State == 1)
+                .Count();
         }
 
         // 스피커가 속한 그룹 목록 가져오기  
@@ -274,6 +332,17 @@ namespace WicsPlatform.Client.Pages.SubPages
             selectedGroups.Clear();
             Logger.LogInformation("선택 초기화됨");
             StateHasChanged();
+        }
+
+        // 동기식으로 그룹의 스피커 목록 가져오기
+        protected IEnumerable<WicsPlatform.Server.Models.wics.Speaker> GetSpeakersInGroupSync(ulong groupId)
+        {
+            var speakerIds = speakerGroupMappings
+                .Where(m => m.GroupId == groupId && m.LastYn == "Y")
+                .Select(m => m.SpeakerId)
+                .Distinct();
+
+            return allSpeakers.Where(s => speakerIds.Contains(s.Id));
         }
 
         // UI Helper Methods
