@@ -41,7 +41,6 @@ namespace WicsPlatform.Client.Pages
 
         // UI 상태
         protected bool speakerGroupPanelCollapsed = false;
-        protected bool volumePanelCollapsed = false;
         protected bool playlistPanelCollapsed = false;
         protected bool ttsPanelCollapsed = false;
         protected bool monitoringPanelCollapsed = false;
@@ -230,6 +229,57 @@ namespace WicsPlatform.Client.Pages
 
                 NotifySuccess("오디오 설정",
                     $"설정이 변경되었습니다. (샘플레이트: {audioSettings.SampleRate}Hz, 채널: {audioSettings.Channels}ch)");
+            }
+        }
+        #endregion
+
+        #region Volume Control Dialog
+        protected async Task OpenVolumeControlDialog()
+        {
+            if (selectedChannel == null)
+            {
+                NotifyWarn("채널 선택", "먼저 채널을 선택하세요.");
+                return;
+            }
+
+            var parameters = new Dictionary<string, object>
+            {
+                { "Channel", selectedChannel },
+                { "CurrentBroadcastId", currentBroadcastId?.ToString() },
+                { "IsBroadcasting", isBroadcasting }
+            };
+
+            var result = await DialogService.OpenAsync<VolumeControlDialog>(
+                "볼륨 제어",
+                parameters,
+                new DialogOptions
+                {
+                    Width = "600px",
+                    Height = "auto",
+                    Resizable = false,
+                    Draggable = true
+                });
+
+            if (result is bool saved && saved)
+            {
+                // 볼륨이 저장되었으면 현재 채널 정보를 다시 로드
+                if (selectedChannel != null)
+                {
+                    var query = new Radzen.Query
+                    {
+                        Filter = $"Id eq {selectedChannel.Id}"
+                    };
+                    var updatedChannel = await WicsService.GetChannels(query);
+                    if (updatedChannel.Value.Any())
+                    {
+                        selectedChannel = updatedChannel.Value.First();
+                        micVolume = (int)(selectedChannel.MicVolume * 100);
+                        mediaVolume = (int)(selectedChannel.MediaVolume * 100);
+                        ttsVolume = (int)(selectedChannel.TtsVolume * 100);
+                    }
+                }
+
+                NotifyInfo("볼륨 설정", "볼륨 설정이 업데이트되었습니다.");
             }
         }
         #endregion
@@ -590,7 +640,6 @@ namespace WicsPlatform.Client.Pages
             switch (panelName)
             {
                 case "speakerGroup": speakerGroupPanelCollapsed = !speakerGroupPanelCollapsed; break;
-                case "volume": volumePanelCollapsed = !volumePanelCollapsed; break;
                 case "tts": ttsPanelCollapsed = !ttsPanelCollapsed; break;
                 case "monitoring": monitoringPanelCollapsed = !monitoringPanelCollapsed; break;
             }
@@ -854,7 +903,7 @@ namespace WicsPlatform.Client.Pages
 
         private void ResetAllPanels()
         {
-            speakerGroupPanelCollapsed = volumePanelCollapsed =
+            speakerGroupPanelCollapsed =
                 playlistPanelCollapsed = ttsPanelCollapsed = monitoringPanelCollapsed = false;
         }
 

@@ -70,7 +70,7 @@
                               Title="@(selectedChannel == null ? "먼저 채널을 선택하세요" : "")" />
             </RadzenColumn>
 
-            @* 오디오 설정 버튼 추가 *@
+            @* 오디오 설정 버튼 *@
             <RadzenColumn Size="6" SizeMD="1" Class="px-1">
                 <RadzenButton Icon="settings"
                               ButtonStyle="ButtonStyle.Info"
@@ -78,6 +78,17 @@
                               class="icon-control-button"
                               Click="@OpenAudioSettingsDialog"
                               Title="오디오 설정"
+                              Disabled="@(selectedChannel == null)" />
+            </RadzenColumn>
+
+            @* 볼륨 제어 버튼 추가 *@
+            <RadzenColumn Size="6" SizeMD="1" Class="px-1">
+                <RadzenButton Icon="tune"
+                              ButtonStyle="ButtonStyle.Secondary"
+                              Size="ButtonSize.Small"
+                              class="icon-control-button"
+                              Click="@OpenVolumeControlDialog"
+                              Title="볼륨 제어"
                               Disabled="@(selectedChannel == null)" />
             </RadzenColumn>
 
@@ -316,11 +327,6 @@
         <BroadcastSpeakerSection Channel="@selectedChannel"
                                  @bind-IsCollapsed="@speakerGroupPanelCollapsed"
                                  @ref="speakerSection" />
-
-        <!-- 볼륨 설정 패널 -->
-        <BroadcastVolumeSection Channel="@selectedChannel"
-                                @bind-IsCollapsed="@volumePanelCollapsed"
-                                CurrentBroadcastId="@currentBroadcastId?.ToString()" />
 
         <!-- TTS 설정 패널 -->
         <BroadcastTtsSection Channel="@selectedChannel"

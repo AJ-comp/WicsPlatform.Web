@@ -1,26 +1,25 @@
 ﻿using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Components;
-using Radzen;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Radzen;
 using WicsPlatform.Shared;
 
-namespace WicsPlatform.Client.Pages.SubPages
+namespace WicsPlatform.Client.Dialogs
 {
-    public partial class BroadcastVolumeSection
+    public partial class VolumeControlDialog : IDisposable
     {
         [Parameter] public WicsPlatform.Server.Models.wics.Channel Channel { get; set; }
-        [Parameter] public bool IsCollapsed { get; set; }
-        [Parameter] public EventCallback<bool> IsCollapsedChanged { get; set; }
-        [Parameter] public EventCallback OnVolumeSaved { get; set; }
-        [Parameter] public string CurrentBroadcastId { get; set; } // 현재 방송 ID (실시간 조절용)
+        [Parameter] public string CurrentBroadcastId { get; set; }
+        [Parameter] public bool IsBroadcasting { get; set; }
 
+        [Inject] protected DialogService DialogService { get; set; }
         [Inject] protected NotificationService NotificationService { get; set; }
         [Inject] protected HttpClient Http { get; set; }
-        [Inject] protected ILogger<BroadcastVolumeSection> Logger { get; set; }
+        [Inject] protected ILogger<VolumeControlDialog> Logger { get; set; }
 
         private int micVolume = 50;
         private int ttsVolume = 50;
@@ -33,36 +32,22 @@ namespace WicsPlatform.Client.Pages.SubPages
         private bool _hasUnsavedChanges = false;
         private readonly object _debouncelock = new object();
 
-        // 중복 초기화 방지를 위한 변수
-        private ulong? _lastLoadedChannelId = null;
+        // 초기값 저장 (취소 시 복원용)
+        private int _originalMicVolume;
+        private int _originalTtsVolume;
+        private int _originalMediaVolume;
+        private int _originalGlobalVolume;
 
-        protected override void OnParametersSet()
-        {
-            // 채널이 실제로 변경되었을 때만 볼륨 값을 초기화
-            if (Channel != null && _lastLoadedChannelId != Channel.Id)
-            {
-                _lastLoadedChannelId = Channel.Id;
-                LoadVolumeFromChannel();
-            }
-        }
-
-        // 채널에서 볼륨 값을 로드하는 별도 메서드
-        private void LoadVolumeFromChannel()
+        protected override void OnInitialized()
         {
             if (Channel != null)
             {
                 // 채널의 볼륨 값을 로드 (테이블 값은 0~1이므로 100을 곱함)
-                micVolume = (int)(Channel.MicVolume * 100);
-                ttsVolume = (int)(Channel.TtsVolume * 100);
-                mediaVolume = (int)(Channel.MediaVolume * 100);
-                globalVolume = (int)(Channel.Volume * 100);
-                _hasUnsavedChanges = false;
+                micVolume = _originalMicVolume = (int)(Channel.MicVolume * 100);
+                ttsVolume = _originalTtsVolume = (int)(Channel.TtsVolume * 100);
+                mediaVolume = _originalMediaVolume = (int)(Channel.MediaVolume * 100);
+                globalVolume = _originalGlobalVolume = (int)(Channel.Volume * 100);
             }
-        }
-
-        private async Task TogglePanel()
-        {
-            await IsCollapsedChanged.InvokeAsync(!IsCollapsed);
         }
 
         private void UpdateVolume(string volumeType, int value)
@@ -84,7 +69,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
 
             // 변경 사항이 있음을 표시
-            _hasUnsavedChanges = true;
+            _hasUnsavedChanges = CheckForChanges();
 
             // 디바운싱을 위한 타이머 재설정
             lock (_debouncelock)
@@ -95,6 +80,14 @@ namespace WicsPlatform.Client.Pages.SubPages
                     await InvokeAsync(StateHasChanged);
                 }, null, 100, Timeout.Infinite); // 100ms 후에만 UI 업데이트
             }
+        }
+
+        private bool CheckForChanges()
+        {
+            return micVolume != _originalMicVolume ||
+                   ttsVolume != _originalTtsVolume ||
+                   mediaVolume != _originalMediaVolume ||
+                   globalVolume != _originalGlobalVolume;
         }
 
         private async Task SaveVolumes()
@@ -111,7 +104,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 {
                     new VolumeRequest
                     {
-                        BroadcastId = string.IsNullOrWhiteSpace(CurrentBroadcastId) ? null : ulong.Parse(CurrentBroadcastId), // 방송 중이면 실시간 적용
+                        BroadcastId = string.IsNullOrWhiteSpace(CurrentBroadcastId) ? null : ulong.Parse(CurrentBroadcastId),
                         ChannelId = Channel.Id,
                         Source = AudioSource.Microphone,
                         Volume = micVolume / 100f
@@ -158,8 +151,6 @@ namespace WicsPlatform.Client.Pages.SubPages
                     }
                 }
 
-                _hasUnsavedChanges = false;
-
                 // 로컬 채널 객체의 볼륨 값도 업데이트하여 동기화
                 if (Channel != null)
                 {
@@ -170,18 +161,20 @@ namespace WicsPlatform.Client.Pages.SubPages
                     Channel.UpdatedAt = DateTime.Now;
                 }
 
+                _hasUnsavedChanges = false;
+
                 NotificationService.Notify(new NotificationMessage
                 {
                     Severity = NotificationSeverity.Success,
                     Summary = "저장 완료",
-                    Detail = CurrentBroadcastId != null
+                    Detail = IsBroadcasting && CurrentBroadcastId != null
                         ? "볼륨 설정이 저장되고 실시간으로 적용되었습니다."
                         : "볼륨 설정이 저장되었습니다. 다음 방송부터 적용됩니다.",
                     Duration = 3000
                 });
 
-                // 부모 컴포넌트에 저장 완료 알림
-                await OnVolumeSaved.InvokeAsync();
+                // 다이얼로그 닫기
+                DialogService.Close(true);
             }
             catch (Exception ex)
             {
@@ -220,7 +213,6 @@ namespace WicsPlatform.Client.Pages.SubPages
             });
         }
 
-        // 프리셋 적용 메서드 추가
         private void ApplyPreset(string presetType)
         {
             switch (presetType)
@@ -271,6 +263,20 @@ namespace WicsPlatform.Client.Pages.SubPages
             "quiet" => "조용히",
             _ => "사용자 정의"
         };
+
+        private void Cancel()
+        {
+            if (_hasUnsavedChanges)
+            {
+                // 원래 값으로 복원
+                micVolume = _originalMicVolume;
+                ttsVolume = _originalTtsVolume;
+                mediaVolume = _originalMediaVolume;
+                globalVolume = _originalGlobalVolume;
+            }
+
+            DialogService.Close(false);
+        }
 
         public void Dispose()
         {
