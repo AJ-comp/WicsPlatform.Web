@@ -63,6 +63,10 @@ namespace WicsPlatform.Client.Pages
         protected int mediaVolume = 50;
         protected int ttsVolume = 50;
 
+        // 오디오 설정 (간소화)
+        private int _preferredSampleRate = 48000;
+        private int _preferredChannels = 2;
+
         // JS Interop
         private IJSObjectReference _mixerModule;
         private IJSObjectReference _jsModule;
@@ -77,49 +81,6 @@ namespace WicsPlatform.Client.Pages
 
         // Broadcast 관련
         private bool _currentLoopbackSetting = false;
-        #endregion
-
-        #region Audio Configuration
-        public class AudioConfiguration
-        {
-            public int SampleRate { get; set; } = 44100;
-            public int ChannelCount { get; set; } = 2;
-            public bool EchoCancellation { get; set; } = true;
-            public bool NoiseSuppression { get; set; } = true;
-            public bool AutoGainControl { get; set; } = true;
-            public string DeviceId { get; set; }
-            public string GroupId { get; set; }
-        }
-
-        private AudioConfiguration _currentAudioConfig = new AudioConfiguration();
-        private int _preferredSampleRate = 48000;
-        private int _preferredChannels = 2;
-
-        private List<SampleRateOption> sampleRateOptions = new List<SampleRateOption>
-        {
-            new SampleRateOption { Value = 8000, Text = "8000 Hz (전화품질)" },
-            new SampleRateOption { Value = 16000, Text = "16000 Hz (광대역)" },
-            new SampleRateOption { Value = 24000, Text = "24000 Hz (고품질)" },
-            new SampleRateOption { Value = 48000, Text = "48000 Hz (프로페셔널)" }
-        };
-
-        private List<ChannelOption> channelOptions = new List<ChannelOption>
-        {
-            new ChannelOption { Value = 1, Text = "모노 (1채널)" },
-            new ChannelOption { Value = 2, Text = "스테레오 (2채널)" }
-        };
-
-        public class SampleRateOption
-        {
-            public int Value { get; set; }
-            public string Text { get; set; }
-        }
-
-        public class ChannelOption
-        {
-            public int Value { get; set; }
-            public string Text { get; set; }
-        }
         #endregion
 
         #region Lifecycle Methods
@@ -187,18 +148,11 @@ namespace WicsPlatform.Client.Pages
                 mediaVolume = (int)(channel.MediaVolume * 100);
                 ttsVolume = (int)(channel.TtsVolume * 100);
 
-                var channelSampleRate = (int)(channel.SamplingRate > 0 ? channel.SamplingRate : 48000);
-                var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
-                _preferredSampleRate = FindClosestSampleRate(channelSampleRate, supportedSampleRates);
-
-                if (_preferredSampleRate != channelSampleRate && channel.SamplingRate > 0)
-                {
-                    await BroadcastDataService.UpdateChannelAudioSettingsAsync(channel, _preferredSampleRate, null);
-                }
-
+                // 단순히 채널의 값을 저장
+                _preferredSampleRate = channel.SamplingRate > 0 ? (int)channel.SamplingRate : 48000;
                 _preferredChannels = channel.ChannelCount;
 
-                _logger.LogInformation($"Channel selected: {channel.Name}, Channel Settings: {_preferredSampleRate}Hz, {_preferredChannels}ch");
+                _logger.LogInformation($"Channel selected: {channel.Name}, Settings: {_preferredSampleRate}Hz, {_preferredChannels}ch");
 
                 await CheckAndRecoverIfNeeded(channel.Id);
             }
@@ -209,16 +163,6 @@ namespace WicsPlatform.Client.Pages
             }
 
             await InvokeAsync(StateHasChanged);
-        }
-
-        private int FindClosestSampleRate(int targetSampleRate, int[] supportedSampleRates)
-        {
-            if (supportedSampleRates.Contains(targetSampleRate))
-                return targetSampleRate;
-
-            return supportedSampleRates
-                .OrderBy(rate => Math.Abs(rate - targetSampleRate))
-                .First();
         }
 
         protected async Task ToggleBroadcast(ulong channelId)
@@ -238,6 +182,55 @@ namespace WicsPlatform.Client.Pages
 
             notifyAction(isChannelBroadcasting[channelId] ? "방송 시작" : "방송 중지", message);
             await InvokeAsync(StateHasChanged);
+        }
+        #endregion
+
+        #region Audio Settings Dialog
+        protected async Task OpenAudioSettingsDialog()
+        {
+            if (selectedChannel == null)
+            {
+                NotifyWarn("채널 선택", "먼저 채널을 선택하세요.");
+                return;
+            }
+
+            var parameters = new Dictionary<string, object>
+            {
+                { "Channel", selectedChannel },
+                { "IsBroadcasting", isBroadcasting },
+                { "PreferredSampleRate", _preferredSampleRate },
+                { "PreferredChannels", _preferredChannels }
+            };
+
+            var result = await DialogService.OpenAsync<AudioSettingsDialog>(
+                "오디오 설정",
+                parameters,
+                new DialogOptions
+                {
+                    Width = "500px",
+                    Height = "auto",
+                    Resizable = false,
+                    Draggable = true
+                });
+
+            if (result is AudioSettingsResult audioSettings)
+            {
+                // 설정 적용
+                _preferredSampleRate = audioSettings.SampleRate;
+                _preferredChannels = audioSettings.Channels;
+
+                // 채널에 저장
+                if (selectedChannel != null)
+                {
+                    await BroadcastDataService.UpdateChannelAudioSettingsAsync(
+                        selectedChannel,
+                        audioSettings.SampleRate,
+                        audioSettings.Channels);
+                }
+
+                NotifySuccess("오디오 설정",
+                    $"설정이 변경되었습니다. (샘플레이트: {audioSettings.SampleRate}Hz, 채널: {audioSettings.Channels}ch)");
+            }
         }
         #endregion
 
@@ -265,7 +258,7 @@ namespace WicsPlatform.Client.Pages
                 LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
                 await SaveSelectedTtsToChannel();
 
-                // 마이크 초기화 - InitializeAudioMixer 내부에서 상태 확인
+                // 마이크 초기화
                 _logger.LogInformation("2단계: 오디오 믹서 초기화 (필요시)");
                 if (!await InitializeAudioMixer())
                     return;
@@ -276,7 +269,7 @@ namespace WicsPlatform.Client.Pages
                 if (!await InitializeWebSocketBroadcast(onlineGroups))
                     return;
 
-                // 마이크 활성화 - EnableMicrophone 내부에서 상태 확인
+                // 마이크 활성화
                 _logger.LogInformation("4단계: 마이크 활성화 (필요시)");
                 if (!await EnableMicrophone())
                 {
@@ -482,8 +475,6 @@ namespace WicsPlatform.Client.Pages
         {
             await StopWebSocketBroadcast();
             currentBroadcastId = null;
-
-            // 마이크 정리는 Microphone 파일의 메서드 호출
             await CleanupMicrophone();
         }
 
@@ -666,8 +657,6 @@ namespace WicsPlatform.Client.Pages
                 }
 
                 await StopWebSocketBroadcast();
-
-                // 마이크 정리는 Microphone 파일의 메서드 호출
                 await CleanupMicrophone();
 
                 _currentLoopbackSetting = false;
@@ -916,47 +905,6 @@ namespace WicsPlatform.Client.Pages
 
         private void NotifyInfo(string summary, string detail) =>
             Notify(NotificationSeverity.Info, summary, detail);
-
-        // Audio Settings
-        protected async Task ChangeSampleRate(int newSampleRate) => await ChangeAudioSetting(newSampleRate, null);
-        protected async Task ChangeChannels(int newChannels) => await ChangeAudioSetting(null, newChannels);
-
-        private async Task ChangeAudioSetting(int? newSampleRate, int? newChannels)
-        {
-            if (isBroadcasting)
-            {
-                NotifyWarn("방송 중", "방송 중에는 오디오 설정을 변경할 수 없습니다.");
-                return;
-            }
-
-            if (newSampleRate.HasValue)
-            {
-                var supportedSampleRates = sampleRateOptions.Select(o => o.Value).ToArray();
-                if (!supportedSampleRates.Contains(newSampleRate.Value))
-                {
-                    NotifyWarn("지원되지 않는 샘플레이트", $"{newSampleRate.Value}Hz는 지원되지 않는 샘플레이트입니다.");
-                    return;
-                }
-                _preferredSampleRate = newSampleRate.Value;
-            }
-
-            if (newChannels.HasValue)
-            {
-                _preferredChannels = newChannels.Value;
-            }
-
-            if (selectedChannel != null)
-            {
-                await BroadcastDataService.UpdateChannelAudioSettingsAsync(selectedChannel, newSampleRate, newChannels);
-            }
-            else
-            {
-                var settingType = newSampleRate.HasValue ? "샘플레이트" : "채널 수";
-                var settingValue = newSampleRate ?? newChannels;
-                var settingUnit = newSampleRate.HasValue ? "Hz" : "채널";
-                NotifyInfo("설정 변경", $"{settingType}가 {settingValue}{settingUnit}로 설정되었습니다. 다음 방송부터 적용됩니다.");
-            }
-        }
         #endregion
     }
 }

@@ -70,6 +70,17 @@
                               Title="@(selectedChannel == null ? "먼저 채널을 선택하세요" : "")" />
             </RadzenColumn>
 
+            @* 오디오 설정 버튼 추가 *@
+            <RadzenColumn Size="6" SizeMD="1" Class="px-1">
+                <RadzenButton Icon="settings"
+                              ButtonStyle="ButtonStyle.Info"
+                              Size="ButtonSize.Small"
+                              class="icon-control-button"
+                              Click="@OpenAudioSettingsDialog"
+                              Title="오디오 설정"
+                              Disabled="@(selectedChannel == null)" />
+            </RadzenColumn>
+
             @if (isBroadcasting)
             {
                 <RadzenColumn Size="6" SizeMD="1" Class="px-1">
@@ -287,71 +298,6 @@
     <!-- 선택된 채널의 섹션들 -->
     @if (selectedChannel != null)
     {
-        <!-- 오디오 설정 패널 -->
-        <RadzenCard class="settings-card mb-2">
-            <RadzenStack Gap="0.75rem">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem" class="mb-1">
-                    <RadzenIcon Icon="tune" class="section-icon" />
-                    <RadzenText TextStyle="TextStyle.Body1" class="section-title">오디오 설정</RadzenText>
-                </RadzenStack>
-
-                <RadzenRow Gap="0.75rem">
-                    <RadzenColumn Size="6" SizeMD="3">
-                        <RadzenFormField Text="샘플레이트" class="compact-form-field">
-                            <RadzenDropDown @bind-Value="_preferredSampleRate"
-                                            Data="@sampleRateOptions"
-                                            TextProperty="Text"
-                                            ValueProperty="Value"
-                                            Disabled="@isBroadcasting"
-                                            Change="@(args => ChangeSampleRate((int)args))"
-                                            class="compact-dropdown" />
-                        </RadzenFormField>
-                    </RadzenColumn>
-
-                    <RadzenColumn Size="6" SizeMD="3">
-                        <RadzenFormField Text="채널" class="compact-form-field">
-                            <RadzenDropDown @bind-Value="_preferredChannels"
-                                            Data="@channelOptions"
-                                            TextProperty="Text"
-                                            ValueProperty="Value"
-                                            Disabled="@isBroadcasting"
-                                            Change="@(args => ChangeChannels((int)args))"
-                                            class="compact-dropdown" />
-                        </RadzenFormField>
-                    </RadzenColumn>
-
-                    <RadzenColumn Size="6" SizeMD="3">
-                        <RadzenFormField Text="현재 설정" class="compact-form-field">
-                            <RadzenTextBox Value="@($"{(selectedChannel?.SamplingRate > 0 ? selectedChannel.SamplingRate : _currentAudioConfig.SampleRate)}Hz, {(selectedChannel?.ChannelCount)}ch")"
-                                           ReadOnly="true"
-                                           class="compact-input readonly" />
-                        </RadzenFormField>
-                    </RadzenColumn>
-
-                    <RadzenColumn Size="6" SizeMD="3">
-                        <RadzenFormField Text="상태" class="compact-form-field">
-                            <RadzenBadge BadgeStyle="@(isBroadcasting? BadgeStyle.Success: BadgeStyle.Light)"
-                                         IsPill="true"
-                                         Text="@(isBroadcasting ? "방송 중" : "대기 중")"
-                                         class="status-indicator" />
-                        </RadzenFormField>
-                    </RadzenColumn>
-                </RadzenRow>
-
-                @if (!isBroadcasting)
-                {
-                    <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" Size="AlertSize.Small" class="info-alert">
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
-                            <RadzenIcon Icon="info" class="alert-icon" />
-                            <RadzenText TextStyle="TextStyle.Caption" class="alert-text">
-                                설정 변경은 방송 시작 전에만 가능합니다. 변경된 설정은 다음 방송부터 적용됩니다.
-                            </RadzenText>
-                        </RadzenStack>
-                    </RadzenAlert>
-                }
-            </RadzenStack>
-        </RadzenCard>
-
         <!-- 방송 모니터링 패널 (방송 중일 때만 표시) -->
         @if (isBroadcasting)
         {
@@ -430,7 +376,7 @@
     }
 
     /* 카드 스타일 */
-    .create-channel-card, .channels-panel, .settings-card, .guide-card {
+    .create-channel-card, .channels-panel, .guide-card {
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
         border: 1px solid var(--professional-border) !important;
         border-radius: 6px !important;
@@ -443,10 +389,6 @@
 
     .channels-panel {
         padding: 1rem !important;
-    }
-
-    .settings-card {
-        padding: 0.875rem !important;
     }
 
     .guide-card {
@@ -613,15 +555,11 @@
             font-weight: 500 !important;
         }
 
-    .compact-input, .compact-dropdown {
+    .compact-input {
         height: 30px !important;
         font-size: 0.75rem !important;
         padding: 0.25rem 0.5rem !important;
     }
-
-        .compact-input.readonly {
-            background-color: var(--professional-background) !important;
-        }
 
     /* 버튼 스타일 */
     .primary-button, .broadcast-button {
@@ -659,15 +597,6 @@
         }
 
     /* 상태 표시 */
-    .status-indicator {
-        width: 100% !important;
-        height: 30px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 0.7rem !important;
-    }
-
     .recording-icon {
         font-size: 0.75rem !important;
         color: var(--professional-danger) !important;
@@ -677,24 +606,6 @@
     .loopback-icon {
         font-size: 0.75rem !important;
         color: var(--professional-success) !important;
-    }
-
-    /* 알림 */
-    .info-alert {
-        padding: 0.5rem 0.75rem !important;
-        background-color: #e8f4fd !important;
-        border: 1px solid #b8daff !important;
-    }
-
-    .alert-icon {
-        font-size: 0.875rem !important;
-        color: var(--professional-accent) !important;
-    }
-
-    .alert-text {
-        font-size: 0.7rem !important;
-        color: var(--professional-primary) !important;
-        margin: 0 !important;
     }
 
     /* 가이드 카드 */
@@ -841,48 +752,39 @@
 
     /* 애니메이션 */
     @@keyframes fadeIn {
-        from
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
 
-    {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
     }
 
     @@keyframes blink {
-        0%, 50%, 100%
+        0%, 50%, 100% {
+            opacity: 1;
+        }
 
-    {
-        opacity: 1;
-    }
-
-    25%, 75% {
-        opacity: 0.5;
-    }
-
+        25%, 75% {
+            opacity: 0.5;
+        }
     }
 
     @@keyframes pulse {
-        0%
+        0% {
+            opacity: 1;
+        }
 
-    {
-        opacity: 1;
-    }
+        50% {
+            opacity: 0.6;
+        }
 
-    50% {
-        opacity: 0.6;
-    }
-
-    100% {
-        opacity: 1;
-    }
-
+        100% {
+            opacity: 1;
+        }
     }
 
     /* 다크 테마 지원 */
@@ -891,8 +793,7 @@
     }
 
     :root[data-theme='dark'] .create-channel-card,
-    :root[data-theme='dark'] .channels-panel,
-    :root[data-theme='dark'] .settings-card {
+    :root[data-theme='dark'] .channels-panel {
         background: #0d1117 !important;
         border-color: #30363d !important;
     }
@@ -920,11 +821,6 @@
     :root[data-theme='dark'] .guide-step-card {
         background: #0d1117 !important;
         border-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .info-alert {
-        background-color: #1f2937 !important;
-        border-color: #374151 !important;
     }
 
     :root[data-theme='dark'] .broadcast-status-bar {
