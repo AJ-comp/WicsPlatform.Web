@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -31,6 +31,7 @@ namespace WicsPlatform.Client.Dialogs
         public ulong TtsId { get; set; }
 
         protected TtsEditFormModel model = new TtsEditFormModel();
+        protected TtsData originalTts;
         protected string error;
         protected bool errorVisible;
         protected bool isProcessing = false;
@@ -47,13 +48,13 @@ namespace WicsPlatform.Client.Dialogs
                 isProcessing = true;
 
                 // TTS 데이터 가져오기
-                var tts = await Http.GetFromJsonAsync<TtsData>($"odata/wics/Tts({TtsId})");
+                originalTts = await Http.GetFromJsonAsync<TtsData>($"odata/wics/Tts({TtsId})");
 
-                if (tts != null)
+                if (originalTts != null)
                 {
                     // 모델에 데이터 설정
-                    model.Name = tts.Name;
-                    model.Content = tts.Content;
+                    model.Name = originalTts.Name;
+                    model.Content = originalTts.Content;
                 }
                 else
                 {
