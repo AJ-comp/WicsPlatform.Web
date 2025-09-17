@@ -113,6 +113,10 @@ namespace WicsPlatform.Server.Data
               .HasDefaultValueSql(@"'32000'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
+              .Property(p => p.Priority)
+              .HasDefaultValueSql(@"'255'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
               .Property(p => p.Description)
               .HasDefaultValueSql(@"''");
 

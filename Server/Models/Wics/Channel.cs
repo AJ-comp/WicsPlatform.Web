@@ -55,6 +55,9 @@ namespace WicsPlatform.Server.Models.wics
         [Column("bit_rate")]
         public uint BitRate { get; set; }
 
+        [Column("priority")]
+        public byte Priority { get; set; }
+
         [Column("state")]
         [Required]
         public sbyte State { get; set; }
