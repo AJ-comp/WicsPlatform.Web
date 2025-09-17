@@ -1865,5 +1865,41 @@ namespace WicsPlatform.Server
 
             return itemToDelete;
         }
+    
+        public async Task ExportSpeakerOwnershipStatesToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerownershipstates/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerownershipstates/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
         }
+
+        public async Task ExportSpeakerOwnershipStatesToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerownershipstates/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerownershipstates/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnSpeakerOwnershipStatesRead(ref IQueryable<WicsPlatform.Server.Models.wics.SpeakerOwnershipState> items);
+
+        public async Task<IQueryable<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>> GetSpeakerOwnershipStates(Query query = null)
+        {
+            var items = Context.SpeakerOwnershipStates.AsQueryable();
+
+
+            if (query != null)
+            {
+                if (!string.IsNullOrEmpty(query.Expand))
+                {
+                    var propertiesToExpand = query.Expand.Split(',');
+                    foreach(var p in propertiesToExpand)
+                    {
+                        items = items.Include(p.Trim());
+                    }
+                }
+
+                ApplyQuery(ref items, query);
+            }
+
+            OnSpeakerOwnershipStatesRead(ref items);
+
+            return await Task.FromResult(items);
+        }
+    }
 }

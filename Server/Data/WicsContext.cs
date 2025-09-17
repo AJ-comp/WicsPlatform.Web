@@ -22,6 +22,8 @@ namespace WicsPlatform.Server.Data
         {
             base.OnModelCreating(builder);
 
+            builder.Entity<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>().HasNoKey();
+
             builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
               .HasOne(i => i.Channel)
               .WithMany(i => i.Broadcasts)
@@ -180,6 +182,10 @@ namespace WicsPlatform.Server.Data
               .Property(p => p.DeleteYn)
               .HasDefaultValueSql(@"'N'");
 
+            builder.Entity<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>()
+              .Property(p => p.Ownership)
+              .HasDefaultValueSql(@"'N'");
+
             builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
               .Property(p => p.CreatedAt)
               .HasColumnType("datetime");
@@ -257,6 +263,14 @@ namespace WicsPlatform.Server.Data
               .HasColumnType("datetime");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Tt>()
+              .Property(p => p.UpdatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>()
+              .Property(p => p.CreatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>()
               .Property(p => p.UpdatedAt)
               .HasColumnType("datetime");
             this.OnModelBuilding(builder);
@@ -283,6 +297,8 @@ namespace WicsPlatform.Server.Data
         public DbSet<WicsPlatform.Server.Models.wics.Speaker> Speakers { get; set; }
 
         public DbSet<WicsPlatform.Server.Models.wics.Tt> Tts { get; set; }
+
+        public DbSet<WicsPlatform.Server.Models.wics.SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
 
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
         {

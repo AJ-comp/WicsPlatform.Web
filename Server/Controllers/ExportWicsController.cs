@@ -172,5 +172,19 @@ namespace WicsPlatform.Server.Controllers
         {
             return ToExcel(ApplyQuery(await service.GetTts(), Request.Query, false), fileName);
         }
+
+        [HttpGet("/export/wics/speakerownershipstates/csv")]
+        [HttpGet("/export/wics/speakerownershipstates/csv(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportSpeakerOwnershipStatesToCSV(string fileName = null)
+        {
+            return ToCSV(ApplyQuery(await service.GetSpeakerOwnershipStates(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/speakerownershipstates/excel")]
+        [HttpGet("/export/wics/speakerownershipstates/excel(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportSpeakerOwnershipStatesToExcel(string fileName = null)
+        {
+            return ToExcel(ApplyQuery(await service.GetSpeakerOwnershipStates(), Request.Query, false), fileName);
+        }
     }
 }

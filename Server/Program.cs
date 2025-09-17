@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.StaticFiles;
@@ -25,9 +25,8 @@ static void RegisterDBContext(WebApplicationBuilder builder)
         options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
     });
     builder.Services.AddIdentity<ApplicationUser, ApplicationRole>().AddEntityFrameworkStores<ApplicationIdentityDbContext>().AddDefaultTokenProviders();
-
-    // appsettings.json에서 연결 문자열 가져오기
-    /*
+// appsettings.json에서 연결 문자열 가져오기
+/*
         var connectionString = builder.Configuration.GetConnectionString("wicsConnection");
 
         // DbContext를 종속성 주입을 통해 등록
@@ -77,6 +76,7 @@ builder.Services.AddControllers().AddOData(opt =>
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Mic>("Mics");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Speaker>("Speakers");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Tt>("Tts");
+    oDataBuilderwics.Function("SpeakerOwnershipStates").Returns<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>();
     opt.AddRouteComponents("odata/wics", oDataBuilderwics.GetEdmModel()).Count().Filter().OrderBy().Expand().Select().SetMaxTop(null).TimeZone = TimeZoneInfo.Utc;
 });
 builder.Services.AddScoped<WicsPlatform.Client.wicsService>();
@@ -114,9 +114,7 @@ builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
 {
     options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
 });
-
 var app = builder.Build();
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -125,16 +123,14 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    // app.UseHsts();  // 주석 처리
+// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+// app.UseHsts();  // 주석 처리
 }
 
 // app.UseHttpsRedirection();  // 주석 처리
-
 // 정적 파일 제공 설정 - 순서 중요!
 // 1. 기본 wwwroot 폴더
 app.UseStaticFiles();
-
 // 2. Uploads 폴더를 위한 추가 설정
 var provider = new FileExtensionContentTypeProvider();
 provider.Mappings[".mp3"] = "audio/mpeg";
@@ -143,31 +139,19 @@ provider.Mappings[".ogg"] = "audio/ogg";
 provider.Mappings[".webm"] = "audio/webm";
 provider.Mappings[".m4a"] = "audio/mp4";
 provider.Mappings[".flac"] = "audio/flac";
-
-app.UseStaticFiles(new StaticFileOptions
+app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.WebRootPath, "Uploads")), RequestPath = "/Uploads", ContentTypeProvider = provider, ServeUnknownFileTypes = true, DefaultContentType = "audio/mpeg", OnPrepareResponse = ctx =>
 {
-    FileProvider = new PhysicalFileProvider(
-       Path.Combine(builder.Environment.WebRootPath, "Uploads")),
-    RequestPath = "/Uploads",
-    ContentTypeProvider = provider,
-    ServeUnknownFileTypes = true,
-    DefaultContentType = "audio/mpeg",
-    OnPrepareResponse = ctx =>
+    // CORS 헤더 추가
+    ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+    ctx.Context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    ctx.Context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
+    // 캐싱 설정 (개발 중에는 no-cache)
+    if (app.Environment.IsDevelopment())
     {
-        // CORS 헤더 추가
-        ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
-        ctx.Context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-        ctx.Context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
-
-        // 캐싱 설정 (개발 중에는 no-cache)
-        if (app.Environment.IsDevelopment())
-        {
-            ctx.Context.Response.Headers.Append("Cache-Control", "no-cache, no-store");
-            ctx.Context.Response.Headers.Append("Pragma", "no-cache");
-        }
+        ctx.Context.Response.Headers.Append("Cache-Control", "no-cache, no-store");
+        ctx.Context.Response.Headers.Append("Pragma", "no-cache");
     }
-});
-
+} });
 app.UseCors("AllowAll"); // Apply CORS policy
 app.MapControllers();
 app.UseHeaderPropagation();
