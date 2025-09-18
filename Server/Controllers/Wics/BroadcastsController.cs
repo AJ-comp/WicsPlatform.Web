@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Data;
 using System.Linq;
@@ -43,9 +43,9 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         [HttpGet("/odata/wics/Broadcasts(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.Broadcast> GetBroadcast(ulong Id)
+        public SingleResult<WicsPlatform.Server.Models.wics.Broadcast> GetBroadcast(ulong key)
         {
-            var items = this.context.Broadcasts.Where(i => i.Id == Id);
+            var items = this.context.Broadcasts.Where(i => i.Id == key);
             var result = SingleResult.Create(items);
 
             OnBroadcastGet(ref result);
@@ -56,7 +56,7 @@ namespace WicsPlatform.Server.Controllers.wics
         partial void OnAfterBroadcastDeleted(WicsPlatform.Server.Models.wics.Broadcast item);
 
         [HttpDelete("/odata/wics/Broadcasts(Id={Id})")]
-        public IActionResult DeleteBroadcast(ulong Id)
+        public IActionResult DeleteBroadcast(ulong key)
         {
             try
             {
@@ -67,7 +67,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
 
                 var item = this.context.Broadcasts
-                    .Where(i => i.Id == Id)
+                    .Where(i => i.Id == key)
                     .FirstOrDefault();
 
                 if (item == null)
@@ -94,7 +94,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPut("/odata/wics/Broadcasts(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutBroadcast(ulong Id, [FromBody]WicsPlatform.Server.Models.wics.Broadcast item)
+        public IActionResult PutBroadcast(ulong key, [FromBody]WicsPlatform.Server.Models.wics.Broadcast item)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                if (item == null || (item.Id != Id))
+                if (item == null || (item.Id != key))
                 {
                     return BadRequest();
                 }
@@ -111,7 +111,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Broadcasts.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Broadcasts.Where(i => i.Id == Id);
+                var itemToReturn = this.context.Broadcasts.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Channel");
                 this.OnAfterBroadcastUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
@@ -125,7 +125,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPatch("/odata/wics/Broadcasts(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchBroadcast(ulong Id, [FromBody]Delta<WicsPlatform.Server.Models.wics.Broadcast> patch)
+        public IActionResult PatchBroadcast(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.Broadcast> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.Broadcasts.Where(i => i.Id == Id).FirstOrDefault();
+                var item = this.context.Broadcasts.Where(i => i.Id == key).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -146,7 +146,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Broadcasts.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Broadcasts.Where(i => i.Id == Id);
+                var itemToReturn = this.context.Broadcasts.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Channel");
                 this.OnAfterBroadcastUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));

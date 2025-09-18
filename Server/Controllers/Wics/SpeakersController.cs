@@ -43,9 +43,9 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         [HttpGet("/odata/wics/Speakers(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.Speaker> GetSpeaker(ulong Id)
+        public SingleResult<WicsPlatform.Server.Models.wics.Speaker> GetSpeaker(ulong key)
         {
-            var items = this.context.Speakers.Where(i => i.Id == Id);
+            var items = this.context.Speakers.Where(i => i.Id == key);
             var result = SingleResult.Create(items);
 
             OnSpeakerGet(ref result);
@@ -56,7 +56,7 @@ namespace WicsPlatform.Server.Controllers.wics
         partial void OnAfterSpeakerDeleted(WicsPlatform.Server.Models.wics.Speaker item);
 
         [HttpDelete("/odata/wics/Speakers(Id={Id})")]
-        public IActionResult DeleteSpeaker(ulong Id)
+        public IActionResult DeleteSpeaker(ulong key)
         {
             try
             {
@@ -67,7 +67,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
 
                 var item = this.context.Speakers
-                    .Where(i => i.Id == Id)
+                    .Where(i => i.Id == key)
                     .FirstOrDefault();
 
                 if (item == null)
@@ -94,7 +94,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPut("/odata/wics/Speakers(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutSpeaker(ulong Id, [FromBody]WicsPlatform.Server.Models.wics.Speaker item)
+        public IActionResult PutSpeaker(ulong key, [FromBody]WicsPlatform.Server.Models.wics.Speaker item)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                if (item == null || (item.Id != Id))
+                if (item == null || (item.Id != key))
                 {
                     return BadRequest();
                 }
@@ -111,7 +111,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Speakers.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Speakers.Where(i => i.Id == Id);
+                var itemToReturn = this.context.Speakers.Where(i => i.Id == key);
                 
                 this.OnAfterSpeakerUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
@@ -125,7 +125,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPatch("/odata/wics/Speakers(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchSpeaker(ulong Id, [FromBody]Delta<WicsPlatform.Server.Models.wics.Speaker> patch)
+        public IActionResult PatchSpeaker(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.Speaker> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.Speakers.Where(i => i.Id == Id).FirstOrDefault();
+                var item = this.context.Speakers.Where(i => i.Id == key).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -146,7 +146,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Speakers.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Speakers.Where(i => i.Id == Id);
+                var itemToReturn = this.context.Speakers.Where(i => i.Id == key);
                 
                 this.OnAfterSpeakerUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));

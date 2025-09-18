@@ -43,9 +43,9 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         [HttpGet("/odata/wics/Groups(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.Group> GetGroup(ulong Id)
+        public SingleResult<WicsPlatform.Server.Models.wics.Group> GetGroup(ulong key)
         {
-            var items = this.context.Groups.Where(i => i.Id == Id);
+            var items = this.context.Groups.Where(i => i.Id == key);
             var result = SingleResult.Create(items);
 
             OnGroupGet(ref result);
@@ -56,7 +56,7 @@ namespace WicsPlatform.Server.Controllers.wics
         partial void OnAfterGroupDeleted(WicsPlatform.Server.Models.wics.Group item);
 
         [HttpDelete("/odata/wics/Groups(Id={Id})")]
-        public IActionResult DeleteGroup(ulong Id)
+        public IActionResult DeleteGroup(ulong key)
         {
             try
             {
@@ -67,7 +67,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
 
                 var item = this.context.Groups
-                    .Where(i => i.Id == Id)
+                    .Where(i => i.Id == key)
                     .FirstOrDefault();
 
                 if (item == null)
@@ -94,7 +94,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPut("/odata/wics/Groups(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutGroup(ulong Id, [FromBody]WicsPlatform.Server.Models.wics.Group item)
+        public IActionResult PutGroup(ulong key, [FromBody]WicsPlatform.Server.Models.wics.Group item)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                if (item == null || (item.Id != Id))
+                if (item == null || (item.Id != key))
                 {
                     return BadRequest();
                 }
@@ -111,7 +111,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Groups.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Groups.Where(i => i.Id == Id);
+                var itemToReturn = this.context.Groups.Where(i => i.Id == key);
                 
                 this.OnAfterGroupUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
@@ -125,7 +125,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPatch("/odata/wics/Groups(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchGroup(ulong Id, [FromBody]Delta<WicsPlatform.Server.Models.wics.Group> patch)
+        public IActionResult PatchGroup(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.Group> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.Groups.Where(i => i.Id == Id).FirstOrDefault();
+                var item = this.context.Groups.Where(i => i.Id == key).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -146,7 +146,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Groups.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Groups.Where(i => i.Id == Id);
+                var itemToReturn = this.context.Groups.Where(i => i.Id == key);
                 
                 this.OnAfterGroupUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));

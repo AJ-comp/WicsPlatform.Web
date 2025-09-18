@@ -43,9 +43,9 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         [HttpGet("/odata/wics/MapMediaGroups(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.MapMediaGroup> GetMapMediaGroup(ulong Id)
+        public SingleResult<WicsPlatform.Server.Models.wics.MapMediaGroup> GetMapMediaGroup(ulong key)
         {
-            var items = this.context.MapMediaGroups.Where(i => i.Id == Id);
+            var items = this.context.MapMediaGroups.Where(i => i.Id == key);
             var result = SingleResult.Create(items);
 
             OnMapMediaGroupGet(ref result);
@@ -56,7 +56,7 @@ namespace WicsPlatform.Server.Controllers.wics
         partial void OnAfterMapMediaGroupDeleted(WicsPlatform.Server.Models.wics.MapMediaGroup item);
 
         [HttpDelete("/odata/wics/MapMediaGroups(Id={Id})")]
-        public IActionResult DeleteMapMediaGroup(ulong Id)
+        public IActionResult DeleteMapMediaGroup(ulong key)
         {
             try
             {
@@ -67,7 +67,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
 
                 var item = this.context.MapMediaGroups
-                    .Where(i => i.Id == Id)
+                    .Where(i => i.Id == key)
                     .FirstOrDefault();
 
                 if (item == null)
@@ -94,7 +94,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPut("/odata/wics/MapMediaGroups(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutMapMediaGroup(ulong Id, [FromBody]WicsPlatform.Server.Models.wics.MapMediaGroup item)
+        public IActionResult PutMapMediaGroup(ulong key, [FromBody]WicsPlatform.Server.Models.wics.MapMediaGroup item)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                if (item == null || (item.Id != Id))
+                if (item == null || (item.Id != key))
                 {
                     return BadRequest();
                 }
@@ -111,7 +111,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.MapMediaGroups.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.MapMediaGroups.Where(i => i.Id == Id);
+                var itemToReturn = this.context.MapMediaGroups.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Group,Medium");
                 this.OnAfterMapMediaGroupUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
@@ -125,7 +125,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPatch("/odata/wics/MapMediaGroups(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchMapMediaGroup(ulong Id, [FromBody]Delta<WicsPlatform.Server.Models.wics.MapMediaGroup> patch)
+        public IActionResult PatchMapMediaGroup(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.MapMediaGroup> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.MapMediaGroups.Where(i => i.Id == Id).FirstOrDefault();
+                var item = this.context.MapMediaGroups.Where(i => i.Id == key).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -146,7 +146,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.MapMediaGroups.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.MapMediaGroups.Where(i => i.Id == Id);
+                var itemToReturn = this.context.MapMediaGroups.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Group,Medium");
                 this.OnAfterMapMediaGroupUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));

@@ -971,6 +971,100 @@ namespace WicsPlatform.Client
             return await httpClient.SendAsync(httpRequestMessage);
         }
 
+        public async System.Threading.Tasks.Task ExportSpeakerOwnershipStatesToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerownershipstates/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerownershipstates/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async System.Threading.Tasks.Task ExportSpeakerOwnershipStatesToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerownershipstates/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerownershipstates/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnGetSpeakerOwnershipStates(HttpRequestMessage requestMessage);
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>> GetSpeakerOwnershipStates(Query query)
+        {
+            return await GetSpeakerOwnershipStates(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
+        }
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>> GetSpeakerOwnershipStates(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
+        {
+            var uri = new Uri(baseUri, $"SpeakerOwnershipStates");
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetSpeakerOwnershipStates(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>>(response);
+        }
+
+        partial void OnCreateSpeakerOwnershipState(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.SpeakerOwnershipState> CreateSpeakerOwnershipState(WicsPlatform.Server.Models.wics.SpeakerOwnershipState speakerOwnershipState = default(WicsPlatform.Server.Models.wics.SpeakerOwnershipState))
+        {
+            var uri = new Uri(baseUri, $"SpeakerOwnershipStates");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(speakerOwnershipState), Encoding.UTF8, "application/json");
+
+            OnCreateSpeakerOwnershipState(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>(response);
+        }
+
+        partial void OnDeleteSpeakerOwnershipState(HttpRequestMessage requestMessage);
+
+        public async Task<HttpResponseMessage> DeleteSpeakerOwnershipState(ulong speakerId = default(ulong), ulong channelId = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"SpeakerOwnershipStates(SpeakerId={speakerId},ChannelId={channelId})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
+
+            OnDeleteSpeakerOwnershipState(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
+        partial void OnGetSpeakerOwnershipStateBySpeakerIdAndChannelId(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.SpeakerOwnershipState> GetSpeakerOwnershipStateBySpeakerIdAndChannelId(string expand = default(string), ulong speakerId = default(ulong), ulong channelId = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"SpeakerOwnershipStates(SpeakerId={speakerId},ChannelId={channelId})");
+
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetSpeakerOwnershipStateBySpeakerIdAndChannelId(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>(response);
+        }
+
+        partial void OnUpdateSpeakerOwnershipState(HttpRequestMessage requestMessage);
+        
+        public async Task<HttpResponseMessage> UpdateSpeakerOwnershipState(ulong speakerId = default(ulong), ulong channelId = default(ulong), WicsPlatform.Server.Models.wics.SpeakerOwnershipState speakerOwnershipState = default(WicsPlatform.Server.Models.wics.SpeakerOwnershipState))
+        {
+            var uri = new Uri(baseUri, $"SpeakerOwnershipStates(SpeakerId={speakerId},ChannelId={channelId})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
+
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(speakerOwnershipState), Encoding.UTF8, "application/json");
+
+            OnUpdateSpeakerOwnershipState(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
         public async System.Threading.Tasks.Task ExportTtsToExcel(Query query = null, string fileName = null)
         {
             navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/tts/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/tts/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
@@ -1063,37 +1157,6 @@ namespace WicsPlatform.Client
             OnUpdateTt(httpRequestMessage);
 
             return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        public async System.Threading.Tasks.Task ExportSpeakerOwnershipStatesToExcel(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerownershipstates/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerownershipstates/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        public async System.Threading.Tasks.Task ExportSpeakerOwnershipStatesToCSV(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerownershipstates/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerownershipstates/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        partial void OnGetSpeakerOwnershipStates(HttpRequestMessage requestMessage);
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>> GetSpeakerOwnershipStates(Query query)
-        {
-            return await GetSpeakerOwnershipStates(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
-        }
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>> GetSpeakerOwnershipStates(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
-        {
-            var uri = new Uri(baseUri, $"SpeakerOwnershipStates");
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetSpeakerOwnershipStates(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>>(response);
         }
     }
 }

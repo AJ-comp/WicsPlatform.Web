@@ -61,5 +61,7 @@ namespace WicsPlatform.Server.Models.wics
         public DateTime UpdatedAt { get; set; }
 
         public ICollection<MapSpeakerGroup> MapSpeakerGroups { get; set; }
+
+        public ICollection<SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
     }
 }

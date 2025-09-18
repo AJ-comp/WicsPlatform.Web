@@ -81,5 +81,7 @@ namespace WicsPlatform.Server.Models.wics
         public ICollection<MapChannelMedium> MapChannelMedia { get; set; }
 
         public ICollection<MapChannelTt> MapChannelTts { get; set; }
+
+        public ICollection<SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
     }
 }

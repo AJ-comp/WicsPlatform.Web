@@ -159,20 +159,6 @@ namespace WicsPlatform.Server.Controllers
             return ToExcel(ApplyQuery(await service.GetSpeakers(), Request.Query, false), fileName);
         }
 
-        [HttpGet("/export/wics/tts/csv")]
-        [HttpGet("/export/wics/tts/csv(fileName='{fileName}')")]
-        public async Task<FileStreamResult> ExportTtsToCSV(string fileName = null)
-        {
-            return ToCSV(ApplyQuery(await service.GetTts(), Request.Query, false), fileName);
-        }
-
-        [HttpGet("/export/wics/tts/excel")]
-        [HttpGet("/export/wics/tts/excel(fileName='{fileName}')")]
-        public async Task<FileStreamResult> ExportTtsToExcel(string fileName = null)
-        {
-            return ToExcel(ApplyQuery(await service.GetTts(), Request.Query, false), fileName);
-        }
-
         [HttpGet("/export/wics/speakerownershipstates/csv")]
         [HttpGet("/export/wics/speakerownershipstates/csv(fileName='{fileName}')")]
         public async Task<FileStreamResult> ExportSpeakerOwnershipStatesToCSV(string fileName = null)
@@ -185,6 +171,20 @@ namespace WicsPlatform.Server.Controllers
         public async Task<FileStreamResult> ExportSpeakerOwnershipStatesToExcel(string fileName = null)
         {
             return ToExcel(ApplyQuery(await service.GetSpeakerOwnershipStates(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/tts/csv")]
+        [HttpGet("/export/wics/tts/csv(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportTtsToCSV(string fileName = null)
+        {
+            return ToCSV(ApplyQuery(await service.GetTts(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/tts/excel")]
+        [HttpGet("/export/wics/tts/excel(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportTtsToExcel(string fileName = null)
+        {
+            return ToExcel(ApplyQuery(await service.GetTts(), Request.Query, false), fileName);
         }
     }
 }

@@ -43,9 +43,9 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         [HttpGet("/odata/wics/MapSpeakerGroups(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.MapSpeakerGroup> GetMapSpeakerGroup(ulong Id)
+        public SingleResult<WicsPlatform.Server.Models.wics.MapSpeakerGroup> GetMapSpeakerGroup(ulong key)
         {
-            var items = this.context.MapSpeakerGroups.Where(i => i.Id == Id);
+            var items = this.context.MapSpeakerGroups.Where(i => i.Id == key);
             var result = SingleResult.Create(items);
 
             OnMapSpeakerGroupGet(ref result);
@@ -56,7 +56,7 @@ namespace WicsPlatform.Server.Controllers.wics
         partial void OnAfterMapSpeakerGroupDeleted(WicsPlatform.Server.Models.wics.MapSpeakerGroup item);
 
         [HttpDelete("/odata/wics/MapSpeakerGroups(Id={Id})")]
-        public IActionResult DeleteMapSpeakerGroup(ulong Id)
+        public IActionResult DeleteMapSpeakerGroup(ulong key)
         {
             try
             {
@@ -67,7 +67,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
 
                 var item = this.context.MapSpeakerGroups
-                    .Where(i => i.Id == Id)
+                    .Where(i => i.Id == key)
                     .FirstOrDefault();
 
                 if (item == null)
@@ -94,7 +94,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPut("/odata/wics/MapSpeakerGroups(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutMapSpeakerGroup(ulong Id, [FromBody]WicsPlatform.Server.Models.wics.MapSpeakerGroup item)
+        public IActionResult PutMapSpeakerGroup(ulong key, [FromBody]WicsPlatform.Server.Models.wics.MapSpeakerGroup item)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                if (item == null || (item.Id != Id))
+                if (item == null || (item.Id != key))
                 {
                     return BadRequest();
                 }
@@ -111,7 +111,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.MapSpeakerGroups.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.MapSpeakerGroups.Where(i => i.Id == Id);
+                var itemToReturn = this.context.MapSpeakerGroups.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Group,Speaker");
                 this.OnAfterMapSpeakerGroupUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
@@ -125,7 +125,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPatch("/odata/wics/MapSpeakerGroups(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchMapSpeakerGroup(ulong Id, [FromBody]Delta<WicsPlatform.Server.Models.wics.MapSpeakerGroup> patch)
+        public IActionResult PatchMapSpeakerGroup(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.MapSpeakerGroup> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.MapSpeakerGroups.Where(i => i.Id == Id).FirstOrDefault();
+                var item = this.context.MapSpeakerGroups.Where(i => i.Id == key).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -146,7 +146,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.MapSpeakerGroups.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.MapSpeakerGroups.Where(i => i.Id == Id);
+                var itemToReturn = this.context.MapSpeakerGroups.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Group,Speaker");
                 this.OnAfterMapSpeakerGroupUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));

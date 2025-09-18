@@ -75,8 +75,8 @@ builder.Services.AddControllers().AddOData(opt =>
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Medium>("Media");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Mic>("Mics");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Speaker>("Speakers");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>("SpeakerOwnershipStates").EntityType.HasKey(entity => new { entity.SpeakerId, entity.ChannelId });
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Tt>("Tts");
-    oDataBuilderwics.Function("SpeakerOwnershipStates").Returns<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>();
     opt.AddRouteComponents("odata/wics", oDataBuilderwics.GetEdmModel()).Count().Filter().OrderBy().Expand().Select().SetMaxTop(null).TimeZone = TimeZoneInfo.Utc;
 });
 builder.Services.AddScoped<WicsPlatform.Client.wicsService>();

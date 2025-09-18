@@ -95,6 +95,8 @@ public partial class WebSocketMiddleware
         catch (Exception ex)
         {
             logger.LogError(ex, $"WebSocket error for connection: {connectionId}");
+
+            await CloseWebSocketOnError(webSocket, ex);
         }
         finally
         {
@@ -133,34 +135,64 @@ public partial class WebSocketMiddleware
         }
     }
 
-    private async Task ProcessMessageAsync(WebSocket webSocket, string connectionId, ulong channelId, string message)
+    /// <summary>
+    /// 예외 발생 시 WebSocket을 안전하게 종료
+    /// </summary>
+    private async Task CloseWebSocketOnError(WebSocket webSocket, Exception ex)
     {
         try
         {
-            var jsonDoc = JsonDocument.Parse(message);
-            var root = jsonDoc.RootElement;
-
-            if (root.TryGetProperty("type", out var typeElement))
+            if (webSocket.State == WebSocketState.Open)
             {
-                var messageType = typeElement.GetString();
-
-                switch (messageType)
+                // 에러 메시지 전송
+                var errorMessage = JsonSerializer.Serialize(new
                 {
-                    case "connect":
-                        await HandleConnectAsync(webSocket, connectionId, channelId, root);
-                        break;
-                    case "disconnect":
-                        await HandleDisconnectAsync(root);
-                        break;
-                    case "audio":
-                        await HandleAudioDataAsync(webSocket, root);
-                        break;
-                }
+                    type = "error",
+                    message = "Server error occurred",
+                    details = ex.Message
+                });
+
+                var bytes = Encoding.UTF8.GetBytes(errorMessage);
+                await webSocket.SendAsync(
+                    new ArraySegment<byte>(bytes),
+                    WebSocketMessageType.Text,
+                    true,
+                    CancellationToken.None);
+
+                // WebSocket 종료
+                await webSocket.CloseAsync(
+                    WebSocketCloseStatus.InternalServerError,
+                    "Server error",
+                    CancellationToken.None);
             }
         }
-        catch (Exception ex)
+        catch (Exception closeEx)
         {
-            logger.LogError(ex, "Error processing message");
+            logger.LogError(closeEx, "Failed to close WebSocket after error");
+        }
+    }
+
+    private async Task ProcessMessageAsync(WebSocket webSocket, string connectionId, ulong channelId, string message)
+    {
+        var jsonDoc = JsonDocument.Parse(message);
+        var root = jsonDoc.RootElement;
+
+        if (root.TryGetProperty("type", out var typeElement))
+        {
+            var messageType = typeElement.GetString();
+
+            switch (messageType)
+            {
+                case "connect":
+                    await HandleConnectAsync(webSocket, connectionId, channelId, root);
+                    break;
+                case "disconnect":
+                    await HandleDisconnectAsync(root);
+                    break;
+                case "audio":
+                    await HandleAudioDataAsync(webSocket, root);
+                    break;
+            }
         }
     }
 

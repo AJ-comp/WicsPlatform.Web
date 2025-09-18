@@ -43,9 +43,9 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         [HttpGet("/odata/wics/Media(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.Medium> GetMedium(ulong Id)
+        public SingleResult<WicsPlatform.Server.Models.wics.Medium> GetMedium(ulong key)
         {
-            var items = this.context.Media.Where(i => i.Id == Id);
+            var items = this.context.Media.Where(i => i.Id == key);
             var result = SingleResult.Create(items);
 
             OnMediumGet(ref result);
@@ -56,7 +56,7 @@ namespace WicsPlatform.Server.Controllers.wics
         partial void OnAfterMediumDeleted(WicsPlatform.Server.Models.wics.Medium item);
 
         [HttpDelete("/odata/wics/Media(Id={Id})")]
-        public IActionResult DeleteMedium(ulong Id)
+        public IActionResult DeleteMedium(ulong key)
         {
             try
             {
@@ -67,7 +67,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
 
                 var item = this.context.Media
-                    .Where(i => i.Id == Id)
+                    .Where(i => i.Id == key)
                     .FirstOrDefault();
 
                 if (item == null)
@@ -94,7 +94,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPut("/odata/wics/Media(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutMedium(ulong Id, [FromBody]WicsPlatform.Server.Models.wics.Medium item)
+        public IActionResult PutMedium(ulong key, [FromBody]WicsPlatform.Server.Models.wics.Medium item)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                if (item == null || (item.Id != Id))
+                if (item == null || (item.Id != key))
                 {
                     return BadRequest();
                 }
@@ -111,7 +111,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Media.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Media.Where(i => i.Id == Id);
+                var itemToReturn = this.context.Media.Where(i => i.Id == key);
                 
                 this.OnAfterMediumUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
@@ -125,7 +125,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPatch("/odata/wics/Media(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchMedium(ulong Id, [FromBody]Delta<WicsPlatform.Server.Models.wics.Medium> patch)
+        public IActionResult PatchMedium(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.Medium> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.Media.Where(i => i.Id == Id).FirstOrDefault();
+                var item = this.context.Media.Where(i => i.Id == key).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -146,7 +146,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.Media.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Media.Where(i => i.Id == Id);
+                var itemToReturn = this.context.Media.Where(i => i.Id == key);
                 
                 this.OnAfterMediumUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));

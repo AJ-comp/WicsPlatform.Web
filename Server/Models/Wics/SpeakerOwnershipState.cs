@@ -10,13 +10,19 @@ namespace WicsPlatform.Server.Models.wics
     [Table("speaker_ownership_state")]
     public partial class SpeakerOwnershipState
     {
+        [Key]
         [Column("speaker_id")]
         [Required]
         public ulong SpeakerId { get; set; }
 
+        public Speaker Speaker { get; set; }
+
+        [Key]
         [Column("channel_id")]
         [Required]
         public ulong ChannelId { get; set; }
+
+        public Channel Channel { get; set; }
 
         [Column("ownership")]
         public string Ownership { get; set; }

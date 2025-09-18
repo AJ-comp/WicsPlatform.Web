@@ -43,9 +43,9 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         [HttpGet("/odata/wics/MapChannelMedia(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.MapChannelMedium> GetMapChannelMedium(ulong Id)
+        public SingleResult<WicsPlatform.Server.Models.wics.MapChannelMedium> GetMapChannelMedium(ulong key)
         {
-            var items = this.context.MapChannelMedia.Where(i => i.Id == Id);
+            var items = this.context.MapChannelMedia.Where(i => i.Id == key);
             var result = SingleResult.Create(items);
 
             OnMapChannelMediumGet(ref result);
@@ -56,7 +56,7 @@ namespace WicsPlatform.Server.Controllers.wics
         partial void OnAfterMapChannelMediumDeleted(WicsPlatform.Server.Models.wics.MapChannelMedium item);
 
         [HttpDelete("/odata/wics/MapChannelMedia(Id={Id})")]
-        public IActionResult DeleteMapChannelMedium(ulong Id)
+        public IActionResult DeleteMapChannelMedium(ulong key)
         {
             try
             {
@@ -67,7 +67,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
 
                 var item = this.context.MapChannelMedia
-                    .Where(i => i.Id == Id)
+                    .Where(i => i.Id == key)
                     .FirstOrDefault();
 
                 if (item == null)
@@ -94,7 +94,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPut("/odata/wics/MapChannelMedia(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutMapChannelMedium(ulong Id, [FromBody]WicsPlatform.Server.Models.wics.MapChannelMedium item)
+        public IActionResult PutMapChannelMedium(ulong key, [FromBody]WicsPlatform.Server.Models.wics.MapChannelMedium item)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                if (item == null || (item.Id != Id))
+                if (item == null || (item.Id != key))
                 {
                     return BadRequest();
                 }
@@ -111,7 +111,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.MapChannelMedia.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.MapChannelMedia.Where(i => i.Id == Id);
+                var itemToReturn = this.context.MapChannelMedia.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Channel,Medium");
                 this.OnAfterMapChannelMediumUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
@@ -125,7 +125,7 @@ namespace WicsPlatform.Server.Controllers.wics
 
         [HttpPatch("/odata/wics/MapChannelMedia(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchMapChannelMedium(ulong Id, [FromBody]Delta<WicsPlatform.Server.Models.wics.MapChannelMedium> patch)
+        public IActionResult PatchMapChannelMedium(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.MapChannelMedium> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.MapChannelMedia.Where(i => i.Id == Id).FirstOrDefault();
+                var item = this.context.MapChannelMedia.Where(i => i.Id == key).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -146,7 +146,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 this.context.MapChannelMedia.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.MapChannelMedia.Where(i => i.Id == Id);
+                var itemToReturn = this.context.MapChannelMedia.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Channel,Medium");
                 this.OnAfterMapChannelMediumUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));

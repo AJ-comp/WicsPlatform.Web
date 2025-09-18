@@ -543,29 +543,6 @@ namespace WicsPlatform.Client.Pages
         #endregion
 
         #region Loopback Control
-        private async Task<bool> GetLoopbackSetting()
-        {
-            try
-            {
-                var query = new Radzen.Query
-                {
-                    Filter = $"ChannelId eq {selectedChannel.Id} and OngoingYn eq 'Y'",
-                    Top = 1,
-                    OrderBy = "CreatedAt desc"
-                };
-
-                var broadcasts = await WicsService.GetBroadcasts(query);
-                var currentBroadcast = broadcasts.Value.FirstOrDefault();
-
-                _currentLoopbackSetting = currentBroadcast?.LoopbackYn == "Y";
-                return _currentLoopbackSetting;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to get loopback setting");
-                return false;
-            }
-        }
 
         protected async Task ToggleLoopback()
         {
