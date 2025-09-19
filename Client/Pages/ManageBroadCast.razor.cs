@@ -126,13 +126,24 @@ namespace WicsPlatform.Client.Pages
         #endregion
 
         #region Channel Management
-        protected async Task CreateChannel()
+        protected async Task OpenCreateChannelDialog()
         {
-            var createdChannel = await BroadcastDataService.CreateChannelAsync(newChannelName);
-            if (createdChannel != null)
+            var result = await DialogService.OpenAsync<AddChannelDialog>(
+                "새 채널 만들기",
+                null,
+                new DialogOptions
+                {
+                    Width = "500px",
+                    Height = "auto",
+                    Resizable = false,
+                    Draggable = true
+                });
+
+            if (result is bool success && success)
             {
-                newChannelName = "";
+                // 채널 목록 다시 로드
                 await LoadInitialData();
+                NotifySuccess("채널 생성", "새 채널이 성공적으로 생성되었습니다.");
             }
         }
 
