@@ -1,4 +1,4 @@
-@inherits LayoutComponentBase
+﻿@inherits LayoutComponentBase
 @inject CookieThemeService CookieThemeService
 <RadzenComponents />
 
@@ -45,39 +45,47 @@
         </RadzenStack>
         <div class="icon-menu-container">
             <RadzenStack Gap="0.25rem" Style="padding: 0.5rem;">
-                <NavLink href="" class="icon-menu-item" Match="NavLinkMatch.All">
+                <NavLink href="" class="icon-menu-item" Match="NavLinkMatch.All" data-tooltip="홈">
                     <RadzenIcon Icon="home" />
                     @if (sidebarExpanded)
                     {
                         <span class="menu-text">홈</span>
                     }
                 </NavLink>
-                <NavLink href="manage-speaker" class="icon-menu-item">
+                <NavLink href="manage-speaker" class="icon-menu-item" data-tooltip="스피커 관리">
                     <RadzenIcon Icon="speaker" />
                     @if (sidebarExpanded)
                     {
                         <span class="menu-text">스피커 관리</span>
                     }
                 </NavLink>
-                <NavLink href="manage-media" class="icon-menu-item">
+                <NavLink href="manage-media" class="icon-menu-item" data-tooltip="미디어 파일 관리">
                     <RadzenIcon Icon="perm_media" />
                     @if (sidebarExpanded)
                     {
                         <span class="menu-text">미디어 파일 관리</span>
                     }
                 </NavLink>
-                <NavLink href="manage-tts" class="icon-menu-item">
+                <NavLink href="manage-tts" class="icon-menu-item" data-tooltip="TTS 관리">
                     <RadzenIcon Icon="record_voice_over" />
                     @if (sidebarExpanded)
                     {
                         <span class="menu-text">TTS 관리</span>
                     }
                 </NavLink>
-                <NavLink href="manage-broad-cast" class="icon-menu-item">
+                <NavLink href="manage-broad-cast" class="icon-menu-item" data-tooltip="방송 관리">
                     <RadzenIcon Icon="settings_input_antenna" />
                     @if (sidebarExpanded)
                     {
                         <span class="menu-text">방송 관리</span>
+                    }
+                </NavLink>
+                <!-- 예약 방송 메뉴 추가 -->
+                <NavLink href="manage-schedule" class="icon-menu-item" data-tooltip="예약 방송">
+                    <RadzenIcon Icon="schedule" />
+                    @if (sidebarExpanded)
+                    {
+                        <span class="menu-text">예약 방송</span>
                     }
                 </NavLink>
             </RadzenStack>

@@ -1,0 +1,594 @@
+﻿@page "/manage-schedule"
+@attribute [Authorize]
+@using WicsPlatform.Server.Models.wics
+
+<PageTitle>예약 방송</PageTitle>
+
+<RadzenStack>
+    <!-- 페이지 헤더 -->
+    <RadzenRow AlignItems="AlignItems.Center" Class="page-header mb-3">
+        <RadzenColumn Size="12">
+            <RadzenText Text="예약 방송" TextStyle="TextStyle.H5" TagName="TagName.H1" class="page-title" />
+            <RadzenText Text="방송 스케줄을 관리하고 예약된 방송을 확인합니다" TextStyle="TextStyle.Caption" class="page-subtitle" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow Gap="0.75rem">
+        <!-- 좌측: 스케줄 리스트 -->
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard class="schedule-list-panel">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenRow AlignItems="AlignItems.Center" class="section-header">
+                        <RadzenColumn Size="8">
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="schedule" class="section-icon" />
+                                <RadzenText TextStyle="TextStyle.Body1" TagName="TagName.H3" class="section-title">
+                                    스케줄 목록
+                                </RadzenText>
+                            </RadzenStack>
+                        </RadzenColumn>
+                        <RadzenColumn Size="4" class="text-end">
+                            <RadzenButton Icon="add" Text="추가"
+                                          ButtonStyle="ButtonStyle.Primary"
+                                          Size="ButtonSize.Small"
+                                          class="compact-button"
+                                          Disabled="true"
+                                          Title="추후 업데이트 예정" />
+                        </RadzenColumn>
+                    </RadzenRow>
+
+                    @if (isLoadingSchedules)
+                    {
+                        <div class="loading-container">
+                            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="slim-progress" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="loading-text">스케줄을 불러오는 중...</RadzenText>
+                        </div>
+                    }
+                    else if (!schedules.Any())
+                    {
+                        <div class="empty-state">
+                            <RadzenIcon Icon="event_busy" class="empty-icon" />
+                            <RadzenText Text="등록된 스케줄이 없습니다" TextStyle="TextStyle.Caption" class="empty-text" />
+                            <RadzenText Text="새로운 스케줄을 추가하여 방송을 예약하세요" TextStyle="TextStyle.Caption" class="empty-subtext" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="schedule-list-container">
+                            @foreach (var schedule in schedules)
+                            {
+                                <RadzenCard class="@($"schedule-item {(selectedSchedule?.Id == schedule.Id ? "selected" : "")}")"
+                                            @onclick="@(() => SelectSchedule(schedule))">
+                                    <RadzenStack Gap="0.25rem">
+                                        <RadzenRow AlignItems="AlignItems.Center">
+                                            <RadzenColumn Size="8">
+                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                                    <RadzenIcon Icon="event" class="schedule-icon" />
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="schedule-name">
+                                                        @schedule.Name
+                                                    </RadzenText>
+                                                </RadzenStack>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="4" class="text-end">
+                                                <RadzenBadge BadgeStyle="@GetScheduleBadgeStyle(schedule.DeleteYn)"
+                                                             IsPill="true"
+                                                             Text="@GetScheduleStateText(schedule.DeleteYn)"
+                                                             class="state-badge" />
+                                            </RadzenColumn>
+                                        </RadzenRow>
+
+                                        <!-- 시간 정보 -->
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem" class="schedule-time">
+                                            <RadzenIcon Icon="access_time" class="time-icon" />
+                                            <RadzenText TextStyle="TextStyle.Caption" class="time-text">
+                                                @schedule.StartTime.ToString("HH:mm")
+                                            </RadzenText>
+                                            @if (!string.IsNullOrEmpty(GetWeekdaysDisplay(schedule)))
+                                            {
+                                                <RadzenText TextStyle="TextStyle.Caption" class="weekdays-text">
+                                                    @GetWeekdaysDisplay(schedule)
+                                                </RadzenText>
+                                            }
+                                        </RadzenStack>
+
+                                        <!-- 생성일 -->
+                                        <RadzenText TextStyle="TextStyle.Caption" class="created-date">
+                                            등록: @schedule.CreatedAt.ToString("yyyy.MM.dd")
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            }
+                        </div>
+                    }
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <!-- 우측: 선택된 스케줄 상세 정보 -->
+        <RadzenColumn Size="12" SizeMD="8">
+            <RadzenCard class="schedule-detail-panel">
+                @if (selectedSchedule == null)
+                {
+                    <div class="empty-detail-state">
+                        <RadzenIcon Icon="info" class="empty-detail-icon" />
+                        <RadzenText TextStyle="TextStyle.Body2" class="empty-detail-text">
+                            스케줄을 선택하면 상세 정보가 표시됩니다
+                        </RadzenText>
+                    </div>
+                }
+                else
+                {
+                    <RadzenStack Gap="0.75rem">
+                        <!-- 헤더 영역 -->
+                        <RadzenRow AlignItems="AlignItems.Center" class="detail-header">
+                            <RadzenColumn Size="8">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                    <RadzenIcon Icon="event_note" class="section-icon" />
+                                    <RadzenText TextStyle="TextStyle.Body1" class="section-title">
+                                        스케줄 상세 정보
+                                    </RadzenText>
+                                </RadzenStack>
+                            </RadzenColumn>
+                            <RadzenColumn Size="4" class="text-end">
+                                <RadzenButton Icon="edit" Text="편집"
+                                              ButtonStyle="ButtonStyle.Light"
+                                              Size="ButtonSize.Small"
+                                              Disabled="true"
+                                              Title="추후 업데이트 예정"
+                                              class="edit-button" />
+                            </RadzenColumn>
+                        </RadzenRow>
+
+                        <!-- 기본 정보 섹션 -->
+                        <RadzenCard class="info-section">
+                            <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
+                                <RadzenIcon Icon="info" class="info-section-icon" />
+                                기본 정보
+                            </RadzenText>
+                            <RadzenRow Gap="0.5rem" class="mt-2">
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">스케줄 이름</RadzenText>
+                                        <RadzenTextBox Value="@selectedSchedule.Name" Disabled="true" class="info-input" />
+                                    </div>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">상태</RadzenText>
+                                        <RadzenTextBox Value="@GetScheduleStateText(selectedSchedule.DeleteYn)"
+                                                       Disabled="true"
+                                                       class="info-input" />
+                                    </div>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">스케줄 설명</RadzenText>
+                                        <RadzenTextArea Value="@(selectedSchedule.Description ?? "설명이 없습니다")"
+                                                        Disabled="true"
+                                                        Rows="2"
+                                                        class="info-textarea" />
+                                    </div>
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenCard>
+
+                        <!-- 오디오 설정 섹션 -->
+                        <RadzenCard class="info-section">
+                            <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
+                                <RadzenIcon Icon="tune" class="info-section-icon" />
+                                오디오 설정
+                            </RadzenText>
+                            <RadzenRow Gap="0.5rem" class="mt-2">
+                                <RadzenColumn Size="6" SizeMD="3">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">샘플레이트</RadzenText>
+                                        <RadzenTextBox Value="@($"{selectedSchedule.SampleRate} Hz")"
+                                                       Disabled="true"
+                                                       class="info-input" />
+                                    </div>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6" SizeMD="3">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">채널 수</RadzenText>
+                                        <RadzenTextBox Value="@($"{selectedSchedule.ChannelCount}ch")"
+                                                       Disabled="true"
+                                                       class="info-input" />
+                                    </div>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">볼륨</RadzenText>
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenSlider Value="@((double)selectedSchedule.Volume * 100)"
+                                                          Min="0" Max="100" Step="1"
+                                                          Disabled="true"
+                                                          class="volume-slider" />
+                                            <RadzenText TextStyle="TextStyle.Caption" class="volume-text">
+                                                @($"{selectedSchedule.Volume * 100:0}%")
+                                            </RadzenText>
+                                        </RadzenStack>
+                                    </div>
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenCard>
+
+                        <!-- 예약 시간 섹션 -->
+                        <RadzenCard class="info-section">
+                            <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
+                                <RadzenIcon Icon="schedule" class="info-section-icon" />
+                                예약 시간 설정
+                            </RadzenText>
+                            <RadzenRow Gap="0.5rem" class="mt-2">
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">예약 시간</RadzenText>
+                                        <RadzenTextBox Value="@selectedSchedule.StartTime.ToString("HH:mm")"
+                                                       Disabled="true"
+                                                       class="info-input" />
+                                    </div>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">반복 횟수</RadzenText>
+                                        <RadzenTextBox Value="@GetRepeatText(selectedSchedule.RepeatCount)"
+                                                       Disabled="true"
+                                                       class="info-input" />
+                                    </div>
+                                </RadzenColumn>
+                            </RadzenRow>
+
+                            <!-- 요일 선택 -->
+                            <div class="weekday-section mt-3">
+                                <RadzenText TextStyle="TextStyle.Caption" class="info-label mb-2">반복 요일</RadzenText>
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                    @foreach (var day in weekdays)
+                                    {
+                                        <div class="@($"weekday-item {(IsWeekdaySelected(selectedSchedule, day.Value) ? "selected" : "")}")">
+                                            @day.Key
+                                        </div>
+                                    }
+                                </RadzenStack>
+                            </div>
+                        </RadzenCard>
+
+                        <!-- 추가 정보 섹션 -->
+                        <RadzenCard class="info-section">
+                            <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
+                                <RadzenIcon Icon="more_horiz" class="info-section-icon" />
+                                추가 정보
+                            </RadzenText>
+                            <RadzenRow Gap="0.5rem" class="mt-2">
+                                <RadzenColumn Size="6">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">생성일시</RadzenText>
+                                        <RadzenTextBox Value="@selectedSchedule.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")"
+                                                       Disabled="true"
+                                                       class="info-input" />
+                                    </div>
+                                </RadzenColumn>
+                                <RadzenColumn Size="6">
+                                    <div class="info-item">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">최종 수정일시</RadzenText>
+                                        <RadzenTextBox Value="@selectedSchedule.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")"
+                                                       Disabled="true"
+                                                       class="info-input" />
+                                    </div>
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenCard>
+                    </RadzenStack>
+                }
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+</RadzenStack>
+
+<style>
+    /* 기존 스타일 유지 */
+    :root {
+        --professional-primary: #2c3e50;
+        --professional-secondary: #34495e;
+        --professional-accent: #3498db;
+        --professional-success: #27ae60;
+        --professional-danger: #e74c3c;
+        --professional-warning: #f39c12;
+        --professional-info: #9b59b6;
+        --professional-border: #dde2e6;
+        --professional-hover: #ecf0f1;
+        --professional-selected: #e8f4fd;
+        --professional-background: #fafbfc;
+    }
+
+    .page-header {
+        border-bottom: 1px solid var(--professional-border);
+        padding-bottom: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .page-title {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+        letter-spacing: -0.5px;
+    }
+
+    .page-subtitle {
+        font-size: 0.75rem !important;
+        color: #6c757d !important;
+        margin-top: 0.25rem !important;
+        font-weight: 400;
+    }
+
+    .section-header {
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #f0f0f0;
+        margin-bottom: 0.5rem;
+    }
+
+    .section-icon {
+        font-size: 1rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    .section-title {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+    }
+
+    .schedule-list-panel, .schedule-detail-panel {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid var(--professional-border) !important;
+        border-radius: 6px !important;
+        background: white !important;
+        min-height: calc(100vh - 180px);
+    }
+
+    .schedule-list-container {
+        max-height: calc(100vh - 280px);
+        overflow-y: auto;
+        padding-right: 0.25rem;
+    }
+
+    .schedule-item {
+        padding: 0.625rem !important;
+        margin-bottom: 0.5rem;
+        border: 1px solid #e1e4e8 !important;
+        border-radius: 4px !important;
+        transition: all 0.2s ease !important;
+        background: white !important;
+        cursor: pointer;
+    }
+
+        .schedule-item:hover {
+            background: var(--professional-hover) !important;
+            border-color: var(--professional-accent) !important;
+            transform: translateX(2px);
+        }
+
+        .schedule-item.selected {
+            background: var(--professional-selected) !important;
+            border-color: var(--professional-accent) !important;
+            border-width: 2px !important;
+        }
+
+    .schedule-icon {
+        font-size: 0.875rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    .schedule-name {
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+    }
+
+    .schedule-time {
+        margin-top: 0.25rem;
+    }
+
+    .time-icon {
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
+    }
+
+    .time-text {
+        font-size: 0.7rem !important;
+        color: var(--professional-secondary) !important;
+        font-weight: 500 !important;
+    }
+
+    .weekdays-text {
+        font-size: 0.65rem !important;
+        color: var(--professional-info) !important;
+        padding: 2px 6px;
+        background: rgba(155, 89, 182, 0.1);
+        border-radius: 3px;
+    }
+
+    .created-date {
+        font-size: 0.65rem !important;
+        color: #6c757d !important;
+        margin-left: 1.25rem;
+    }
+
+    .state-badge {
+        font-size: 0.6rem !important;
+        padding: 2px 6px !important;
+    }
+
+    .detail-header {
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #e1e4e8;
+        margin-bottom: 0.75rem;
+    }
+
+    .info-section {
+        padding: 0.875rem !important;
+        background: var(--professional-background) !important;
+        border: 1px solid #e1e4e8 !important;
+    }
+
+    .info-section-title {
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin-bottom: 0.75rem !important;
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .info-section-icon {
+        font-size: 0.875rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    .info-item {
+        margin-bottom: 0.5rem;
+    }
+
+    .info-label {
+        font-size: 0.7rem !important;
+        font-weight: 500 !important;
+        color: #6c757d !important;
+        margin-bottom: 0.25rem !important;
+        display: block;
+    }
+
+    .info-input {
+        font-size: 0.75rem !important;
+        height: 32px !important;
+        background: white !important;
+        border-color: #d0d7de !important;
+    }
+
+        .info-input input {
+            font-size: 0.75rem !important;
+            padding: 0.35rem 0.5rem !important;
+        }
+
+    .info-textarea {
+        font-size: 0.75rem !important;
+        background: white !important;
+        border-color: #d0d7de !important;
+    }
+
+        .info-textarea textarea {
+            font-size: 0.75rem !important;
+            padding: 0.5rem !important;
+        }
+
+    .volume-slider {
+        flex: 1;
+    }
+
+    .volume-text {
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        min-width: 40px;
+        text-align: right;
+    }
+
+    .weekday-section {
+        padding-top: 0.5rem;
+        border-top: 1px solid #e1e4e8;
+    }
+
+    .weekday-item {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #d0d7de;
+        border-radius: 50%;
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: #6c757d;
+        background: white;
+        cursor: not-allowed;
+        transition: all 0.2s ease;
+    }
+
+        .weekday-item.selected {
+            background: var(--professional-accent);
+            color: white;
+            border-color: var(--professional-accent);
+        }
+
+    .empty-state, .empty-detail-state {
+        text-align: center;
+        padding: 3rem 0;
+    }
+
+    .empty-icon, .empty-detail-icon {
+        font-size: 2.5rem !important;
+        color: #d0d7de !important;
+        margin-bottom: 0.75rem;
+    }
+
+    .empty-text, .empty-detail-text {
+        font-size: 0.8rem !important;
+        color: var(--professional-secondary) !important;
+        margin: 0.25rem 0 !important;
+    }
+
+    .empty-subtext {
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
+        margin: 0 !important;
+    }
+
+    .compact-button {
+        font-size: 0.75rem !important;
+        padding: 0.25rem 0.5rem !important;
+        height: 28px !important;
+        font-weight: 500 !important;
+    }
+
+    .edit-button {
+        font-size: 0.7rem !important;
+        padding: 0.25rem 0.5rem !important;
+        height: 26px !important;
+    }
+
+    .loading-container {
+        text-align: center;
+        padding: 2rem 0;
+    }
+
+    .slim-progress {
+        width: 100px !important;
+        height: 3px !important;
+        margin: 0 auto !important;
+    }
+
+    .loading-text {
+        margin-top: 0.5rem !important;
+        font-size: 0.7rem !important;
+        color: #6c757d !important;
+    }
+
+    .schedule-list-container::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .schedule-list-container::-webkit-scrollbar-track {
+        background: #f0f0f0;
+        border-radius: 3px;
+    }
+
+    .schedule-list-container::-webkit-scrollbar-thumb {
+        background: #c0c0c0;
+        border-radius: 3px;
+    }
+
+        .schedule-list-container::-webkit-scrollbar-thumb:hover {
+            background: #a0a0a0;
+        }
+</style>
