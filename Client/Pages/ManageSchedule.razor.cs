@@ -1,180 +1,193 @@
 ﻿using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Logging;
 using Radzen;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using WicsPlatform.Client.Dialogs; // 추가
 using WicsPlatform.Server.Models.wics;
 
-namespace WicsPlatform.Client.Pages
+namespace WicsPlatform.Client.Pages;
+
+public partial class ManageSchedule
 {
-    public partial class ManageSchedule
+    [Inject] protected wicsService WicsService { get; set; }
+    [Inject] protected NotificationService NotificationService { get; set; }
+    [Inject] protected DialogService DialogService { get; set; }
+    [Inject] protected ILogger<ManageSchedule> Logger { get; set; }
+
+    // 스케줄 관련 필드
+    private IEnumerable<Schedule> schedules = new List<Schedule>();
+    private Schedule selectedSchedule = null;
+    private bool isLoadingSchedules = false;
+
+    // 요일 데이터
+    private readonly Dictionary<string, string> weekdays = new Dictionary<string, string>
     {
-        [Inject] protected wicsService WicsService { get; set; }
-        [Inject] protected NotificationService NotificationService { get; set; }
-        [Inject] protected DialogService DialogService { get; set; }
-        [Inject] protected ILogger<ManageSchedule> Logger { get; set; }
+        { "월", "monday" },
+        { "화", "tuesday" },
+        { "수", "wednesday" },
+        { "목", "thursday" },
+        { "금", "friday" },
+        { "토", "saturday" },
+        { "일", "sunday" }
+    };
 
-        // 스케줄 관련 필드
-        private IEnumerable<Schedule> schedules = new List<Schedule>();
-        private Schedule selectedSchedule = null;
-        private bool isLoadingSchedules = false;
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSchedules();
+    }
 
-        // 요일 데이터
-        private readonly Dictionary<string, string> weekdays = new Dictionary<string, string>
+    private async Task LoadSchedules()
+    {
+        try
         {
-            { "월", "monday" },
-            { "화", "tuesday" },
-            { "수", "wednesday" },
-            { "목", "thursday" },
-            { "금", "friday" },
-            { "토", "saturday" },
-            { "일", "sunday" }
-        };
+            isLoadingSchedules = true;
+            StateHasChanged();
 
-        protected override async Task OnInitializedAsync()
-        {
-            await LoadSchedules();
+            var query = new Radzen.Query
+            {
+                Filter = "DeleteYn eq 'N' or DeleteYn eq null",
+                OrderBy = "CreatedAt desc"
+            };
+
+            var result = await WicsService.GetSchedules(query);
+            schedules = result.Value.AsODataEnumerable();
+
+            Logger.LogInformation($"Loaded {schedules.Count()} schedules");
         }
-
-        private async Task LoadSchedules()
+        catch (Exception ex)
         {
-            try
+            Logger.LogError(ex, "Failed to load schedules");
+            NotificationService.Notify(new NotificationMessage
             {
-                isLoadingSchedules = true;
-                StateHasChanged();
-
-                var query = new Radzen.Query
-                {
-                    Filter = "DeleteYn eq 'N' or DeleteYn eq null",
-                    OrderBy = "CreatedAt desc"
-                };
-
-                var result = await WicsService.GetSchedules(query);
-                schedules = result.Value.AsODataEnumerable();
-
-                Logger.LogInformation($"Loaded {schedules.Count()} schedules");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Failed to load schedules");
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "오류",
-                    Detail = "스케줄 목록을 불러오는 중 오류가 발생했습니다.",
-                    Duration = 4000
-                });
-            }
-            finally
-            {
-                isLoadingSchedules = false;
-                StateHasChanged();
-            }
+                Severity = NotificationSeverity.Error,
+                Summary = "오류",
+                Detail = "스케줄 목록을 불러오는 중 오류가 발생했습니다.",
+                Duration = 4000
+            });
         }
-
-        private void SelectSchedule(Schedule schedule)
+        finally
         {
-            selectedSchedule = schedule;
-            Logger.LogInformation($"Selected schedule: {schedule.Name} (ID: {schedule.Id})");
+            isLoadingSchedules = false;
             StateHasChanged();
         }
+    }
 
-        // 스케줄 상태 배지 스타일 (DeleteYn 기반)
-        private BadgeStyle GetScheduleBadgeStyle(string deleteYn) =>
-            (deleteYn == "Y") ? BadgeStyle.Danger : BadgeStyle.Success;
+    private void SelectSchedule(Schedule schedule)
+    {
+        selectedSchedule = schedule;
+        Logger.LogInformation($"Selected schedule: {schedule.Name} (ID: {schedule.Id})");
+        StateHasChanged();
+    }
 
-        // 스케줄 상태 텍스트
-        private string GetScheduleStateText(string deleteYn) =>
-            (deleteYn == "Y") ? "삭제됨" : "활성";
+    // 스케줄 상태 배지 스타일 (DeleteYn 기반)
+    private BadgeStyle GetScheduleBadgeStyle(string deleteYn) =>
+        (deleteYn == "Y") ? BadgeStyle.Danger : BadgeStyle.Success;
 
-        // 요일 표시 문자열 생성
-        private string GetWeekdaysDisplay(Schedule schedule)
+    // 스케줄 상태 텍스트
+    private string GetScheduleStateText(string deleteYn) =>
+        (deleteYn == "Y") ? "삭제됨" : "활성";
+
+    // 요일 표시 문자열 생성
+    private string GetWeekdaysDisplay(Schedule schedule)
+    {
+        if (schedule == null) return "";
+
+        var days = new List<string>();
+
+        if (schedule.Monday == "Y") days.Add("월");
+        if (schedule.Tuesday == "Y") days.Add("화");
+        if (schedule.Wednesday == "Y") days.Add("수");
+        if (schedule.Thursday == "Y") days.Add("목");
+        if (schedule.Friday == "Y") days.Add("금");
+        if (schedule.Saturday == "Y") days.Add("토");
+        if (schedule.Sunday == "Y") days.Add("일");
+
+        if (!days.Any()) return "";
+        if (days.Count == 7) return "매일";
+        if (days.Count == 5 && !days.Contains("토") && !days.Contains("일")) return "평일";
+        if (days.Count == 2 && days.Contains("토") && days.Contains("일")) return "주말";
+
+        return string.Join(",", days);
+    }
+
+    // 특정 요일이 선택되었는지 확인
+    private bool IsWeekdaySelected(Schedule schedule, string dayCode)
+    {
+        if (schedule == null) return false;
+
+        return dayCode switch
         {
-            if (schedule == null) return "";
+            "monday" => schedule.Monday == "Y",
+            "tuesday" => schedule.Tuesday == "Y",
+            "wednesday" => schedule.Wednesday == "Y",
+            "thursday" => schedule.Thursday == "Y",
+            "friday" => schedule.Friday == "Y",
+            "saturday" => schedule.Saturday == "Y",
+            "sunday" => schedule.Sunday == "Y",
+            _ => false
+        };
+    }
 
-            var days = new List<string>();
+    // 반복 횟수 텍스트
+    private string GetRepeatText(byte repeatCount)
+    {
+        if (repeatCount == 0)
+            return "무한 반복";
+        if (repeatCount == 255)  // byte의 최대값
+            return "무한 반복";
 
-            if (schedule.Monday == "Y") days.Add("월");
-            if (schedule.Tuesday == "Y") days.Add("화");
-            if (schedule.Wednesday == "Y") days.Add("수");
-            if (schedule.Thursday == "Y") days.Add("목");
-            if (schedule.Friday == "Y") days.Add("금");
-            if (schedule.Saturday == "Y") days.Add("토");
-            if (schedule.Sunday == "Y") days.Add("일");
+        return $"{repeatCount}회 반복";
+    }
 
-            if (!days.Any()) return "";
-            if (days.Count == 7) return "매일";
-            if (days.Count == 5 && !days.Contains("토") && !days.Contains("일")) return "평일";
-            if (days.Count == 2 && days.Contains("토") && days.Contains("일")) return "주말";
-
-            return string.Join(",", days);
-        }
-
-        // 특정 요일이 선택되었는지 확인
-        private bool IsWeekdaySelected(Schedule schedule, string dayCode)
-        {
-            if (schedule == null) return false;
-
-            return dayCode switch
+    // 스케줄 추가 - 이제 실제 구현
+    private async Task OpenAddScheduleDialog()
+    {
+        var result = await DialogService.OpenAsync<AddScheduleDialog>(
+            "새 예약 방송 만들기",
+            null,
+            new DialogOptions
             {
-                "monday" => schedule.Monday == "Y",
-                "tuesday" => schedule.Tuesday == "Y",
-                "wednesday" => schedule.Wednesday == "Y",
-                "thursday" => schedule.Thursday == "Y",
-                "friday" => schedule.Friday == "Y",
-                "saturday" => schedule.Saturday == "Y",
-                "sunday" => schedule.Sunday == "Y",
-                _ => false
-            };
-        }
+                Width = "700px",
+                Height = "auto",
+                Resizable = false,
+                Draggable = true,
+                CloseDialogOnOverlayClick = false
+            });
 
-        // 반복 횟수 텍스트
-        private string GetRepeatText(byte repeatCount)
+        if (result is bool success && success)
         {
-            if (repeatCount == 0)
-                return "반복 없음";
-            if (repeatCount == 255)  // byte의 최대값을 무한 반복으로 사용
-                return "무한 반복";
+            // 스케줄 목록 다시 로드
+            await LoadSchedules();
 
-            return $"{repeatCount}회 반복";
-        }
-
-        // 스케줄 추가 (추후 구현)
-        private async Task OpenAddScheduleDialog()
-        {
             NotificationService.Notify(new NotificationMessage
             {
-                Severity = NotificationSeverity.Info,
-                Summary = "준비 중",
-                Detail = "스케줄 추가 기능은 추후 업데이트 예정입니다.",
-                Duration = 3000
+                Severity = NotificationSeverity.Success,
+                Summary = "생성 완료",
+                Detail = "새 예약 방송 스케줄이 생성되었습니다.",
+                Duration = 4000
             });
         }
+    }
 
-        // 스케줄 편집 (추후 구현)
-        private async Task OpenEditScheduleDialog(Schedule schedule)
+    // 스케줄 편집 (추후 구현)
+    private async Task OpenEditScheduleDialog(Schedule schedule)
+    {
+        NotificationService.Notify(new NotificationMessage
         {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Info,
-                Summary = "준비 중",
-                Detail = "스케줄 편집 기능은 추후 업데이트 예정입니다.",
-                Duration = 3000
-            });
-        }
+            Severity = NotificationSeverity.Info,
+            Summary = "준비 중",
+            Detail = "스케줄 편집 기능은 추후 업데이트 예정입니다.",
+            Duration = 3000
+        });
+    }
 
-        // 스케줄 삭제 (추후 구현)
-        private async Task DeleteSchedule(Schedule schedule)
+    // 스케줄 삭제 (추후 구현)
+    private async Task DeleteSchedule(Schedule schedule)
+    {
+        NotificationService.Notify(new NotificationMessage
         {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Info,
-                Summary = "준비 중",
-                Detail = "스케줄 삭제 기능은 추후 업데이트 예정입니다.",
-                Duration = 3000
-            });
-        }
+            Severity = NotificationSeverity.Info,
+            Summary = "준비 중",
+            Detail = "스케줄 삭제 기능은 추후 업데이트 예정입니다.",
+            Duration = 3000
+        });
     }
 }

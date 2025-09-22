@@ -1,0 +1,416 @@
+﻿@attribute [Authorize]
+@using System.Linq
+
+<div class="schedule-dialog">
+    <!-- 헤더 섹션 -->
+    <div class="dialog-header-section">
+        <div class="header-icon-wrapper">
+            <div class="icon-background">
+                <RadzenIcon Icon="event" class="header-icon" />
+            </div>
+        </div>
+        <div class="header-content">
+            <h2 class="header-title">새 예약 방송 만들기</h2>
+            <p class="header-subtitle">자동 방송 스케줄을 생성하고 설정합니다</p>
+        </div>
+    </div>
+
+    <!-- 폼 섹션 -->
+    <RadzenTemplateForm TItem="ScheduleFormModel" Data="@model" Submit="@FormSubmit">
+        <!-- 에러 알림 -->
+        <RadzenAlert Shade="Shade.Lighter" Variant="Variant.Flat" Size="AlertSize.Small"
+                     AlertStyle="AlertStyle.Danger" Visible="@errorVisible" class="custom-alert">
+            <div class="alert-content">
+                <RadzenIcon Icon="error_outline" class="alert-icon" />
+                <span class="alert-text">@error</span>
+            </div>
+        </RadzenAlert>
+
+        <!-- 메인 폼 컨테이너 -->
+        <div class="form-container">
+            <!-- 기본 정보 섹션 -->
+            <div class="section-group">
+                <div class="section-header">
+                    <div class="section-title-wrapper">
+                        <RadzenIcon Icon="info" class="section-icon" />
+                        <h3 class="section-title">기본 정보</h3>
+                    </div>
+                    <div class="section-line"></div>
+                </div>
+
+                <!-- 스케줄명 필드 -->
+                <div class="form-field">
+                    <label class="field-label">
+                        <span class="label-text">스케줄명</span>
+                        <span class="required-mark">*</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <div class="input-icon-container">
+                            <RadzenIcon Icon="label" class="input-icon" />
+                        </div>
+                        <RadzenTextBox class="custom-input"
+                                       Placeholder="예: 오전 정시 안내방송"
+                                       @bind-Value="@(model.Name)"
+                                       Name="Name" />
+                        <RadzenRequiredValidator Component="Name"
+                                                 Text="스케줄명은 필수 입력 항목입니다"
+                                                 class="custom-validator" />
+                    </div>
+                    <span class="field-hint">스케줄을 쉽게 식별할 수 있는 이름을 입력하세요</span>
+                </div>
+
+                <!-- 설명 필드 -->
+                <div class="form-field">
+                    <label class="field-label">
+                        <span class="label-text">설명</span>
+                        <span class="optional-mark">선택</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <div class="input-icon-container textarea-icon">
+                            <RadzenIcon Icon="description" class="input-icon" />
+                        </div>
+                        <RadzenTextArea Rows="3"
+                                        class="custom-textarea"
+                                        Placeholder="스케줄의 용도나 특징을 간단히 설명해주세요"
+                                        @bind-Value="@(model.Description)"
+                                        Name="Description" />
+                    </div>
+                    <span class="field-hint">예약 방송의 목적이나 내용을 간략히 입력할 수 있습니다</span>
+                </div>
+            </div>
+
+            <!-- 방송 시간 설정 섹션 -->
+            <div class="section-group">
+                <div class="section-header">
+                    <div class="section-title-wrapper">
+                        <RadzenIcon Icon="schedule" class="section-icon" />
+                        <h3 class="section-title">방송 시간 설정</h3>
+                    </div>
+                    <div class="section-line"></div>
+                </div>
+
+                <div class="settings-grid">
+                    <!-- 시작 시간 필드 -->
+                    <div class="form-field">
+                        <label class="field-label">
+                            <span class="label-text">시작 시간</span>
+                            <span class="required-mark">*</span>
+                        </label>
+                        <div class="input-wrapper">
+                            <div class="input-icon-container">
+                                <RadzenIcon Icon="access_time" class="input-icon" />
+                            </div>
+                            <RadzenDatePicker class="custom-input"
+                                              @bind-Value="@(model.StartTime)"
+                                              ShowTime="true"
+                                              TimeOnly="true"
+                                              DateFormat="HH:mm"
+                                              Name="StartTime" />
+                            <RadzenRequiredValidator Component="StartTime"
+                                                     Text="시작 시간은 필수 입력 항목입니다"
+                                                     class="custom-validator" />
+                        </div>
+                    </div>
+
+                    <!-- 반복 횟수 필드 -->
+                    <div class="form-field">
+                        <label class="field-label">
+                            <span class="label-text">반복 횟수</span>
+                            <span class="info-tooltip" title="0: 무한 반복, 1~255: 지정 횟수만큼 반복">
+                                <RadzenIcon Icon="help_outline" class="help-icon" />
+                            </span>
+                        </label>
+                        <div class="input-wrapper">
+                            <div class="input-icon-container">
+                                <RadzenIcon Icon="repeat" class="input-icon" />
+                            </div>
+                            <RadzenNumeric class="custom-numeric"
+                                           @bind-Value="@(model.RepeatCount)"
+                                           Min="0"
+                                           Max="255"
+                                           ShowUpDown="true"
+                                           Format="0"
+                                           Name="RepeatCount" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 요일 선택 섹션 -->
+                <div class="weekday-section">
+                    <label class="field-label mb-3">
+                        <span class="label-text">반복 요일</span>
+                        <span class="required-mark">*</span>
+                        <span class="field-hint ml-2">최소 1개 이상 선택</span>
+                    </label>
+
+                    <div class="weekday-selector">
+                        @foreach (var day in weekdays)
+                        {
+                            <div class="weekday-item @(GetWeekdayValue(day.Key) ? "selected" : "")"
+                                 @onclick="@(() => ToggleWeekday(day.Key))">
+                                <div class="weekday-content">
+                                    <span class="weekday-label">@day.Value</span>
+                                    <span class="weekday-name">@GetWeekdayFullName(day.Key)</span>
+                                </div>
+                                @if (GetWeekdayValue(day.Key))
+                                {
+                                    <RadzenIcon Icon="check_circle" class="weekday-check" />
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <!-- 빠른 선택 버튼 -->
+                    <div class="quick-select-buttons">
+                        <RadzenButton Text="매일"
+                                      Icon="select_all"
+                                      ButtonStyle="ButtonStyle.Light"
+                                      Size="ButtonSize.Small"
+                                      class="quick-button"
+                                      Click="@SelectAllDays" />
+                        <RadzenButton Text="평일"
+                                      Icon="work"
+                                      ButtonStyle="ButtonStyle.Light"
+                                      Size="ButtonSize.Small"
+                                      class="quick-button"
+                                      Click="@SelectWeekdays" />
+                        <RadzenButton Text="주말"
+                                      Icon="weekend"
+                                      ButtonStyle="ButtonStyle.Light"
+                                      Size="ButtonSize.Small"
+                                      class="quick-button"
+                                      Click="@SelectWeekend" />
+                        <RadzenButton Text="초기화"
+                                      Icon="clear"
+                                      ButtonStyle="ButtonStyle.Light"
+                                      Size="ButtonSize.Small"
+                                      class="quick-button"
+                                      Click="@ClearWeekdays" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 오디오 설정 섹션 -->
+            <div class="section-group">
+                <div class="section-header">
+                    <div class="section-title-wrapper">
+                        <RadzenIcon Icon="tune" class="section-icon" />
+                        <h3 class="section-title">오디오 설정</h3>
+                    </div>
+                    <div class="section-line"></div>
+                </div>
+
+                <div class="settings-grid">
+                    <!-- 샘플레이트 필드 -->
+                    <div class="form-field">
+                        <label class="field-label">
+                            <span class="label-text">샘플레이트</span>
+                        </label>
+                        <div class="input-wrapper">
+                            <div class="input-icon-container">
+                                <RadzenIcon Icon="graphic_eq" class="input-icon" />
+                            </div>
+                            <RadzenDropDown class="custom-dropdown"
+                                            @bind-Value="@(model.SampleRate)"
+                                            Data="@sampleRates"
+                                            TextProperty="Text"
+                                            ValueProperty="Value"
+                                            Name="SampleRate" />
+                        </div>
+                    </div>
+
+                    <!-- 채널 수 필드 -->
+                    <div class="form-field">
+                        <label class="field-label">
+                            <span class="label-text">오디오 채널</span>
+                        </label>
+                        <div class="input-wrapper">
+                            <div class="input-icon-container">
+                                <RadzenIcon Icon="surround_sound" class="input-icon" />
+                            </div>
+                            <RadzenDropDown class="custom-dropdown"
+                                            @bind-Value="@(model.ChannelCount)"
+                                            Data="@audioChannels"
+                                            TextProperty="Text"
+                                            ValueProperty="Value"
+                                            Name="ChannelCount" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 볼륨 설정 -->
+                <div class="form-field">
+                    <label class="field-label">
+                        <span class="label-text">방송 볼륨</span>
+                        <span class="volume-value">@((model.Volume * 100).ToString("0"))%</span>
+                    </label>
+                    <div class="volume-slider-container">
+                        <RadzenIcon Icon="volume_down" class="volume-icon" />
+                        <RadzenSlider @bind-Value="@model.Volume"
+                                      Min="0"
+                                      Max="1"
+                                      Step="0.01"
+                                      class="custom-slider" />
+                        <RadzenIcon Icon="volume_up" class="volume-icon" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 방송 콘텐츠 섹션 -->
+            <div class="section-group">
+                <div class="section-header">
+                    <div class="section-title-wrapper">
+                        <RadzenIcon Icon="library_music" class="section-icon" />
+                        <h3 class="section-title">방송 콘텐츠</h3>
+                    </div>
+                    <div class="section-line"></div>
+                </div>
+
+                <!-- 탭 선택 -->
+                <RadzenTabs @bind-SelectedIndex="@selectedTabIndex" class="content-tabs">
+                    <Tabs>
+                        <!-- 미디어 탭 -->
+                        <RadzenTabsItem Text="미디어 파일">
+                            <div class="tab-content">
+                                @if (!availableMedia.Any())
+                                {
+                                    <div class="empty-content">
+                                        <RadzenIcon Icon="library_music" class="empty-content-icon" />
+                                        <p class="empty-content-text">사용 가능한 미디어가 없습니다</p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="content-list">
+                                        @foreach (var media in availableMedia)
+                                        {
+                                            <div class="content-item @(selectedMediaIds.Contains(media.Id) ? "selected" : "")"
+                                                 @onclick="@(() => ToggleMediaSelection(media.Id))">
+                                                <RadzenCheckBox Value="@selectedMediaIds.Contains(media.Id)"
+                                                                @onclick:stopPropagation="true"
+                                                                Change="@((bool value) => ToggleMediaSelection(media.Id))"
+                                                                class="content-checkbox" />
+                                                <RadzenIcon Icon="audiotrack" class="content-icon" />
+                                                <span class="content-name">@media.FileName</span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </RadzenTabsItem>
+
+                        <!-- TTS 탭 -->
+                        <RadzenTabsItem Text="TTS">
+                            <div class="tab-content">
+                                @if (!availableTts.Any())
+                                {
+                                    <div class="empty-content">
+                                        <RadzenIcon Icon="record_voice_over" class="empty-content-icon" />
+                                        <p class="empty-content-text">사용 가능한 TTS가 없습니다</p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="content-list">
+                                        @foreach (var tts in availableTts)
+                                        {
+                                            <div class="content-item @(selectedTtsIds.Contains(tts.Id) ? "selected" : "")"
+                                                 @onclick="@(() => ToggleTtsSelection(tts.Id))">
+                                                <RadzenCheckBox Value="@selectedTtsIds.Contains(tts.Id)"
+                                                                @onclick:stopPropagation="true"
+                                                                Change="@((bool value) => ToggleTtsSelection(tts.Id))"
+                                                                class="content-checkbox" />
+                                                <RadzenIcon Icon="mic" class="content-icon" />
+                                                <div class="content-info">
+                                                    <span class="content-name">@tts.Name</span>
+                                                    <span class="content-detail">@tts.Content</span>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </RadzenTabsItem>
+                    </Tabs>
+                </RadzenTabs>
+
+                <!-- 선택 요약 -->
+                @if (selectedMediaIds.Any() || selectedTtsIds.Any())
+                {
+                    <div class="selection-summary">
+                        <RadzenIcon Icon="check_circle" class="summary-icon" />
+                        <span class="summary-text">
+                            선택된 항목:
+                            @if (selectedMediaIds.Any())
+                            {
+                                <span>미디어 @selectedMediaIds.Count()개</span>
+                            }
+                            @if (selectedMediaIds.Any() && selectedTtsIds.Any())
+                            {
+                                <span>, </span>
+                            }
+                            @if (selectedTtsIds.Any())
+                            {
+                                <span>TTS @selectedTtsIds.Count()개</span>
+                            }
+                        </span>
+                    </div>
+                }
+            </div>
+
+            <!-- 정보 카드 -->
+            <div class="info-section">
+                <div class="info-card">
+                    <RadzenIcon Icon="lightbulb" class="info-icon" />
+                    <div class="info-content">
+                        <h4 class="info-title">예약 방송 안내</h4>
+                        <ul class="info-list">
+                            <li>설정된 시간에 자동으로 방송이 시작됩니다</li>
+                            <li>반복 횟수를 0으로 설정하면 무한 반복됩니다</li>
+                            <li>선택한 요일에만 방송이 실행됩니다</li>
+                            <li>미디어와 TTS를 함께 설정할 수 있습니다</li>
+                            <li>생성된 스케줄은 언제든지 수정 가능합니다</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 액션 버튼 섹션 -->
+        <div class="dialog-actions">
+            <div class="action-info">
+                <RadzenIcon Icon="info_outline" class="action-info-icon" />
+                <span class="action-info-text">모든 필수 항목을 입력했는지 확인하세요</span>
+            </div>
+            <div class="action-buttons">
+                <RadzenButton ButtonStyle="ButtonStyle.Light"
+                              Text="취소"
+                              Icon="close"
+                              Click="@CancelClick"
+                              Variant="Variant.Flat"
+                              class="btn-cancel"
+                              Disabled="@isProcessing" />
+                @if (isProcessing)
+                {
+                    <RadzenButton ButtonType="ButtonType.Submit"
+                                  Text="생성 중..."
+                                  Icon="sync"
+                                  IconSpin="true"
+                                  Disabled="true"
+                                  Variant="Variant.Flat"
+                                  class="btn-primary processing" />
+                }
+                else
+                {
+                    <RadzenButton ButtonType="ButtonType.Submit"
+                                  Icon="add_circle"
+                                  Text="스케줄 생성"
+                                  Variant="Variant.Flat"
+                                  class="btn-primary" />
+                }
+            </div>
+        </div>
+    </RadzenTemplateForm>
+</div>
+
+<!-- 스타일은 이전과 동일 -->
