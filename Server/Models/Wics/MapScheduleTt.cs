@@ -7,21 +7,25 @@ using System.Text.Json.Serialization;
 
 namespace WicsPlatform.Server.Models.wics
 {
-    [Table("media")]
-    public partial class Medium
+    [Table("map_schedule_tts")]
+    public partial class MapScheduleTt
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         [Column("id")]
         public ulong Id { get; set; }
 
-        [Column("file_name")]
+        [Column("schedule_id")]
         [Required]
-        public string FileName { get; set; }
+        public ulong ScheduleId { get; set; }
 
-        [Column("full_path")]
+        public Schedule Schedule { get; set; }
+
+        [Column("tts_id")]
         [Required]
-        public string FullPath { get; set; }
+        public ulong TtsId { get; set; }
+
+        public Tt Tt { get; set; }
 
         [Column("delete_yn")]
         public string DeleteYn { get; set; }
@@ -33,11 +37,5 @@ namespace WicsPlatform.Server.Models.wics
         [Column("updated_at")]
         [Required]
         public DateTime UpdatedAt { get; set; }
-
-        public ICollection<MapChannelMedium> MapChannelMedia { get; set; }
-
-        public ICollection<MapMediaGroup> MapMediaGroups { get; set; }
-
-        public ICollection<MapScheduleMedium> MapScheduleMedia { get; set; }
     }
 }

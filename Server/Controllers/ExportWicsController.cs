@@ -186,5 +186,47 @@ namespace WicsPlatform.Server.Controllers
         {
             return ToExcel(ApplyQuery(await service.GetTts(), Request.Query, false), fileName);
         }
+
+        [HttpGet("/export/wics/mapschedulemedia/csv")]
+        [HttpGet("/export/wics/mapschedulemedia/csv(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportMapScheduleMediaToCSV(string fileName = null)
+        {
+            return ToCSV(ApplyQuery(await service.GetMapScheduleMedia(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/mapschedulemedia/excel")]
+        [HttpGet("/export/wics/mapschedulemedia/excel(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportMapScheduleMediaToExcel(string fileName = null)
+        {
+            return ToExcel(ApplyQuery(await service.GetMapScheduleMedia(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/mapscheduletts/csv")]
+        [HttpGet("/export/wics/mapscheduletts/csv(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportMapScheduleTtsToCSV(string fileName = null)
+        {
+            return ToCSV(ApplyQuery(await service.GetMapScheduleTts(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/mapscheduletts/excel")]
+        [HttpGet("/export/wics/mapscheduletts/excel(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportMapScheduleTtsToExcel(string fileName = null)
+        {
+            return ToExcel(ApplyQuery(await service.GetMapScheduleTts(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/schedules/csv")]
+        [HttpGet("/export/wics/schedules/csv(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportSchedulesToCSV(string fileName = null)
+        {
+            return ToCSV(ApplyQuery(await service.GetSchedules(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/schedules/excel")]
+        [HttpGet("/export/wics/schedules/excel(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportSchedulesToExcel(string fileName = null)
+        {
+            return ToExcel(ApplyQuery(await service.GetSchedules(), Request.Query, false), fileName);
+        }
     }
 }

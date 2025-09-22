@@ -35,5 +35,7 @@ namespace WicsPlatform.Server.Models.wics
         public DateTime UpdatedAt { get; set; }
 
         public ICollection<MapChannelTt> MapChannelTts { get; set; }
+
+        public ICollection<MapScheduleTt> MapScheduleTts { get; set; }
     }
 }

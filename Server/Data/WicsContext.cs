@@ -92,6 +92,30 @@ namespace WicsPlatform.Server.Data
               .HasForeignKey(i => i.SpeakerId)
               .HasPrincipalKey(i => i.Id);
 
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
+              .HasOne(i => i.Medium)
+              .WithMany(i => i.MapScheduleMedia)
+              .HasForeignKey(i => i.MediaId)
+              .HasPrincipalKey(i => i.Id);
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
+              .HasOne(i => i.Schedule)
+              .WithMany(i => i.MapScheduleMedia)
+              .HasForeignKey(i => i.ScheduleId)
+              .HasPrincipalKey(i => i.Id);
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
+              .HasOne(i => i.Schedule)
+              .WithMany(i => i.MapScheduleTts)
+              .HasForeignKey(i => i.ScheduleId)
+              .HasPrincipalKey(i => i.Id);
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
+              .HasOne(i => i.Tt)
+              .WithMany(i => i.MapScheduleTts)
+              .HasForeignKey(i => i.TtsId)
+              .HasPrincipalKey(i => i.Id);
+
             builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
               .Property(p => p.SpeakerIdList)
               .HasDefaultValueSql(@"''");
@@ -200,6 +224,50 @@ namespace WicsPlatform.Server.Data
               .Property(p => p.DeleteYn)
               .HasDefaultValueSql(@"'N'");
 
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
+              .Property(p => p.DeleteYn)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
+              .Property(p => p.DeleteYn)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.Monday)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.Tuesday)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.Wednesday)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.Thursday)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.Friday)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.Saturday)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.Sunday)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.RepeatCount)
+              .HasDefaultValueSql(@"'1'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.DeleteYn)
+              .HasDefaultValueSql(@"'N'");
+
             builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
               .Property(p => p.CreatedAt)
               .HasColumnType("datetime");
@@ -285,6 +353,34 @@ namespace WicsPlatform.Server.Data
               .HasColumnType("datetime");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Tt>()
+              .Property(p => p.UpdatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
+              .Property(p => p.CreatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
+              .Property(p => p.UpdatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
+              .Property(p => p.CreatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
+              .Property(p => p.UpdatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.StartTime)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
+              .Property(p => p.CreatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
               .Property(p => p.UpdatedAt)
               .HasColumnType("datetime");
             this.OnModelBuilding(builder);
@@ -313,6 +409,12 @@ namespace WicsPlatform.Server.Data
         public DbSet<WicsPlatform.Server.Models.wics.SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
 
         public DbSet<WicsPlatform.Server.Models.wics.Tt> Tts { get; set; }
+
+        public DbSet<WicsPlatform.Server.Models.wics.MapScheduleMedium> MapScheduleMedia { get; set; }
+
+        public DbSet<WicsPlatform.Server.Models.wics.MapScheduleTt> MapScheduleTts { get; set; }
+
+        public DbSet<WicsPlatform.Server.Models.wics.Schedule> Schedules { get; set; }
 
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
         {

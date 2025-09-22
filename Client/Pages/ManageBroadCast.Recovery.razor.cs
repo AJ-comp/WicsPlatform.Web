@@ -18,13 +18,17 @@ public partial class ManageBroadCast
     {
         try
         {
+            _logger.LogInformation($"CheckAndRecoverIfNeeded started for channel {channelId}");
+
             // 1. 진행 중인 방송이 있는지 확인
             var ongoingBroadcast = await FindOngoingBroadcast(channelId);
 
             if (ongoingBroadcast == null)
             {
                 _logger.LogInformation($"No ongoing broadcast found for channel {channelId}");
-                return; // 복구할 것이 없으면 그냥 리턴
+                // 방송이 없으면 SubPage들을 비방송 상태로 초기화
+                InitializeSubPagesForNoBroadcast();
+                return;
             }
 
             // 2. 복구가 필요하다고 판단되면 복구 프로세스 시작
@@ -38,6 +42,39 @@ public partial class ManageBroadCast
         {
             _logger.LogError(ex, $"Error checking recovery need for channel {channelId}");
             // 복구 체크 실패는 치명적이지 않으므로 정상 진행
+            InitializeSubPagesForNoBroadcast();
+        }
+    }
+
+    /// <summary>
+    /// SubPage들을 비방송 상태로 초기화
+    /// </summary>
+    private void InitializeSubPagesForNoBroadcast()
+    {
+        _logger.LogInformation("Initializing SubPages for non-broadcasting state");
+
+        // 모니터링 섹션 초기화
+        if (monitoringSection != null)
+        {
+            monitoringSection.ResetBroadcastState();
+        }
+
+        // 플레이리스트 섹션 초기화
+        if (playlistSection != null)
+        {
+            playlistSection.ResetMediaPlaybackState();
+        }
+
+        // TTS 섹션 초기화
+        if (ttsSection != null)
+        {
+            ttsSection.ResetTtsPlaybackState();
+        }
+
+        // 스피커 섹션은 선택 상태만 초기화
+        if (speakerSection != null)
+        {
+            speakerSection.ClearSelection();
         }
     }
 
@@ -73,6 +110,8 @@ public partial class ManageBroadCast
         {
             _logger.LogError(ex, "Recovery process failed");
             NotifyError("방송 복구 실패", ex);
+            // 실패 시에도 SubPage 초기화
+            InitializeSubPagesForNoBroadcast();
         }
         finally
         {
@@ -235,10 +274,16 @@ public partial class ManageBroadCast
 
             var groupIds = await GetGroupIdsFromSpeakers(speakerIds);
 
+            // 먼저 선택 초기화
+            speakerSection.ClearSelection();
+
+            // 그룹 선택 복원
             foreach (var groupId in groupIds)
             {
                 await speakerSection.ToggleGroupSelection(groupId);
             }
+
+            _logger.LogInformation($"Restored {groupIds.Count} speaker groups");
         }
         catch (Exception ex)
         {
@@ -260,6 +305,7 @@ public partial class ManageBroadCast
             if (mediaIds.Any())
             {
                 await playlistSection.RecoverSelectedMedia(mediaIds);
+                _logger.LogInformation($"Restored {mediaIds.Count} media selections");
             }
         }
         catch (Exception ex)
@@ -282,6 +328,7 @@ public partial class ManageBroadCast
             if (ttsIds.Any())
             {
                 await ttsSection.RecoverSelectedTts(ttsIds);
+                _logger.LogInformation($"Restored {ttsIds.Count} TTS selections");
             }
         }
         catch (Exception ex)

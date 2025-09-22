@@ -149,8 +149,28 @@ namespace WicsPlatform.Client.Pages
 
         protected async Task SelectChannel(WicsPlatform.Server.Models.wics.Channel channel)
         {
+            _logger.LogInformation($"SelectChannel called - Old: {selectedChannel?.Id}, New: {channel?.Id}");
+
+            // 이전 채널과 같은 채널을 선택한 경우 무시
+            if (selectedChannel?.Id == channel?.Id)
+            {
+                _logger.LogInformation("Same channel selected, ignoring");
+                return;
+            }
+
+            // 현재 방송 중이면 먼저 정리
+            if (isBroadcasting)
+            {
+                _logger.LogInformation("Cleaning up current broadcast before channel switch");
+                await CleanupCurrentBroadcast();
+            }
+
+            // 새 채널 선택
             selectedChannel = channel;
             ResetAllPanels();
+
+            // SubPage들 초기화
+            InitializeSubPages();
 
             if (channel != null)
             {
@@ -158,21 +178,89 @@ namespace WicsPlatform.Client.Pages
                 mediaVolume = (int)(channel.MediaVolume * 100);
                 ttsVolume = (int)(channel.TtsVolume * 100);
 
-                // 단순히 채널의 값을 저장
                 _preferredSampleRate = channel.SamplingRate > 0 ? (int)channel.SamplingRate : 48000;
                 _preferredChannels = channel.ChannelCount;
 
                 _logger.LogInformation($"Channel selected: {channel.Name}, Settings: {_preferredSampleRate}Hz, {_preferredChannels}ch");
 
+                // 복구 루틴 실행
                 await CheckAndRecoverIfNeeded(channel.Id);
             }
 
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task CleanupCurrentBroadcast()
+        {
+            try
+            {
+                _logger.LogInformation("Starting cleanup of current broadcast");
+
+                // 1. 방송 상태 초기화
+                isBroadcasting = false;
+                var broadcastIdToStop = currentBroadcastId;
+                currentBroadcastId = null;
+
+                // 2. 타이머 정리
+                if (_broadcastTimer != null)
+                {
+                    _broadcastTimer.Dispose();
+                    _broadcastTimer = null;
+                }
+
+                // 3. WebSocket 정리
+                if (broadcastIdToStop.HasValue)
+                {
+                    await StopWebSocketBroadcast();
+                }
+
+                // 4. 마이크 및 오디오 믹서 정리
+                await CleanupMicrophone();
+
+                // 5. DB 업데이트 (이전 채널의 방송 상태를 종료로 변경)
+                if (selectedChannel != null)
+                {
+                    await UpdateBroadcastRecordsToStopped();
+                }
+
+                // 6. 루프백 설정 초기화
+                _currentLoopbackSetting = false;
+
+                _logger.LogInformation("Cleanup completed successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during cleanup");
+            }
+        }
+
+        private void InitializeSubPages()
+        {
+            // 모니터링 섹션 초기화
+            if (monitoringSection != null)
+            {
+                monitoringSection.ResetBroadcastState();
+            }
+
+            // 스피커 섹션 초기화
             if (speakerSection != null)
             {
                 speakerSection.ClearSelection();
             }
 
-            await InvokeAsync(StateHasChanged);
+            // 플레이리스트 섹션 초기화
+            if (playlistSection != null)
+            {
+                playlistSection.ResetMediaPlaybackState();
+            }
+
+            // TTS 섹션 초기화
+            if (ttsSection != null)
+            {
+                ttsSection.ResetTtsPlaybackState();
+            }
+
+            _logger.LogInformation("All SubPages initialized");
         }
 
         protected async Task ToggleBroadcast(ulong channelId)
