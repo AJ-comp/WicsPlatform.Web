@@ -61,7 +61,7 @@
                                             @onclick="@(() => SelectSchedule(schedule))">
                                     <RadzenStack Gap="0.25rem">
                                         <RadzenRow AlignItems="AlignItems.Center">
-                                            <RadzenColumn Size="8">
+                                            <RadzenColumn Size="7">
                                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
                                                     <RadzenIcon Icon="event" class="schedule-icon" />
                                                     <RadzenText TextStyle="TextStyle.Caption" class="schedule-name">
@@ -69,11 +69,22 @@
                                                     </RadzenText>
                                                 </RadzenStack>
                                             </RadzenColumn>
-                                            <RadzenColumn Size="4" class="text-end">
+                                            <RadzenColumn Size="3" class="text-center">
                                                 <RadzenBadge BadgeStyle="@GetScheduleBadgeStyle(schedule.DeleteYn)"
                                                              IsPill="true"
                                                              Text="@GetScheduleStateText(schedule.DeleteYn)"
                                                              class="state-badge" />
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="2" class="text-end">
+                                                <div @onclick:stopPropagation="true">
+                                                    <RadzenButton Icon="delete"
+                                                                  ButtonStyle="ButtonStyle.Danger"
+                                                                  Size="ButtonSize.Small"
+                                                                  Variant="Variant.Text"
+                                                                  class="delete-button"
+                                                                  Click="@(() => ConfirmDeleteSchedule(schedule))"
+                                                                  Title="스케줄 삭제" />
+                                                </div>
                                             </RadzenColumn>
                                         </RadzenRow>
 
@@ -284,7 +295,6 @@
 </RadzenStack>
 
 <style>
-    /* 기존 스타일 유지 */
     :root {
         --professional-primary: #2c3e50;
         --professional-secondary: #34495e;
@@ -360,6 +370,7 @@
         transition: all 0.2s ease !important;
         background: white !important;
         cursor: pointer;
+        position: relative;
     }
 
         .schedule-item:hover {
@@ -385,6 +396,25 @@
         color: var(--professional-primary) !important;
         margin: 0 !important;
     }
+
+    .delete-button {
+        width: 24px !important;
+        height: 24px !important;
+        padding: 0 !important;
+        min-width: 24px !important;
+        border-radius: 4px !important;
+        transition: all 0.2s ease !important;
+    }
+
+        .delete-button .rz-button-icon-left {
+            margin: 0 !important;
+            font-size: 0.875rem !important;
+        }
+
+        .delete-button:hover {
+            background: rgba(231, 76, 60, 0.1) !important;
+            color: var(--professional-danger) !important;
+        }
 
     .schedule-time {
         margin-top: 0.25rem;

@@ -71,8 +71,8 @@ public partial class AddScheduleDialog
     protected override async Task OnInitializedAsync()
     {
         // 기본값 설정
-        model.StartTime = DateTime.Today.AddHours(9); // 오전 9시로 기본 설정
-        model.RepeatCount = 0; // 무한 반복
+        model.StartTime = new TimeOnly(9, 0);
+        model.RepeatCount = 1;
         model.SampleRate = 48000;
         model.ChannelCount = 1;
         model.Volume = 0.5f;
@@ -243,8 +243,8 @@ public partial class AddScheduleDialog
                 return;
             }
 
-            // 서버로 전송할 스케줄 데이터 생성
-            var schedule = new CreateScheduleRequest
+            // Schedule 모델 직접 생성
+            var schedule = new WicsPlatform.Server.Models.wics.Schedule
             {
                 Name = model.Name,
                 Description = model.Description ?? "",
@@ -261,50 +261,49 @@ public partial class AddScheduleDialog
                 Sunday = model.Sunday,
                 RepeatCount = (byte)model.RepeatCount,
                 DeleteYn = "N",
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
-            // API 호출하여 스케줄 생성
-            var response = await Http.PostAsJsonAsync("odata/wics/Schedules", schedule);
 
-            if (response.IsSuccessStatusCode)
+            // WicsService의 CreateSchedule 메서드 사용
+            var createdSchedule = await WicsService.CreateSchedule(schedule);
+
+            if (createdSchedule != null)
             {
-                var createdSchedule = await response.Content.ReadFromJsonAsync<WicsPlatform.Server.Models.wics.Schedule>();
-
                 // 미디어 매핑 저장
-                if (selectedMediaIds.Any() && createdSchedule != null)
+                if (selectedMediaIds.Any())
                 {
                     foreach (var mediaId in selectedMediaIds)
                     {
-                        var mediaMapping = new
+                        var mediaMapping = new WicsPlatform.Server.Models.wics.MapScheduleMedium
                         {
                             ScheduleId = createdSchedule.Id,
                             MediaId = mediaId,
                             DeleteYn = "N",
-                            CreatedAt = DateTime.Now,
-                            UpdatedAt = DateTime.Now
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
                         };
 
-                        await Http.PostAsJsonAsync("odata/wics/MapScheduleMedia", mediaMapping);
+                        await WicsService.CreateMapScheduleMedium(mediaMapping);
                     }
                 }
 
                 // TTS 매핑 저장
-                if (selectedTtsIds.Any() && createdSchedule != null)
+                if (selectedTtsIds.Any())
                 {
                     foreach (var ttsId in selectedTtsIds)
                     {
-                        var ttsMapping = new
+                        var ttsMapping = new WicsPlatform.Server.Models.wics.MapScheduleTt
                         {
                             ScheduleId = createdSchedule.Id,
                             TtsId = ttsId,
                             DeleteYn = "N",
-                            CreatedAt = DateTime.Now,
-                            UpdatedAt = DateTime.Now
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
                         };
 
-                        await Http.PostAsJsonAsync("odata/wics/MapScheduleTts", ttsMapping);
+                        await WicsService.CreateMapScheduleTt(ttsMapping);
                     }
                 }
 
@@ -320,12 +319,6 @@ public partial class AddScheduleDialog
 
                 // 다이얼로그 닫기 및 데이터 반환
                 DialogService.Close(true);
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                errorVisible = true;
-                error = $"스케줄 생성 중 오류가 발생했습니다: {errorContent}";
             }
         }
         catch (Exception ex)
@@ -399,7 +392,7 @@ public class ScheduleFormModel
     public string Description { get; set; }
 
     [Required(ErrorMessage = "시작 시간은 필수입니다.")]
-    public DateTime StartTime { get; set; }
+    public TimeOnly StartTime { get; set; }
 
     public string Monday { get; set; } = "N";
     public string Tuesday { get; set; } = "N";

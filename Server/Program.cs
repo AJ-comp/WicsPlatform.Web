@@ -71,15 +71,15 @@ builder.Services.AddControllers().AddOData(opt =>
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelMedium>("MapChannelMedia");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelTt>("MapChannelTts");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapMediaGroup>("MapMediaGroups");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapScheduleMedium>("MapScheduleMedia");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapScheduleTt>("MapScheduleTts");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapSpeakerGroup>("MapSpeakerGroups");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Medium>("Media");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Mic>("Mics");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Schedule>("Schedules");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Speaker>("Speakers");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>("SpeakerOwnershipStates").EntityType.HasKey(entity => new { entity.SpeakerId, entity.ChannelId });
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Tt>("Tts");
-    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapScheduleMedium>("MapScheduleMedia");
-    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapScheduleTt>("MapScheduleTts");
-    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Schedule>("Schedules");
     opt.AddRouteComponents("odata/wics", oDataBuilderwics.GetEdmModel()).Count().Filter().OrderBy().Expand().Select().SetMaxTop(null).TimeZone = TimeZoneInfo.Utc;
 });
 builder.Services.AddScoped<WicsPlatform.Client.wicsService>();

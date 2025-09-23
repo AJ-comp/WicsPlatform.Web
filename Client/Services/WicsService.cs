@@ -595,6 +595,194 @@ namespace WicsPlatform.Client
             return await httpClient.SendAsync(httpRequestMessage);
         }
 
+        public async System.Threading.Tasks.Task ExportMapScheduleMediaToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapschedulemedia/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapschedulemedia/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async System.Threading.Tasks.Task ExportMapScheduleMediaToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapschedulemedia/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapschedulemedia/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnGetMapScheduleMedia(HttpRequestMessage requestMessage);
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleMedium>> GetMapScheduleMedia(Query query)
+        {
+            return await GetMapScheduleMedia(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
+        }
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleMedium>> GetMapScheduleMedia(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleMedia");
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetMapScheduleMedia(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleMedium>>(response);
+        }
+
+        partial void OnCreateMapScheduleMedium(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapScheduleMedium> CreateMapScheduleMedium(WicsPlatform.Server.Models.wics.MapScheduleMedium mapScheduleMedium = default(WicsPlatform.Server.Models.wics.MapScheduleMedium))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleMedia");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapScheduleMedium), Encoding.UTF8, "application/json");
+
+            OnCreateMapScheduleMedium(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapScheduleMedium>(response);
+        }
+
+        partial void OnDeleteMapScheduleMedium(HttpRequestMessage requestMessage);
+
+        public async Task<HttpResponseMessage> DeleteMapScheduleMedium(ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleMedia({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
+
+            OnDeleteMapScheduleMedium(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
+        partial void OnGetMapScheduleMediumById(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapScheduleMedium> GetMapScheduleMediumById(string expand = default(string), ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleMedia({id})");
+
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetMapScheduleMediumById(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapScheduleMedium>(response);
+        }
+
+        partial void OnUpdateMapScheduleMedium(HttpRequestMessage requestMessage);
+        
+        public async Task<HttpResponseMessage> UpdateMapScheduleMedium(ulong id = default(ulong), WicsPlatform.Server.Models.wics.MapScheduleMedium mapScheduleMedium = default(WicsPlatform.Server.Models.wics.MapScheduleMedium))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleMedia({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
+
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapScheduleMedium), Encoding.UTF8, "application/json");
+
+            OnUpdateMapScheduleMedium(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
+        public async System.Threading.Tasks.Task ExportMapScheduleTtsToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapscheduletts/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapscheduletts/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async System.Threading.Tasks.Task ExportMapScheduleTtsToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapscheduletts/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapscheduletts/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnGetMapScheduleTts(HttpRequestMessage requestMessage);
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleTt>> GetMapScheduleTts(Query query)
+        {
+            return await GetMapScheduleTts(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
+        }
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleTt>> GetMapScheduleTts(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleTts");
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetMapScheduleTts(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleTt>>(response);
+        }
+
+        partial void OnCreateMapScheduleTt(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapScheduleTt> CreateMapScheduleTt(WicsPlatform.Server.Models.wics.MapScheduleTt mapScheduleTt = default(WicsPlatform.Server.Models.wics.MapScheduleTt))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleTts");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapScheduleTt), Encoding.UTF8, "application/json");
+
+            OnCreateMapScheduleTt(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapScheduleTt>(response);
+        }
+
+        partial void OnDeleteMapScheduleTt(HttpRequestMessage requestMessage);
+
+        public async Task<HttpResponseMessage> DeleteMapScheduleTt(ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleTts({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
+
+            OnDeleteMapScheduleTt(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
+        partial void OnGetMapScheduleTtById(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapScheduleTt> GetMapScheduleTtById(string expand = default(string), ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleTts({id})");
+
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetMapScheduleTtById(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapScheduleTt>(response);
+        }
+
+        partial void OnUpdateMapScheduleTt(HttpRequestMessage requestMessage);
+        
+        public async Task<HttpResponseMessage> UpdateMapScheduleTt(ulong id = default(ulong), WicsPlatform.Server.Models.wics.MapScheduleTt mapScheduleTt = default(WicsPlatform.Server.Models.wics.MapScheduleTt))
+        {
+            var uri = new Uri(baseUri, $"MapScheduleTts({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
+
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapScheduleTt), Encoding.UTF8, "application/json");
+
+            OnUpdateMapScheduleTt(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
         public async System.Threading.Tasks.Task ExportMapSpeakerGroupsToExcel(Query query = null, string fileName = null)
         {
             navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapspeakergroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapspeakergroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
@@ -877,6 +1065,100 @@ namespace WicsPlatform.Client
             return await httpClient.SendAsync(httpRequestMessage);
         }
 
+        public async System.Threading.Tasks.Task ExportSchedulesToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/schedules/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/schedules/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async System.Threading.Tasks.Task ExportSchedulesToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/schedules/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/schedules/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnGetSchedules(HttpRequestMessage requestMessage);
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.Schedule>> GetSchedules(Query query)
+        {
+            return await GetSchedules(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
+        }
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.Schedule>> GetSchedules(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
+        {
+            var uri = new Uri(baseUri, $"Schedules");
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetSchedules(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.Schedule>>(response);
+        }
+
+        partial void OnCreateSchedule(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.Schedule> CreateSchedule(WicsPlatform.Server.Models.wics.Schedule schedule = default(WicsPlatform.Server.Models.wics.Schedule))
+        {
+            var uri = new Uri(baseUri, $"Schedules");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(schedule), Encoding.UTF8, "application/json");
+
+            OnCreateSchedule(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.Schedule>(response);
+        }
+
+        partial void OnDeleteSchedule(HttpRequestMessage requestMessage);
+
+        public async Task<HttpResponseMessage> DeleteSchedule(ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"Schedules({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
+
+            OnDeleteSchedule(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
+        partial void OnGetScheduleById(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.Schedule> GetScheduleById(string expand = default(string), ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"Schedules({id})");
+
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetScheduleById(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.Schedule>(response);
+        }
+
+        partial void OnUpdateSchedule(HttpRequestMessage requestMessage);
+        
+        public async Task<HttpResponseMessage> UpdateSchedule(ulong id = default(ulong), WicsPlatform.Server.Models.wics.Schedule schedule = default(WicsPlatform.Server.Models.wics.Schedule))
+        {
+            var uri = new Uri(baseUri, $"Schedules({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
+
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(schedule), Encoding.UTF8, "application/json");
+
+            OnUpdateSchedule(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
         public async System.Threading.Tasks.Task ExportSpeakersToExcel(Query query = null, string fileName = null)
         {
             navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
@@ -1155,288 +1437,6 @@ namespace WicsPlatform.Client
             httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(tt), Encoding.UTF8, "application/json");
 
             OnUpdateTt(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        public async System.Threading.Tasks.Task ExportMapScheduleMediaToExcel(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapschedulemedia/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapschedulemedia/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        public async System.Threading.Tasks.Task ExportMapScheduleMediaToCSV(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapschedulemedia/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapschedulemedia/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        partial void OnGetMapScheduleMedia(HttpRequestMessage requestMessage);
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleMedium>> GetMapScheduleMedia(Query query)
-        {
-            return await GetMapScheduleMedia(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
-        }
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleMedium>> GetMapScheduleMedia(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleMedia");
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetMapScheduleMedia(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleMedium>>(response);
-        }
-
-        partial void OnCreateMapScheduleMedium(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapScheduleMedium> CreateMapScheduleMedium(WicsPlatform.Server.Models.wics.MapScheduleMedium mapScheduleMedium = default(WicsPlatform.Server.Models.wics.MapScheduleMedium))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleMedia");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapScheduleMedium), Encoding.UTF8, "application/json");
-
-            OnCreateMapScheduleMedium(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapScheduleMedium>(response);
-        }
-
-        partial void OnDeleteMapScheduleMedium(HttpRequestMessage requestMessage);
-
-        public async Task<HttpResponseMessage> DeleteMapScheduleMedium(ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleMedia({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
-
-            OnDeleteMapScheduleMedium(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        partial void OnGetMapScheduleMediumById(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapScheduleMedium> GetMapScheduleMediumById(string expand = default(string), ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleMedia({id})");
-
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetMapScheduleMediumById(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapScheduleMedium>(response);
-        }
-
-        partial void OnUpdateMapScheduleMedium(HttpRequestMessage requestMessage);
-        
-        public async Task<HttpResponseMessage> UpdateMapScheduleMedium(ulong id = default(ulong), WicsPlatform.Server.Models.wics.MapScheduleMedium mapScheduleMedium = default(WicsPlatform.Server.Models.wics.MapScheduleMedium))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleMedia({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
-
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapScheduleMedium), Encoding.UTF8, "application/json");
-
-            OnUpdateMapScheduleMedium(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        public async System.Threading.Tasks.Task ExportMapScheduleTtsToExcel(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapscheduletts/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapscheduletts/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        public async System.Threading.Tasks.Task ExportMapScheduleTtsToCSV(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapscheduletts/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapscheduletts/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        partial void OnGetMapScheduleTts(HttpRequestMessage requestMessage);
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleTt>> GetMapScheduleTts(Query query)
-        {
-            return await GetMapScheduleTts(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
-        }
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleTt>> GetMapScheduleTts(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleTts");
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetMapScheduleTts(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapScheduleTt>>(response);
-        }
-
-        partial void OnCreateMapScheduleTt(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapScheduleTt> CreateMapScheduleTt(WicsPlatform.Server.Models.wics.MapScheduleTt mapScheduleTt = default(WicsPlatform.Server.Models.wics.MapScheduleTt))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleTts");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapScheduleTt), Encoding.UTF8, "application/json");
-
-            OnCreateMapScheduleTt(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapScheduleTt>(response);
-        }
-
-        partial void OnDeleteMapScheduleTt(HttpRequestMessage requestMessage);
-
-        public async Task<HttpResponseMessage> DeleteMapScheduleTt(ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleTts({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
-
-            OnDeleteMapScheduleTt(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        partial void OnGetMapScheduleTtById(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapScheduleTt> GetMapScheduleTtById(string expand = default(string), ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleTts({id})");
-
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetMapScheduleTtById(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapScheduleTt>(response);
-        }
-
-        partial void OnUpdateMapScheduleTt(HttpRequestMessage requestMessage);
-        
-        public async Task<HttpResponseMessage> UpdateMapScheduleTt(ulong id = default(ulong), WicsPlatform.Server.Models.wics.MapScheduleTt mapScheduleTt = default(WicsPlatform.Server.Models.wics.MapScheduleTt))
-        {
-            var uri = new Uri(baseUri, $"MapScheduleTts({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
-
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapScheduleTt), Encoding.UTF8, "application/json");
-
-            OnUpdateMapScheduleTt(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        public async System.Threading.Tasks.Task ExportSchedulesToExcel(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/schedules/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/schedules/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        public async System.Threading.Tasks.Task ExportSchedulesToCSV(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/schedules/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/schedules/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        partial void OnGetSchedules(HttpRequestMessage requestMessage);
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.Schedule>> GetSchedules(Query query)
-        {
-            return await GetSchedules(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
-        }
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.Schedule>> GetSchedules(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
-        {
-            var uri = new Uri(baseUri, $"Schedules");
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetSchedules(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.Schedule>>(response);
-        }
-
-        partial void OnCreateSchedule(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.Schedule> CreateSchedule(WicsPlatform.Server.Models.wics.Schedule schedule = default(WicsPlatform.Server.Models.wics.Schedule))
-        {
-            var uri = new Uri(baseUri, $"Schedules");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(schedule), Encoding.UTF8, "application/json");
-
-            OnCreateSchedule(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.Schedule>(response);
-        }
-
-        partial void OnDeleteSchedule(HttpRequestMessage requestMessage);
-
-        public async Task<HttpResponseMessage> DeleteSchedule(ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"Schedules({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
-
-            OnDeleteSchedule(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        partial void OnGetScheduleById(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.Schedule> GetScheduleById(string expand = default(string), ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"Schedules({id})");
-
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetScheduleById(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.Schedule>(response);
-        }
-
-        partial void OnUpdateSchedule(HttpRequestMessage requestMessage);
-        
-        public async Task<HttpResponseMessage> UpdateSchedule(ulong id = default(ulong), WicsPlatform.Server.Models.wics.Schedule schedule = default(WicsPlatform.Server.Models.wics.Schedule))
-        {
-            var uri = new Uri(baseUri, $"Schedules({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
-
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(schedule), Encoding.UTF8, "application/json");
-
-            OnUpdateSchedule(httpRequestMessage);
 
             return await httpClient.SendAsync(httpRequestMessage);
         }

@@ -100,7 +100,7 @@
                             <div class="input-icon-container">
                                 <RadzenIcon Icon="access_time" class="input-icon" />
                             </div>
-                            <RadzenDatePicker class="custom-input"
+                            <RadzenDatePicker class="custom-input time-picker"
                                               @bind-Value="@(model.StartTime)"
                                               ShowTime="true"
                                               TimeOnly="true"
@@ -140,7 +140,6 @@
                     <label class="field-label mb-3">
                         <span class="label-text">반복 요일</span>
                         <span class="required-mark">*</span>
-                        <span class="field-hint ml-2">최소 1개 이상 선택</span>
                     </label>
 
                     <div class="weekday-selector">
@@ -148,14 +147,13 @@
                         {
                             <div class="weekday-item @(GetWeekdayValue(day.Key) ? "selected" : "")"
                                  @onclick="@(() => ToggleWeekday(day.Key))">
-                                <div class="weekday-content">
-                                    <span class="weekday-label">@day.Value</span>
-                                    <span class="weekday-name">@GetWeekdayFullName(day.Key)</span>
+                                <div class="weekday-checkbox">
+                                    @if (GetWeekdayValue(day.Key))
+                                    {
+                                        <RadzenIcon Icon="check" class="check-icon" />
+                                    }
                                 </div>
-                                @if (GetWeekdayValue(day.Key))
-                                {
-                                    <RadzenIcon Icon="check_circle" class="weekday-check" />
-                                }
+                                <span class="weekday-label">@day.Value</span>
                             </div>
                         }
                     </div>
@@ -163,7 +161,7 @@
                     <!-- 빠른 선택 버튼 -->
                     <div class="quick-select-buttons">
                         <RadzenButton Text="매일"
-                                      Icon="select_all"
+                                      Icon="calendar_today"
                                       ButtonStyle="ButtonStyle.Light"
                                       Size="ButtonSize.Small"
                                       class="quick-button"
@@ -184,7 +182,7 @@
                                       Icon="clear"
                                       ButtonStyle="ButtonStyle.Light"
                                       Size="ButtonSize.Small"
-                                      class="quick-button"
+                                      class="quick-button reset"
                                       Click="@ClearWeekdays" />
                     </div>
                 </div>
@@ -239,19 +237,23 @@
                 </div>
 
                 <!-- 볼륨 설정 -->
-                <div class="form-field">
+                <div class="volume-control">
                     <label class="field-label">
                         <span class="label-text">방송 볼륨</span>
                         <span class="volume-value">@((model.Volume * 100).ToString("0"))%</span>
                     </label>
                     <div class="volume-slider-container">
-                        <RadzenIcon Icon="volume_down" class="volume-icon" />
+                        <RadzenIcon Icon="volume_mute" class="volume-icon min" />
                         <RadzenSlider @bind-Value="@model.Volume"
                                       Min="0"
                                       Max="1"
                                       Step="0.01"
                                       class="custom-slider" />
-                        <RadzenIcon Icon="volume_up" class="volume-icon" />
+                        <RadzenIcon Icon="volume_up" class="volume-icon max" />
+                    </div>
+                    <div class="volume-hint">
+                        <RadzenIcon Icon="info" class="hint-icon" />
+                        <span class="hint-text">방송 시 출력될 볼륨을 조절합니다</span>
                     </div>
                 </div>
             </div>
@@ -274,24 +276,34 @@
                             <div class="tab-content">
                                 @if (!availableMedia.Any())
                                 {
-                                    <div class="empty-content">
-                                        <RadzenIcon Icon="library_music" class="empty-content-icon" />
-                                        <p class="empty-content-text">사용 가능한 미디어가 없습니다</p>
+                                    <div class="empty-state">
+                                        <RadzenIcon Icon="music_off" class="empty-icon" />
+                                        <h4 class="empty-title">미디어가 없습니다</h4>
+                                        <p class="empty-text">사용 가능한 미디어 파일이 없습니다</p>
                                     </div>
                                 }
                                 else
                                 {
-                                    <div class="content-list">
+                                    <div class="content-grid">
                                         @foreach (var media in availableMedia)
                                         {
-                                            <div class="content-item @(selectedMediaIds.Contains(media.Id) ? "selected" : "")"
+                                            <div class="content-card @(selectedMediaIds.Contains(media.Id) ? "selected" : "")"
                                                  @onclick="@(() => ToggleMediaSelection(media.Id))">
-                                                <RadzenCheckBox Value="@selectedMediaIds.Contains(media.Id)"
-                                                                @onclick:stopPropagation="true"
-                                                                Change="@((bool value) => ToggleMediaSelection(media.Id))"
-                                                                class="content-checkbox" />
-                                                <RadzenIcon Icon="audiotrack" class="content-icon" />
-                                                <span class="content-name">@media.FileName</span>
+                                                <div class="card-checkbox">
+                                                    @if (selectedMediaIds.Contains(media.Id))
+                                                    {
+                                                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <RadzenIcon Icon="radio_button_unchecked" class="uncheck-icon" />
+                                                    }
+                                                </div>
+                                                <RadzenIcon Icon="audiotrack" class="card-icon" />
+                                                <div class="card-content">
+                                                    <span class="card-title">@media.FileName</span>
+                                                    <span class="card-subtitle">@media.CreatedAt.ToString("yyyy-MM-dd")</span>
+                                                </div>
                                             </div>
                                         }
                                     </div>
@@ -300,30 +312,37 @@
                         </RadzenTabsItem>
 
                         <!-- TTS 탭 -->
-                        <RadzenTabsItem Text="TTS">
+                        <RadzenTabsItem Text="TTS 메시지">
                             <div class="tab-content">
                                 @if (!availableTts.Any())
                                 {
-                                    <div class="empty-content">
-                                        <RadzenIcon Icon="record_voice_over" class="empty-content-icon" />
-                                        <p class="empty-content-text">사용 가능한 TTS가 없습니다</p>
+                                    <div class="empty-state">
+                                        <RadzenIcon Icon="mic_off" class="empty-icon" />
+                                        <h4 class="empty-title">TTS가 없습니다</h4>
+                                        <p class="empty-text">사용 가능한 TTS 메시지가 없습니다</p>
                                     </div>
                                 }
                                 else
                                 {
-                                    <div class="content-list">
+                                    <div class="content-grid">
                                         @foreach (var tts in availableTts)
                                         {
-                                            <div class="content-item @(selectedTtsIds.Contains(tts.Id) ? "selected" : "")"
+                                            <div class="content-card tts @(selectedTtsIds.Contains(tts.Id) ? "selected" : "")"
                                                  @onclick="@(() => ToggleTtsSelection(tts.Id))">
-                                                <RadzenCheckBox Value="@selectedTtsIds.Contains(tts.Id)"
-                                                                @onclick:stopPropagation="true"
-                                                                Change="@((bool value) => ToggleTtsSelection(tts.Id))"
-                                                                class="content-checkbox" />
-                                                <RadzenIcon Icon="mic" class="content-icon" />
-                                                <div class="content-info">
-                                                    <span class="content-name">@tts.Name</span>
-                                                    <span class="content-detail">@tts.Content</span>
+                                                <div class="card-checkbox">
+                                                    @if (selectedTtsIds.Contains(tts.Id))
+                                                    {
+                                                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <RadzenIcon Icon="radio_button_unchecked" class="uncheck-icon" />
+                                                    }
+                                                </div>
+                                                <RadzenIcon Icon="record_voice_over" class="card-icon tts" />
+                                                <div class="card-content">
+                                                    <span class="card-title">@tts.Name</span>
+                                                    <span class="card-subtitle">@(tts.Content.Length > 50 ? tts.Content.Substring(0, 50) + "..." : tts.Content)</span>
                                                 </div>
                                             </div>
                                         }
@@ -338,22 +357,24 @@
                 @if (selectedMediaIds.Any() || selectedTtsIds.Any())
                 {
                     <div class="selection-summary">
-                        <RadzenIcon Icon="check_circle" class="summary-icon" />
-                        <span class="summary-text">
-                            선택된 항목:
-                            @if (selectedMediaIds.Any())
-                            {
-                                <span>미디어 @selectedMediaIds.Count()개</span>
-                            }
-                            @if (selectedMediaIds.Any() && selectedTtsIds.Any())
-                            {
-                                <span>, </span>
-                            }
-                            @if (selectedTtsIds.Any())
-                            {
-                                <span>TTS @selectedTtsIds.Count()개</span>
-                            }
-                        </span>
+                        <div class="summary-content">
+                            <RadzenIcon Icon="check_circle" class="summary-icon" />
+                            <span class="summary-text">
+                                선택된 콘텐츠:
+                                @if (selectedMediaIds.Any())
+                                {
+                                    <span class="summary-item">미디어 @selectedMediaIds.Count()개</span>
+                                }
+                                @if (selectedMediaIds.Any() && selectedTtsIds.Any())
+                                {
+                                    <span class="summary-separator">•</span>
+                                }
+                                @if (selectedTtsIds.Any())
+                                {
+                                    <span class="summary-item">TTS @selectedTtsIds.Count()개</span>
+                                }
+                            </span>
+                        </div>
                     </div>
                 }
             </div>
@@ -413,4 +434,871 @@
     </RadzenTemplateForm>
 </div>
 
-<!-- 스타일은 이전과 동일 -->
+<style>
+    /* 메인 컨테이너 */
+    .schedule-dialog {
+        padding: 0;
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* 헤더 섹션 - 보라색 그라데이션 */
+    .dialog-header-section {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px 12px 0 0;
+        margin: -24px -24px 0 -24px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-icon-wrapper {
+        flex-shrink: 0;
+    }
+
+    .icon-background {
+        width: 3rem;
+        height: 3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-icon {
+        font-size: 1.5rem !important;
+        color: white !important;
+    }
+
+    .header-content {
+        flex: 1;
+    }
+
+    .header-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: white;
+        letter-spacing: -0.02em;
+    }
+
+    .header-subtitle {
+        margin: 0.25rem 0 0 0;
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.9);
+        font-weight: 400;
+    }
+
+    /* 커스텀 알림 */
+    .custom-alert {
+        margin: 1.5rem 0 1rem 0;
+        border-radius: 8px;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        background: rgba(254, 226, 226, 0.5);
+        backdrop-filter: blur(5px);
+    }
+
+    .alert-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .alert-icon {
+        font-size: 1rem !important;
+        color: #dc2626;
+    }
+
+    .alert-text {
+        font-size: 0.75rem;
+        color: #991b1b;
+        font-weight: 500;
+    }
+
+    /* 폼 컨테이너 */
+    .form-container {
+        padding: 1.5rem 0;
+    }
+
+    /* 섹션 그룹 */
+    .section-group {
+        margin-bottom: 2rem;
+        padding: 1.25rem;
+        background: linear-gradient(to bottom, #fafbfc, #ffffff);
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+        transition: all 0.3s ease;
+    }
+
+        .section-group:hover {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+    .section-header {
+        margin-bottom: 1.25rem;
+    }
+
+    .section-title-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .section-icon {
+        font-size: 0.9rem !important;
+        color: #667eea;
+    }
+
+    .section-title {
+        margin: 0;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #1e293b;
+        letter-spacing: -0.01em;
+    }
+
+    .section-line {
+        height: 2px;
+        background: linear-gradient(90deg, #667eea 0%, transparent 100%);
+        border-radius: 1px;
+    }
+
+    /* 폼 필드 */
+    .form-field {
+        margin-bottom: 1.25rem;
+    }
+
+        .form-field:last-child {
+            margin-bottom: 0;
+        }
+
+    .field-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .label-text {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #374151;
+        letter-spacing: 0.025em;
+    }
+
+    .required-mark {
+        color: #ef4444;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .optional-mark {
+        color: #9ca3af;
+        font-size: 0.65rem;
+        font-weight: 400;
+        background: #f3f4f6;
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+    }
+
+    .info-tooltip {
+        display: inline-flex;
+        align-items: center;
+        cursor: help;
+    }
+
+    .help-icon {
+        font-size: 0.75rem !important;
+        color: #9ca3af;
+    }
+
+    /* 입력 필드 */
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-icon-container {
+        position: absolute;
+        left: 0.875rem;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+        .input-icon-container.textarea-icon {
+            top: 1rem;
+            transform: none;
+        }
+
+    .input-icon {
+        font-size: 1rem !important;
+        color: #9ca3af;
+        transition: color 0.2s;
+    }
+
+    .custom-input,
+    .custom-textarea,
+    .custom-dropdown,
+    .custom-numeric,
+    .time-picker {
+        width: 100% !important;
+        padding-left: 2.75rem !important;
+        font-size: 0.8rem !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        background: white !important;
+        transition: all 0.2s !important;
+    }
+
+    .custom-input,
+    .custom-dropdown,
+    .custom-numeric,
+    .time-picker {
+        height: 2.5rem !important;
+    }
+
+    .custom-textarea {
+        min-height: 4.5rem !important;
+        padding-top: 0.75rem !important;
+        resize: vertical !important;
+    }
+
+        .custom-input:hover,
+        .custom-textarea:hover,
+        .custom-dropdown:hover,
+        .custom-numeric:hover {
+            border-color: #9ca3af !important;
+        }
+
+        .custom-input:focus,
+        .custom-textarea:focus,
+        .custom-dropdown:focus,
+        .custom-numeric:focus {
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+            outline: none !important;
+        }
+
+    .field-hint {
+        display: block;
+        margin-top: 0.375rem;
+        font-size: 0.7rem;
+        color: #6b7280;
+        padding-left: 2.75rem;
+    }
+
+    .custom-validator {
+        font-size: 0.7rem !important;
+        color: #ef4444 !important;
+        margin-top: 0.25rem !important;
+        padding-left: 2.75rem !important;
+    }
+
+    /* 설정 그리드 */
+    .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    /* 요일 선택 섹션 */
+    .weekday-section {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .weekday-selector {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .weekday-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0.75rem 0.5rem;
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .weekday-item:hover {
+            border-color: #a5b4fc;
+            background: #f0f9ff;
+        }
+
+        .weekday-item.selected {
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+            border-color: #8b5cf6;
+        }
+
+    .weekday-checkbox {
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid #d1d5db;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.375rem;
+        background: white;
+        transition: all 0.2s;
+    }
+
+    .weekday-item.selected .weekday-checkbox {
+        background: #8b5cf6;
+        border-color: #8b5cf6;
+    }
+
+    .check-icon {
+        font-size: 0.875rem !important;
+        color: white !important;
+    }
+
+    .weekday-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .weekday-item.selected .weekday-label {
+        color: #7c3aed;
+    }
+
+    /* 빠른 선택 버튼 */
+    .quick-select-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .quick-button {
+        font-size: 0.7rem !important;
+        padding: 0.375rem 0.75rem !important;
+        height: 30px !important;
+        border-radius: 6px !important;
+        background: white !important;
+        border: 1px solid #e5e7eb !important;
+        color: #6b7280 !important;
+        transition: all 0.2s !important;
+    }
+
+        .quick-button:hover {
+            background: #f3f4f6 !important;
+            border-color: #9ca3af !important;
+            color: #374151 !important;
+        }
+
+        .quick-button.reset {
+            border-color: #fca5a5 !important;
+            color: #ef4444 !important;
+        }
+
+            .quick-button.reset:hover {
+                background: #fee2e2 !important;
+                border-color: #f87171 !important;
+            }
+
+    /* 볼륨 컨트롤 */
+    .volume-control {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: linear-gradient(to bottom, #f9fafb, #ffffff);
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .volume-value {
+        margin-left: auto;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #667eea;
+        background: #ede9fe;
+        padding: 0.125rem 0.5rem;
+        border-radius: 12px;
+    }
+
+    .volume-slider-container {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1rem 0;
+    }
+
+    .volume-icon {
+        font-size: 1rem !important;
+        color: #9ca3af;
+    }
+
+        .volume-icon.min {
+            color: #d1d5db;
+        }
+
+        .volume-icon.max {
+            color: #667eea;
+        }
+
+    .custom-slider {
+        flex: 1;
+    }
+
+        .custom-slider .rz-slider-horizontal .rz-slider-track {
+            height: 6px !important;
+            background: #e5e7eb !important;
+            border-radius: 3px !important;
+        }
+
+        .custom-slider .rz-slider-horizontal .rz-slider-range {
+            background: linear-gradient(90deg, #a5b4fc 0%, #667eea 100%) !important;
+        }
+
+        .custom-slider .rz-slider-handle {
+            width: 16px !important;
+            height: 16px !important;
+            background: white !important;
+            border: 2px solid #667eea !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        }
+
+    .volume-hint {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.5rem;
+        background: #f0f9ff;
+        border-radius: 6px;
+        border: 1px solid #bfdbfe;
+    }
+
+    .hint-icon {
+        font-size: 0.75rem !important;
+        color: #3b82f6;
+    }
+
+    .hint-text {
+        font-size: 0.65rem;
+        color: #1e40af;
+    }
+
+    /* 콘텐츠 탭 */
+    .content-tabs {
+        margin-top: 1rem;
+    }
+
+        .content-tabs .rz-tabview-nav {
+            border-bottom: 2px solid #e5e7eb !important;
+            background: transparent !important;
+        }
+
+        .content-tabs .rz-tabview-nav-item {
+            background: transparent !important;
+            border: none !important;
+            padding: 0.5rem 1rem !important;
+            font-size: 0.8rem !important;
+            font-weight: 500 !important;
+            color: #6b7280 !important;
+            transition: all 0.2s !important;
+        }
+
+            .content-tabs .rz-tabview-nav-item:hover {
+                color: #374151 !important;
+            }
+
+            .content-tabs .rz-tabview-nav-item.rz-state-active {
+                color: #667eea !important;
+                border-bottom: 2px solid #667eea !important;
+            }
+
+    .tab-content {
+        padding: 1.25rem 0.5rem;
+        min-height: 200px;
+    }
+
+    /* 빈 상태 */
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        text-align: center;
+    }
+
+    .empty-icon {
+        font-size: 3rem !important;
+        color: #d1d5db !important;
+        margin-bottom: 1rem;
+    }
+
+    .empty-title {
+        margin: 0 0 0.5rem 0;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #6b7280;
+    }
+
+    .empty-text {
+        margin: 0;
+        font-size: 0.75rem;
+        color: #9ca3af;
+    }
+
+    /* 콘텐츠 그리드 */
+    .content-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .content-card {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.875rem;
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .content-card:hover {
+            border-color: #a5b4fc;
+            background: #f0f9ff;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .content-card.selected {
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+            border-color: #8b5cf6;
+        }
+
+        .content-card.tts.selected {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            border-color: #10b981;
+        }
+
+    .card-checkbox {
+        flex-shrink: 0;
+    }
+
+    .check-icon {
+        font-size: 1.25rem !important;
+        color: #8b5cf6 !important;
+    }
+
+    .content-card.tts .check-icon {
+        color: #10b981 !important;
+    }
+
+    .uncheck-icon {
+        font-size: 1.25rem !important;
+        color: #d1d5db !important;
+    }
+
+    .card-icon {
+        font-size: 1.25rem !important;
+        color: #8b5cf6 !important;
+        flex-shrink: 0;
+    }
+
+        .card-icon.tts {
+            color: #10b981 !important;
+        }
+
+    .card-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .card-title {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .card-subtitle {
+        display: block;
+        font-size: 0.65rem;
+        color: #6b7280;
+        margin-top: 0.125rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* 선택 요약 */
+    .selection-summary {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border-radius: 8px;
+        border: 1px solid #bfdbfe;
+    }
+
+    .summary-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .summary-icon {
+        font-size: 1rem !important;
+        color: #3b82f6;
+    }
+
+    .summary-text {
+        font-size: 0.75rem;
+        color: #1e40af;
+        font-weight: 500;
+    }
+
+    .summary-item {
+        background: white;
+        padding: 0.125rem 0.5rem;
+        border-radius: 12px;
+        font-weight: 600;
+    }
+
+    .summary-separator {
+        margin: 0 0.25rem;
+        color: #3b82f6;
+    }
+
+    /* 정보 카드 */
+    .info-section {
+        margin-top: 1.5rem;
+    }
+
+    .info-card {
+        display: flex;
+        gap: 0.875rem;
+        padding: 1rem;
+        background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+        border-radius: 10px;
+        border: 1px solid #ddd6fe;
+    }
+
+    .info-icon {
+        font-size: 1rem !important;
+        color: #8b5cf6;
+        flex-shrink: 0;
+        margin-top: 0.125rem;
+    }
+
+    .info-content {
+        flex: 1;
+    }
+
+    .info-title {
+        margin: 0 0 0.5rem 0;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6d28d9;
+    }
+
+    .info-list {
+        margin: 0;
+        padding-left: 1.25rem;
+        list-style: none;
+    }
+
+        .info-list li {
+            position: relative;
+            font-size: 0.7rem;
+            color: #7c3aed;
+            line-height: 1.5;
+            margin-bottom: 0.375rem;
+            padding-left: 1rem;
+        }
+
+            .info-list li:last-child {
+                margin-bottom: 0;
+            }
+
+            .info-list li::before {
+                content: "✓";
+                position: absolute;
+                left: 0;
+                color: #8b5cf6;
+                font-weight: bold;
+                font-size: 0.75rem;
+            }
+
+    /* 액션 버튼 섹션 */
+    .dialog-actions {
+        padding: 1.25rem 0 0 0;
+        margin-top: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .action-info {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .action-info-icon {
+        font-size: 0.875rem !important;
+        color: #667eea;
+    }
+
+    .action-info-text {
+        font-size: 0.7rem;
+        color: #6b7280;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .btn-cancel,
+    .btn-primary {
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        padding: 0.5rem 1.25rem !important;
+        border-radius: 8px !important;
+        transition: all 0.2s !important;
+        letter-spacing: 0.025em !important;
+    }
+
+    .btn-cancel {
+        background: white !important;
+        color: #6b7280 !important;
+        border: 1px solid #e5e7eb !important;
+    }
+
+        .btn-cancel:hover:not(:disabled) {
+            background: #f9fafb !important;
+            border-color: #d1d5db !important;
+            color: #374151 !important;
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2) !important;
+    }
+
+        .btn-primary:hover:not(:disabled) {
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3) !important;
+            transform: translateY(-1px);
+        }
+
+        .btn-primary.processing {
+            background: #9ca3af !important;
+            cursor: not-allowed !important;
+        }
+
+    /* 애니메이션 */
+    @@keyframes fadeIn {
+        from
+
+    {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    }
+
+    @@keyframes slideIn {
+        from
+
+    {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    }
+
+    @@keyframes pulse {
+        0%, 100%
+
+    {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    }
+
+    .schedule-dialog {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .section-group {
+        animation: slideIn 0.4s ease-out;
+        animation-fill-mode: both;
+    }
+
+        .section-group:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .section-group:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .section-group:nth-child(4) {
+            animation-delay: 0.3s;
+        }
+
+    .btn-primary.processing {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* 반응형 디자인 */
+    @@media (max-width: 768px) {
+        .weekday-selector
+
+    {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    }
+</style>

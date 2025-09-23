@@ -28,16 +28,14 @@ namespace WicsPlatform.Server.Models.wics
         public uint SampleRate { get; set; }
 
         [Column("channel_count")]
-        [Required]
         public byte ChannelCount { get; set; }
 
         [Column("volume")]
-        [Required]
         public float Volume { get; set; }
 
         [Column("start_time")]
         [Required]
-        public DateTime StartTime { get; set; }
+        public TimeOnly StartTime { get; set; }
 
         [Column("monday")]
         public string Monday { get; set; }

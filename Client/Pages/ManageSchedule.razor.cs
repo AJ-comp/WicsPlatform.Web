@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Radzen;
-using WicsPlatform.Client.Dialogs; // 추가
+using WicsPlatform.Client.Dialogs;
 using WicsPlatform.Server.Models.wics;
 
 namespace WicsPlatform.Client.Pages;
@@ -16,6 +16,7 @@ public partial class ManageSchedule
     private IEnumerable<Schedule> schedules = new List<Schedule>();
     private Schedule selectedSchedule = null;
     private bool isLoadingSchedules = false;
+    private bool isDeletingSchedule = false;
 
     // 요일 데이터
     private readonly Dictionary<string, string> weekdays = new Dictionary<string, string>
@@ -137,7 +138,7 @@ public partial class ManageSchedule
         return $"{repeatCount}회 반복";
     }
 
-    // 스케줄 추가 - 이제 실제 구현
+    // 스케줄 추가
     private async Task OpenAddScheduleDialog()
     {
         var result = await DialogService.OpenAsync<AddScheduleDialog>(
@@ -167,27 +168,105 @@ public partial class ManageSchedule
         }
     }
 
-    // 스케줄 편집 (추후 구현)
-    private async Task OpenEditScheduleDialog(Schedule schedule)
+    // 스케줄 삭제 확인 다이얼로그 - MouseEventArgs 파라미터 제거
+    private async Task ConfirmDeleteSchedule(Schedule schedule)
     {
-        NotificationService.Notify(new NotificationMessage
+        var result = await DialogService.Confirm(
+            $"'{schedule.Name}' 스케줄을 삭제하시겠습니까?\n연결된 미디어 및 TTS 매핑도 함께 삭제됩니다.",
+            "스케줄 삭제 확인",
+            new ConfirmOptions
+            {
+                OkButtonText = "삭제",
+                CancelButtonText = "취소"
+            });
+
+        if (result == true)
         {
-            Severity = NotificationSeverity.Info,
-            Summary = "준비 중",
-            Detail = "스케줄 편집 기능은 추후 업데이트 예정입니다.",
-            Duration = 3000
-        });
+            await DeleteSchedule(schedule);
+        }
     }
 
-    // 스케줄 삭제 (추후 구현)
+    // 스케줄 및 관련 데이터 소프트 삭제
     private async Task DeleteSchedule(Schedule schedule)
     {
-        NotificationService.Notify(new NotificationMessage
+        if (isDeletingSchedule) return;
+
+        try
         {
-            Severity = NotificationSeverity.Info,
-            Summary = "준비 중",
-            Detail = "스케줄 삭제 기능은 추후 업데이트 예정입니다.",
-            Duration = 3000
-        });
+            isDeletingSchedule = true;
+            StateHasChanged();
+
+            Logger.LogInformation($"Deleting schedule: {schedule.Name} (ID: {schedule.Id})");
+
+            // 1. 스케줄과 연결된 미디어 매핑 소프트 삭제
+            var mediaQuery = new Radzen.Query
+            {
+                Filter = $"ScheduleId eq {schedule.Id} and (DeleteYn eq 'N' or DeleteYn eq null)"
+            };
+            var mediaMappings = await WicsService.GetMapScheduleMedia(mediaQuery);
+
+            foreach (var mapping in mediaMappings.Value.AsODataEnumerable())
+            {
+                mapping.DeleteYn = "Y";
+                mapping.UpdatedAt = DateTime.UtcNow;
+                await WicsService.UpdateMapScheduleMedium(mapping.Id, mapping);
+                Logger.LogInformation($"Soft deleted media mapping: {mapping.Id}");
+            }
+
+            // 2. 스케줄과 연결된 TTS 매핑 소프트 삭제
+            var ttsQuery = new Radzen.Query
+            {
+                Filter = $"ScheduleId eq {schedule.Id} and (DeleteYn eq 'N' or DeleteYn eq null)"
+            };
+            var ttsMappings = await WicsService.GetMapScheduleTts(ttsQuery);
+
+            foreach (var mapping in ttsMappings.Value.AsODataEnumerable())
+            {
+                mapping.DeleteYn = "Y";
+                mapping.UpdatedAt = DateTime.UtcNow;
+                await WicsService.UpdateMapScheduleTt(mapping.Id, mapping);
+                Logger.LogInformation($"Soft deleted TTS mapping: {mapping.Id}");
+            }
+
+            // 3. 스케줄 자체 소프트 삭제
+            schedule.DeleteYn = "Y";
+            schedule.UpdatedAt = DateTime.UtcNow;
+            await WicsService.UpdateSchedule(schedule.Id, schedule);
+
+            Logger.LogInformation($"Successfully soft deleted schedule: {schedule.Name}");
+
+            // 선택된 스케줄이 삭제된 스케줄이면 선택 해제
+            if (selectedSchedule?.Id == schedule.Id)
+            {
+                selectedSchedule = null;
+            }
+
+            // 스케줄 목록 새로고침
+            await LoadSchedules();
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "삭제 완료",
+                Detail = $"'{schedule.Name}' 스케줄이 삭제되었습니다.",
+                Duration = 4000
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"Failed to delete schedule: {schedule.Name}");
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "삭제 실패",
+                Detail = "스케줄 삭제 중 오류가 발생했습니다.",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isDeletingSchedule = false;
+            StateHasChanged();
+        }
     }
 }
