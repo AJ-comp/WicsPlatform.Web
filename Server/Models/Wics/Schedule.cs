@@ -15,24 +15,6 @@ namespace WicsPlatform.Server.Models.wics
         [Column("id")]
         public ulong Id { get; set; }
 
-        [Column("name")]
-        [Required]
-        public string Name { get; set; }
-
-        [Column("description")]
-        [Required]
-        public string Description { get; set; }
-
-        [Column("sample_rate")]
-        [Required]
-        public uint SampleRate { get; set; }
-
-        [Column("channel_count")]
-        public byte ChannelCount { get; set; }
-
-        [Column("volume")]
-        public float Volume { get; set; }
-
         [Column("start_time")]
         [Required]
         public TimeOnly StartTime { get; set; }
@@ -72,8 +54,8 @@ namespace WicsPlatform.Server.Models.wics
         [Required]
         public DateTime UpdatedAt { get; set; }
 
-        public ICollection<MapScheduleMedium> MapScheduleMedia { get; set; }
+        public ICollection<Channel> Channels { get; set; }
 
-        public ICollection<MapScheduleTt> MapScheduleTts { get; set; }
+        public ICollection<SchedulePlay> SchedulePlays { get; set; }
     }
 }

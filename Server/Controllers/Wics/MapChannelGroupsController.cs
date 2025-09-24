@@ -16,12 +16,12 @@ using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace WicsPlatform.Server.Controllers.wics
 {
-    [Route("odata/wics/Channels")]
-    public partial class ChannelsController : ODataController
+    [Route("odata/wics/MapChannelGroups")]
+    public partial class MapChannelGroupsController : ODataController
     {
         private WicsPlatform.Server.Data.wicsContext context;
 
-        public ChannelsController(WicsPlatform.Server.Data.wicsContext context)
+        public MapChannelGroupsController(WicsPlatform.Server.Data.wicsContext context)
         {
             this.context = context;
         }
@@ -29,34 +29,34 @@ namespace WicsPlatform.Server.Controllers.wics
     
         [HttpGet]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IEnumerable<WicsPlatform.Server.Models.wics.Channel> GetChannels()
+        public IEnumerable<WicsPlatform.Server.Models.wics.MapChannelGroup> GetMapChannelGroups()
         {
-            var items = this.context.Channels.AsQueryable<WicsPlatform.Server.Models.wics.Channel>();
-            this.OnChannelsRead(ref items);
+            var items = this.context.MapChannelGroups.AsQueryable<WicsPlatform.Server.Models.wics.MapChannelGroup>();
+            this.OnMapChannelGroupsRead(ref items);
 
             return items;
         }
 
-        partial void OnChannelsRead(ref IQueryable<WicsPlatform.Server.Models.wics.Channel> items);
+        partial void OnMapChannelGroupsRead(ref IQueryable<WicsPlatform.Server.Models.wics.MapChannelGroup> items);
 
-        partial void OnChannelGet(ref SingleResult<WicsPlatform.Server.Models.wics.Channel> item);
+        partial void OnMapChannelGroupGet(ref SingleResult<WicsPlatform.Server.Models.wics.MapChannelGroup> item);
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        [HttpGet("/odata/wics/Channels(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.Channel> GetChannel(ulong key)
+        [HttpGet("/odata/wics/MapChannelGroups(Id={Id})")]
+        public SingleResult<WicsPlatform.Server.Models.wics.MapChannelGroup> GetMapChannelGroup(ulong key)
         {
-            var items = this.context.Channels.Where(i => i.Id == key);
+            var items = this.context.MapChannelGroups.Where(i => i.Id == key);
             var result = SingleResult.Create(items);
 
-            OnChannelGet(ref result);
+            OnMapChannelGroupGet(ref result);
 
             return result;
         }
-        partial void OnChannelDeleted(WicsPlatform.Server.Models.wics.Channel item);
-        partial void OnAfterChannelDeleted(WicsPlatform.Server.Models.wics.Channel item);
+        partial void OnMapChannelGroupDeleted(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+        partial void OnAfterMapChannelGroupDeleted(WicsPlatform.Server.Models.wics.MapChannelGroup item);
 
-        [HttpDelete("/odata/wics/Channels(Id={Id})")]
-        public IActionResult DeleteChannel(ulong key)
+        [HttpDelete("/odata/wics/MapChannelGroups(Id={Id})")]
+        public IActionResult DeleteMapChannelGroup(ulong key)
         {
             try
             {
@@ -66,7 +66,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 }
 
 
-                var item = this.context.Channels
+                var item = this.context.MapChannelGroups
                     .Where(i => i.Id == key)
                     .FirstOrDefault();
 
@@ -74,10 +74,10 @@ namespace WicsPlatform.Server.Controllers.wics
                 {
                     return BadRequest();
                 }
-                this.OnChannelDeleted(item);
-                this.context.Channels.Remove(item);
+                this.OnMapChannelGroupDeleted(item);
+                this.context.MapChannelGroups.Remove(item);
                 this.context.SaveChanges();
-                this.OnAfterChannelDeleted(item);
+                this.OnAfterMapChannelGroupDeleted(item);
 
                 return new NoContentResult();
 
@@ -89,12 +89,12 @@ namespace WicsPlatform.Server.Controllers.wics
             }
         }
 
-        partial void OnChannelUpdated(WicsPlatform.Server.Models.wics.Channel item);
-        partial void OnAfterChannelUpdated(WicsPlatform.Server.Models.wics.Channel item);
+        partial void OnMapChannelGroupUpdated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+        partial void OnAfterMapChannelGroupUpdated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
 
-        [HttpPut("/odata/wics/Channels(Id={Id})")]
+        [HttpPut("/odata/wics/MapChannelGroups(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutChannel(ulong key, [FromBody]WicsPlatform.Server.Models.wics.Channel item)
+        public IActionResult PutMapChannelGroup(ulong key, [FromBody]WicsPlatform.Server.Models.wics.MapChannelGroup item)
         {
             try
             {
@@ -107,13 +107,13 @@ namespace WicsPlatform.Server.Controllers.wics
                 {
                     return BadRequest();
                 }
-                this.OnChannelUpdated(item);
-                this.context.Channels.Update(item);
+                this.OnMapChannelGroupUpdated(item);
+                this.context.MapChannelGroups.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Channels.Where(i => i.Id == key);
-                Request.QueryString = Request.QueryString.Add("$expand", "Schedule");
-                this.OnAfterChannelUpdated(item);
+                var itemToReturn = this.context.MapChannelGroups.Where(i => i.Id == key);
+                Request.QueryString = Request.QueryString.Add("$expand", "Channel,Group");
+                this.OnAfterMapChannelGroupUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
             }
             catch(Exception ex)
@@ -123,9 +123,9 @@ namespace WicsPlatform.Server.Controllers.wics
             }
         }
 
-        [HttpPatch("/odata/wics/Channels(Id={Id})")]
+        [HttpPatch("/odata/wics/MapChannelGroups(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchChannel(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.Channel> patch)
+        public IActionResult PatchMapChannelGroup(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.MapChannelGroup> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.Channels.Where(i => i.Id == key).FirstOrDefault();
+                var item = this.context.MapChannelGroups.Where(i => i.Id == key).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -142,13 +142,13 @@ namespace WicsPlatform.Server.Controllers.wics
                 }
                 patch.Patch(item);
 
-                this.OnChannelUpdated(item);
-                this.context.Channels.Update(item);
+                this.OnMapChannelGroupUpdated(item);
+                this.context.MapChannelGroups.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Channels.Where(i => i.Id == key);
-                Request.QueryString = Request.QueryString.Add("$expand", "Schedule");
-                this.OnAfterChannelUpdated(item);
+                var itemToReturn = this.context.MapChannelGroups.Where(i => i.Id == key);
+                Request.QueryString = Request.QueryString.Add("$expand", "Channel,Group");
+                this.OnAfterMapChannelGroupUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
             }
             catch(Exception ex)
@@ -158,12 +158,12 @@ namespace WicsPlatform.Server.Controllers.wics
             }
         }
 
-        partial void OnChannelCreated(WicsPlatform.Server.Models.wics.Channel item);
-        partial void OnAfterChannelCreated(WicsPlatform.Server.Models.wics.Channel item);
+        partial void OnMapChannelGroupCreated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+        partial void OnAfterMapChannelGroupCreated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
 
         [HttpPost]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult Post([FromBody] WicsPlatform.Server.Models.wics.Channel item)
+        public IActionResult Post([FromBody] WicsPlatform.Server.Models.wics.MapChannelGroup item)
         {
             try
             {
@@ -177,15 +177,15 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest();
                 }
 
-                this.OnChannelCreated(item);
-                this.context.Channels.Add(item);
+                this.OnMapChannelGroupCreated(item);
+                this.context.MapChannelGroups.Add(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Channels.Where(i => i.Id == item.Id);
+                var itemToReturn = this.context.MapChannelGroups.Where(i => i.Id == item.Id);
 
-                Request.QueryString = Request.QueryString.Add("$expand", "Schedule");
+                Request.QueryString = Request.QueryString.Add("$expand", "Channel,Group");
 
-                this.OnAfterChannelCreated(item);
+                this.OnAfterMapChannelGroupCreated(item);
 
                 return new ObjectResult(SingleResult.Create(itemToReturn))
                 {

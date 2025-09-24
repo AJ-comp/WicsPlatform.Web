@@ -19,6 +19,11 @@ namespace WicsPlatform.Server.Models.wics
         [Required]
         public byte Type { get; set; }
 
+        [Column("schedule_id")]
+        public ulong? ScheduleId { get; set; }
+
+        public Schedule Schedule { get; set; }
+
         [Column("name")]
         [Required]
         public string Name { get; set; }
@@ -81,6 +86,10 @@ namespace WicsPlatform.Server.Models.wics
         public ICollection<MapChannelMedium> MapChannelMedia { get; set; }
 
         public ICollection<MapChannelTt> MapChannelTts { get; set; }
+
+        public ICollection<MapChannelGroup> MapChannelGroups { get; set; }
+
+        public ICollection<MapChannelSpeaker> MapChannelSpeakers { get; set; }
 
         public ICollection<SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
     }

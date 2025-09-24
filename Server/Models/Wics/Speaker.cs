@@ -62,6 +62,8 @@ namespace WicsPlatform.Server.Models.wics
 
         public ICollection<MapSpeakerGroup> MapSpeakerGroups { get; set; }
 
+        public ICollection<MapChannelSpeaker> MapChannelSpeakers { get; set; }
+
         public ICollection<SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
     }
 }

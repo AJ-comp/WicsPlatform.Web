@@ -41,5 +41,7 @@ namespace WicsPlatform.Server.Models.wics
         public ICollection<MapMediaGroup> MapMediaGroups { get; set; }
 
         public ICollection<MapSpeakerGroup> MapSpeakerGroups { get; set; }
+
+        public ICollection<MapChannelGroup> MapChannelGroups { get; set; }
     }
 }

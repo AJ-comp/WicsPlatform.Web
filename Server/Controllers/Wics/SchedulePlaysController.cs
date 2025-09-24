@@ -16,12 +16,12 @@ using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace WicsPlatform.Server.Controllers.wics
 {
-    [Route("odata/wics/Channels")]
-    public partial class ChannelsController : ODataController
+    [Route("odata/wics/SchedulePlays")]
+    public partial class SchedulePlaysController : ODataController
     {
         private WicsPlatform.Server.Data.wicsContext context;
 
-        public ChannelsController(WicsPlatform.Server.Data.wicsContext context)
+        public SchedulePlaysController(WicsPlatform.Server.Data.wicsContext context)
         {
             this.context = context;
         }
@@ -29,34 +29,34 @@ namespace WicsPlatform.Server.Controllers.wics
     
         [HttpGet]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IEnumerable<WicsPlatform.Server.Models.wics.Channel> GetChannels()
+        public IEnumerable<WicsPlatform.Server.Models.wics.SchedulePlay> GetSchedulePlays()
         {
-            var items = this.context.Channels.AsQueryable<WicsPlatform.Server.Models.wics.Channel>();
-            this.OnChannelsRead(ref items);
+            var items = this.context.SchedulePlays.AsQueryable<WicsPlatform.Server.Models.wics.SchedulePlay>();
+            this.OnSchedulePlaysRead(ref items);
 
             return items;
         }
 
-        partial void OnChannelsRead(ref IQueryable<WicsPlatform.Server.Models.wics.Channel> items);
+        partial void OnSchedulePlaysRead(ref IQueryable<WicsPlatform.Server.Models.wics.SchedulePlay> items);
 
-        partial void OnChannelGet(ref SingleResult<WicsPlatform.Server.Models.wics.Channel> item);
+        partial void OnSchedulePlayGet(ref SingleResult<WicsPlatform.Server.Models.wics.SchedulePlay> item);
 
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        [HttpGet("/odata/wics/Channels(Id={Id})")]
-        public SingleResult<WicsPlatform.Server.Models.wics.Channel> GetChannel(ulong key)
+        [HttpGet("/odata/wics/SchedulePlays(Id={Id})")]
+        public SingleResult<WicsPlatform.Server.Models.wics.SchedulePlay> GetSchedulePlay(ulong key)
         {
-            var items = this.context.Channels.Where(i => i.Id == key);
+            var items = this.context.SchedulePlays.Where(i => i.Id == key);
             var result = SingleResult.Create(items);
 
-            OnChannelGet(ref result);
+            OnSchedulePlayGet(ref result);
 
             return result;
         }
-        partial void OnChannelDeleted(WicsPlatform.Server.Models.wics.Channel item);
-        partial void OnAfterChannelDeleted(WicsPlatform.Server.Models.wics.Channel item);
+        partial void OnSchedulePlayDeleted(WicsPlatform.Server.Models.wics.SchedulePlay item);
+        partial void OnAfterSchedulePlayDeleted(WicsPlatform.Server.Models.wics.SchedulePlay item);
 
-        [HttpDelete("/odata/wics/Channels(Id={Id})")]
-        public IActionResult DeleteChannel(ulong key)
+        [HttpDelete("/odata/wics/SchedulePlays(Id={Id})")]
+        public IActionResult DeleteSchedulePlay(ulong key)
         {
             try
             {
@@ -66,7 +66,7 @@ namespace WicsPlatform.Server.Controllers.wics
                 }
 
 
-                var item = this.context.Channels
+                var item = this.context.SchedulePlays
                     .Where(i => i.Id == key)
                     .FirstOrDefault();
 
@@ -74,10 +74,10 @@ namespace WicsPlatform.Server.Controllers.wics
                 {
                     return BadRequest();
                 }
-                this.OnChannelDeleted(item);
-                this.context.Channels.Remove(item);
+                this.OnSchedulePlayDeleted(item);
+                this.context.SchedulePlays.Remove(item);
                 this.context.SaveChanges();
-                this.OnAfterChannelDeleted(item);
+                this.OnAfterSchedulePlayDeleted(item);
 
                 return new NoContentResult();
 
@@ -89,12 +89,12 @@ namespace WicsPlatform.Server.Controllers.wics
             }
         }
 
-        partial void OnChannelUpdated(WicsPlatform.Server.Models.wics.Channel item);
-        partial void OnAfterChannelUpdated(WicsPlatform.Server.Models.wics.Channel item);
+        partial void OnSchedulePlayUpdated(WicsPlatform.Server.Models.wics.SchedulePlay item);
+        partial void OnAfterSchedulePlayUpdated(WicsPlatform.Server.Models.wics.SchedulePlay item);
 
-        [HttpPut("/odata/wics/Channels(Id={Id})")]
+        [HttpPut("/odata/wics/SchedulePlays(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PutChannel(ulong key, [FromBody]WicsPlatform.Server.Models.wics.Channel item)
+        public IActionResult PutSchedulePlay(ulong key, [FromBody]WicsPlatform.Server.Models.wics.SchedulePlay item)
         {
             try
             {
@@ -107,13 +107,13 @@ namespace WicsPlatform.Server.Controllers.wics
                 {
                     return BadRequest();
                 }
-                this.OnChannelUpdated(item);
-                this.context.Channels.Update(item);
+                this.OnSchedulePlayUpdated(item);
+                this.context.SchedulePlays.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Channels.Where(i => i.Id == key);
+                var itemToReturn = this.context.SchedulePlays.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Schedule");
-                this.OnAfterChannelUpdated(item);
+                this.OnAfterSchedulePlayUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
             }
             catch(Exception ex)
@@ -123,9 +123,9 @@ namespace WicsPlatform.Server.Controllers.wics
             }
         }
 
-        [HttpPatch("/odata/wics/Channels(Id={Id})")]
+        [HttpPatch("/odata/wics/SchedulePlays(Id={Id})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult PatchChannel(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.Channel> patch)
+        public IActionResult PatchSchedulePlay(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.SchedulePlay> patch)
         {
             try
             {
@@ -134,7 +134,7 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest(ModelState);
                 }
 
-                var item = this.context.Channels.Where(i => i.Id == key).FirstOrDefault();
+                var item = this.context.SchedulePlays.Where(i => i.Id == key).FirstOrDefault();
 
                 if (item == null)
                 {
@@ -142,13 +142,13 @@ namespace WicsPlatform.Server.Controllers.wics
                 }
                 patch.Patch(item);
 
-                this.OnChannelUpdated(item);
-                this.context.Channels.Update(item);
+                this.OnSchedulePlayUpdated(item);
+                this.context.SchedulePlays.Update(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Channels.Where(i => i.Id == key);
+                var itemToReturn = this.context.SchedulePlays.Where(i => i.Id == key);
                 Request.QueryString = Request.QueryString.Add("$expand", "Schedule");
-                this.OnAfterChannelUpdated(item);
+                this.OnAfterSchedulePlayUpdated(item);
                 return new ObjectResult(SingleResult.Create(itemToReturn));
             }
             catch(Exception ex)
@@ -158,12 +158,12 @@ namespace WicsPlatform.Server.Controllers.wics
             }
         }
 
-        partial void OnChannelCreated(WicsPlatform.Server.Models.wics.Channel item);
-        partial void OnAfterChannelCreated(WicsPlatform.Server.Models.wics.Channel item);
+        partial void OnSchedulePlayCreated(WicsPlatform.Server.Models.wics.SchedulePlay item);
+        partial void OnAfterSchedulePlayCreated(WicsPlatform.Server.Models.wics.SchedulePlay item);
 
         [HttpPost]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
-        public IActionResult Post([FromBody] WicsPlatform.Server.Models.wics.Channel item)
+        public IActionResult Post([FromBody] WicsPlatform.Server.Models.wics.SchedulePlay item)
         {
             try
             {
@@ -177,15 +177,15 @@ namespace WicsPlatform.Server.Controllers.wics
                     return BadRequest();
                 }
 
-                this.OnChannelCreated(item);
-                this.context.Channels.Add(item);
+                this.OnSchedulePlayCreated(item);
+                this.context.SchedulePlays.Add(item);
                 this.context.SaveChanges();
 
-                var itemToReturn = this.context.Channels.Where(i => i.Id == item.Id);
+                var itemToReturn = this.context.SchedulePlays.Where(i => i.Id == item.Id);
 
                 Request.QueryString = Request.QueryString.Add("$expand", "Schedule");
 
-                this.OnAfterChannelCreated(item);
+                this.OnAfterSchedulePlayCreated(item);
 
                 return new ObjectResult(SingleResult.Create(itemToReturn))
                 {

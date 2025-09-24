@@ -32,6 +32,12 @@ namespace WicsPlatform.Server.Data
               .HasForeignKey(i => i.ChannelId)
               .HasPrincipalKey(i => i.Id);
 
+            builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
+              .HasOne(i => i.Schedule)
+              .WithMany(i => i.Channels)
+              .HasForeignKey(i => i.ScheduleId)
+              .HasPrincipalKey(i => i.Id);
+
             builder.Entity<WicsPlatform.Server.Models.wics.MapChannelMedium>()
               .HasOne(i => i.Channel)
               .WithMany(i => i.MapChannelMedia)
@@ -68,30 +74,6 @@ namespace WicsPlatform.Server.Data
               .HasForeignKey(i => i.MediaId)
               .HasPrincipalKey(i => i.Id);
 
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
-              .HasOne(i => i.Medium)
-              .WithMany(i => i.MapScheduleMedia)
-              .HasForeignKey(i => i.MediaId)
-              .HasPrincipalKey(i => i.Id);
-
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
-              .HasOne(i => i.Schedule)
-              .WithMany(i => i.MapScheduleMedia)
-              .HasForeignKey(i => i.ScheduleId)
-              .HasPrincipalKey(i => i.Id);
-
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
-              .HasOne(i => i.Schedule)
-              .WithMany(i => i.MapScheduleTts)
-              .HasForeignKey(i => i.ScheduleId)
-              .HasPrincipalKey(i => i.Id);
-
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
-              .HasOne(i => i.Tt)
-              .WithMany(i => i.MapScheduleTts)
-              .HasForeignKey(i => i.TtsId)
-              .HasPrincipalKey(i => i.Id);
-
             builder.Entity<WicsPlatform.Server.Models.wics.MapSpeakerGroup>()
               .HasOne(i => i.Group)
               .WithMany(i => i.MapSpeakerGroups)
@@ -104,6 +86,12 @@ namespace WicsPlatform.Server.Data
               .HasForeignKey(i => i.SpeakerId)
               .HasPrincipalKey(i => i.Id);
 
+            builder.Entity<WicsPlatform.Server.Models.wics.SchedulePlay>()
+              .HasOne(i => i.Schedule)
+              .WithMany(i => i.SchedulePlays)
+              .HasForeignKey(i => i.ScheduleId)
+              .HasPrincipalKey(i => i.Id);
+
             builder.Entity<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>()
               .HasOne(i => i.Channel)
               .WithMany(i => i.SpeakerOwnershipStates)
@@ -114,6 +102,30 @@ namespace WicsPlatform.Server.Data
               .HasOne(i => i.Speaker)
               .WithMany(i => i.SpeakerOwnershipStates)
               .HasForeignKey(i => i.SpeakerId)
+              .HasPrincipalKey(i => i.Id);
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelSpeaker>()
+              .HasOne(i => i.Channel)
+              .WithMany(i => i.MapChannelSpeakers)
+              .HasForeignKey(i => i.ChannelId)
+              .HasPrincipalKey(i => i.Id);
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelSpeaker>()
+              .HasOne(i => i.Speaker)
+              .WithMany(i => i.MapChannelSpeakers)
+              .HasForeignKey(i => i.SpeakerId)
+              .HasPrincipalKey(i => i.Id);
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelGroup>()
+              .HasOne(i => i.Channel)
+              .WithMany(i => i.MapChannelGroups)
+              .HasForeignKey(i => i.ChannelId)
+              .HasPrincipalKey(i => i.Id);
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelGroup>()
+              .HasOne(i => i.Group)
+              .WithMany(i => i.MapChannelGroups)
+              .HasForeignKey(i => i.GroupId)
               .HasPrincipalKey(i => i.Id);
 
             builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
@@ -184,14 +196,6 @@ namespace WicsPlatform.Server.Data
               .Property(p => p.LastYn)
               .HasDefaultValueSql(@"'Y'");
 
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
-              .Property(p => p.DeleteYn)
-              .HasDefaultValueSql(@"'N'");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
-              .Property(p => p.DeleteYn)
-              .HasDefaultValueSql(@"'N'");
-
             builder.Entity<WicsPlatform.Server.Models.wics.MapSpeakerGroup>()
               .Property(p => p.LastYn)
               .HasDefaultValueSql(@"'Y'");
@@ -211,14 +215,6 @@ namespace WicsPlatform.Server.Data
             builder.Entity<WicsPlatform.Server.Models.wics.Mic>()
               .Property(p => p.Bitrate)
               .HasDefaultValueSql(@"'32000'");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
-              .Property(p => p.ChannelCount)
-              .HasDefaultValueSql(@"'1'");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
-              .Property(p => p.Volume)
-              .HasDefaultValueSql(@"'0.5'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Schedule>()
               .Property(p => p.Monday)
@@ -256,6 +252,10 @@ namespace WicsPlatform.Server.Data
               .Property(p => p.DeleteYn)
               .HasDefaultValueSql(@"'N'");
 
+            builder.Entity<WicsPlatform.Server.Models.wics.SchedulePlay>()
+              .Property(p => p.DeleteYn)
+              .HasDefaultValueSql(@"'N'");
+
             builder.Entity<WicsPlatform.Server.Models.wics.Speaker>()
               .Property(p => p.VpnUseYn)
               .HasDefaultValueSql(@"'N'");
@@ -276,6 +276,14 @@ namespace WicsPlatform.Server.Data
               .Property(p => p.DeleteYn)
               .HasDefaultValueSql(@"'N'");
 
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelSpeaker>()
+              .Property(p => p.DeleteYn)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelGroup>()
+              .Property(p => p.DeleteYn)
+              .HasDefaultValueSql(@"'N'");
+
             builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
               .Property(p => p.CreatedAt)
               .HasColumnType("datetime");
@@ -324,22 +332,6 @@ namespace WicsPlatform.Server.Data
               .Property(p => p.UpdatedAt)
               .HasColumnType("datetime");
 
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
-              .Property(p => p.CreatedAt)
-              .HasColumnType("datetime");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleMedium>()
-              .Property(p => p.UpdatedAt)
-              .HasColumnType("datetime");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
-              .Property(p => p.CreatedAt)
-              .HasColumnType("datetime");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.MapScheduleTt>()
-              .Property(p => p.UpdatedAt)
-              .HasColumnType("datetime");
-
             builder.Entity<WicsPlatform.Server.Models.wics.MapSpeakerGroup>()
               .Property(p => p.CreatedAt)
               .HasColumnType("datetime");
@@ -364,6 +356,14 @@ namespace WicsPlatform.Server.Data
               .Property(p => p.UpdatedAt)
               .HasColumnType("datetime");
 
+            builder.Entity<WicsPlatform.Server.Models.wics.SchedulePlay>()
+              .Property(p => p.CreatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.SchedulePlay>()
+              .Property(p => p.UpdatedAt)
+              .HasColumnType("datetime");
+
             builder.Entity<WicsPlatform.Server.Models.wics.Speaker>()
               .Property(p => p.CreatedAt)
               .HasColumnType("datetime");
@@ -385,6 +385,22 @@ namespace WicsPlatform.Server.Data
               .HasColumnType("datetime");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Tt>()
+              .Property(p => p.UpdatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelSpeaker>()
+              .Property(p => p.CreatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelSpeaker>()
+              .Property(p => p.UpdatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelGroup>()
+              .Property(p => p.CreatedAt)
+              .HasColumnType("datetime");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.MapChannelGroup>()
               .Property(p => p.UpdatedAt)
               .HasColumnType("datetime");
             this.OnModelBuilding(builder);
@@ -402,10 +418,6 @@ namespace WicsPlatform.Server.Data
 
         public DbSet<WicsPlatform.Server.Models.wics.MapMediaGroup> MapMediaGroups { get; set; }
 
-        public DbSet<WicsPlatform.Server.Models.wics.MapScheduleMedium> MapScheduleMedia { get; set; }
-
-        public DbSet<WicsPlatform.Server.Models.wics.MapScheduleTt> MapScheduleTts { get; set; }
-
         public DbSet<WicsPlatform.Server.Models.wics.MapSpeakerGroup> MapSpeakerGroups { get; set; }
 
         public DbSet<WicsPlatform.Server.Models.wics.Medium> Media { get; set; }
@@ -414,11 +426,17 @@ namespace WicsPlatform.Server.Data
 
         public DbSet<WicsPlatform.Server.Models.wics.Schedule> Schedules { get; set; }
 
+        public DbSet<WicsPlatform.Server.Models.wics.SchedulePlay> SchedulePlays { get; set; }
+
         public DbSet<WicsPlatform.Server.Models.wics.Speaker> Speakers { get; set; }
 
         public DbSet<WicsPlatform.Server.Models.wics.SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
 
         public DbSet<WicsPlatform.Server.Models.wics.Tt> Tts { get; set; }
+
+        public DbSet<WicsPlatform.Server.Models.wics.MapChannelSpeaker> MapChannelSpeakers { get; set; }
+
+        public DbSet<WicsPlatform.Server.Models.wics.MapChannelGroup> MapChannelGroups { get; set; }
 
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
         {

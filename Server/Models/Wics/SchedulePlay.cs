@@ -7,21 +7,29 @@ using System.Text.Json.Serialization;
 
 namespace WicsPlatform.Server.Models.wics
 {
-    [Table("tts")]
-    public partial class Tt
+    [Table("schedule_play")]
+    public partial class SchedulePlay
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         [Column("id")]
         public ulong Id { get; set; }
 
-        [Column("name")]
+        [Column("schedule_id")]
         [Required]
-        public string Name { get; set; }
+        public ulong ScheduleId { get; set; }
 
-        [Column("content")]
+        public Schedule Schedule { get; set; }
+
+        [Column("media_id")]
+        public ulong? MediaId { get; set; }
+
+        [Column("tts_id")]
+        public ulong? TtsId { get; set; }
+
+        [Column("delay")]
         [Required]
-        public string Content { get; set; }
+        public ulong Delay { get; set; }
 
         [Column("delete_yn")]
         public string DeleteYn { get; set; }
@@ -33,7 +41,5 @@ namespace WicsPlatform.Server.Models.wics
         [Column("updated_at")]
         [Required]
         public DateTime UpdatedAt { get; set; }
-
-        public ICollection<MapChannelTt> MapChannelTts { get; set; }
     }
 }

@@ -37,7 +37,5 @@ namespace WicsPlatform.Server.Models.wics
         public ICollection<MapChannelMedium> MapChannelMedia { get; set; }
 
         public ICollection<MapMediaGroup> MapMediaGroups { get; set; }
-
-        public ICollection<MapScheduleMedium> MapScheduleMedia { get; set; }
     }
 }

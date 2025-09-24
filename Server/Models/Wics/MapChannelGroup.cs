@@ -7,21 +7,25 @@ using System.Text.Json.Serialization;
 
 namespace WicsPlatform.Server.Models.wics
 {
-    [Table("tts")]
-    public partial class Tt
+    [Table("map_channel_group")]
+    public partial class MapChannelGroup
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         [Column("id")]
         public ulong Id { get; set; }
 
-        [Column("name")]
+        [Column("channel_id")]
         [Required]
-        public string Name { get; set; }
+        public ulong ChannelId { get; set; }
 
-        [Column("content")]
+        public Channel Channel { get; set; }
+
+        [Column("group_id")]
         [Required]
-        public string Content { get; set; }
+        public ulong GroupId { get; set; }
+
+        public Group Group { get; set; }
 
         [Column("delete_yn")]
         public string DeleteYn { get; set; }
@@ -33,7 +37,5 @@ namespace WicsPlatform.Server.Models.wics
         [Column("updated_at")]
         [Required]
         public DateTime UpdatedAt { get; set; }
-
-        public ICollection<MapChannelTt> MapChannelTts { get; set; }
     }
 }
