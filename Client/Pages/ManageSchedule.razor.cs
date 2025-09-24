@@ -29,6 +29,8 @@ public partial class ManageSchedule
 
     // 스케줄별 채널 캐시
     private readonly Dictionary<ulong, Channel> scheduleChannels = new();
+    // 스케줄 활성 상태 캐시: 콘텐츠/스피커 설정 여부
+    private readonly Dictionary<ulong, (bool HasContent, bool HasSpeakers)> scheduleActivation = new();
 
     // 콘텐츠 관련 필드
     private IEnumerable<Medium> availableMedia = new List<Medium>();
@@ -38,9 +40,33 @@ public partial class ManageSchedule
     private IEnumerable<Medium> currentScheduleMedia = new List<Medium>();
     private IEnumerable<Tt> currentScheduleTts = new List<Tt>();
 
+    // 현재 스케줄의 SchedulePlay 순서(보기/초기화용) - Id 오름차순 = 저장 순서
+    private List<(bool IsMedia, ulong Id)> existingPlayOrder = new();
+
     // 편집 중인 콘텐츠 선택 상태
     private HashSet<ulong> editingSelectedMediaIds = new HashSet<ulong>();
     private HashSet<ulong> editingSelectedTtsIds = new HashSet<ulong>();
+
+    // 편집 중 선택 순서 추적 (가장 최근에 클릭한 항목이 마지막)
+    private class SelectedContent
+    {
+        public bool IsMedia { get; set; }
+        public ulong Id { get; set; }
+        public int Seq { get; set; }
+    }
+    private readonly List<SelectedContent> editingSelectionOrder = new();
+    private int nextSelectionSeq = 0;
+
+    // 스피커/그룹 선택 (편집용)
+    private IEnumerable<Server.Models.wics.Group> speakerGroups = new List<Server.Models.wics.Group>();
+    private IEnumerable<Speaker> allSpeakers = new List<Speaker>();
+    private IEnumerable<MapSpeakerGroup> speakerGroupMappings = new List<MapSpeakerGroup>();
+    private bool isLoadingGroups = false;
+    private bool isLoadingSpeakers = false;
+    private HashSet<ulong> editingSelectedGroupIds = new();
+    private HashSet<ulong> editingSelectedSpeakerIds = new();
+    private Server.Models.wics.Group? viewingGroup = null;
+    private HashSet<ulong> expandedGroups = new();
 
     // 요일 데이터
     private readonly Dictionary<string, string> weekdays = new Dictionary<string, string>
@@ -74,6 +100,7 @@ public partial class ManageSchedule
     {
         await LoadSchedules();
         await LoadAvailableContent();
+        await LoadSpeakerData();
     }
 
     private async Task LoadSchedules()
@@ -94,6 +121,7 @@ public partial class ManageSchedule
 
             // 각 스케줄에 연결된 채널 로드 (첫번째 채널 기준)
             scheduleChannels.Clear();
+            scheduleActivation.Clear();
             foreach (var sch in schedules)
             {
                 try
@@ -109,6 +137,12 @@ public partial class ManageSchedule
                     {
                         scheduleChannels[sch.Id] = channel;
                     }
+
+
+                    // 상태 캐시 채우기: 콘텐츠/스피커 존재 여부
+                    var hasContent = await HasContentAsync(sch.Id);
+                    var hasSpeakers = channel != null && await HasSpeakersAsync(channel.Id);
+                    scheduleActivation[sch.Id] = (hasContent, hasSpeakers);
                 }
                 catch (Exception ex)
                 {
@@ -134,6 +168,49 @@ public partial class ManageSchedule
             isLoadingSchedules = false;
             StateHasChanged();
         }
+    }
+
+    private async Task<bool> HasContentAsync(ulong scheduleId)
+    {
+        try
+        {
+            var q = new Radzen.Query
+            {
+                Filter = $"ScheduleId eq {scheduleId} and (DeleteYn eq 'N' or DeleteYn eq null)",
+                Top = 1
+            };
+            var result = await WicsService.GetSchedulePlays(q);
+            return result.Value.AsODataEnumerable().Any();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> HasSpeakersAsync(ulong channelId)
+    {
+        try
+        {
+            var q = new Radzen.Query
+            {
+                Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)",
+                Top = 1
+            };
+            var result = await WicsService.GetMapChannelSpeakers(q);
+            return result.Value.AsODataEnumerable().Any();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private (bool HasContent, bool HasSpeakers) GetActivationStatus(ulong scheduleId)
+    {
+        return scheduleActivation.TryGetValue(scheduleId, out var st)
+            ? st
+            : (HasContent: false, HasSpeakers: false);
     }
 
     private async Task LoadAvailableContent()
@@ -166,6 +243,84 @@ public partial class ManageSchedule
         }
     }
 
+    private async Task LoadSpeakerData()
+    {
+        await Task.WhenAll(
+            LoadSpeakerGroups(),
+            LoadAllSpeakers(),
+            LoadSpeakerGroupMappings()
+        );
+    }
+
+    private async Task LoadSpeakerGroups()
+    {
+        try
+        {
+            isLoadingGroups = true;
+            StateHasChanged();
+
+            var query = new Radzen.Query
+            {
+                Filter = "(DeleteYn eq 'N' or DeleteYn eq null) and Type eq 0"
+            };
+            var result = await WicsService.GetGroups(query);
+            speakerGroups = result.Value.AsODataEnumerable();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load speaker groups");
+        }
+        finally
+        {
+            isLoadingGroups = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAllSpeakers()
+    {
+        try
+        {
+            isLoadingSpeakers = true;
+            StateHasChanged();
+
+            var query = new Radzen.Query
+            {
+                Expand = "Channel",
+                Filter = "DeleteYn eq 'N' or DeleteYn eq null"
+            };
+            var result = await WicsService.GetSpeakers(query);
+            allSpeakers = result.Value.AsODataEnumerable();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load speakers");
+        }
+        finally
+        {
+            isLoadingSpeakers = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadSpeakerGroupMappings()
+    {
+        try
+        {
+            var query = new Radzen.Query
+            {
+                Expand = "Group,Speaker",
+                Filter = "LastYn eq 'Y'"
+            };
+            var result = await WicsService.GetMapSpeakerGroups(query);
+            speakerGroupMappings = result.Value.AsODataEnumerable();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load speaker-group mappings");
+        }
+    }
+
     private async Task LoadScheduleContent(ulong scheduleId)
     {
         try
@@ -177,6 +332,13 @@ public partial class ManageSchedule
             };
             var playsResult = await WicsService.GetSchedulePlays(playQuery);
             var plays = playsResult.Value.AsODataEnumerable();
+
+            // 저장된 순서(=Id asc) 기록
+            existingPlayOrder = plays
+                .OrderBy(p => p.Id)
+                .Select(p => (IsMedia: p.MediaId.HasValue, Id: p.MediaId ?? p.TtsId ?? 0))
+                .Where(x => x.Id != 0)
+                .ToList();
 
             var mediaIds = plays.Where(p => p.MediaId.HasValue).Select(p => p.MediaId!.Value).Distinct().ToList();
             var ttsIds = plays.Where(p => p.TtsId.HasValue).Select(p => p.TtsId!.Value).Distinct().ToList();
@@ -316,6 +478,20 @@ public partial class ManageSchedule
         editingSelectedMediaIds = new HashSet<ulong>(currentScheduleMedia.Select(m => m.Id));
         editingSelectedTtsIds = new HashSet<ulong>(currentScheduleTts.Select(t => t.Id));
 
+        // 초기 선택 순서 구성: 기존 콘텐츠를 생성일/ID 기준으로 결합하여 순서 부여
+        BuildInitialSelectionOrder();
+
+        // 스피커/그룹 선택 초기화 (채널 기준)
+        editingSelectedGroupIds.Clear();
+        editingSelectedSpeakerIds.Clear();
+        viewingGroup = null;
+        expandedGroups.Clear();
+
+        if (editingChannel != null)
+        {
+            await InitializeChannelSpeakerSelections(editingChannel.Id);
+        }
+
         StateHasChanged();
     }
 
@@ -329,6 +505,12 @@ public partial class ManageSchedule
         tempRepeatCount = 0;
         editingSelectedMediaIds.Clear();
         editingSelectedTtsIds.Clear();
+        editingSelectedGroupIds.Clear();
+        editingSelectedSpeakerIds.Clear();
+        viewingGroup = null;
+        expandedGroups.Clear();
+        editingSelectionOrder.Clear();
+        nextSelectionSeq = 0;
         StateHasChanged();
     }
 
@@ -394,6 +576,12 @@ public partial class ManageSchedule
             // 콘텐츠 매핑 업데이트 -> SchedulePlay 기반
             await UpdateSchedulePlays(editingSchedule.Id);
 
+            // 스피커/그룹 매핑 업데이트 -> 채널 기준
+            if (editingChannel != null)
+            {
+                await UpdateChannelSpeakerMappings(editingChannel.Id);
+            }
+
             // 성공 알림
             var name = editingChannel?.Name ?? $"스케줄 #{editingSchedule.Id}";
             NotificationService.Notify(new NotificationMessage
@@ -443,7 +631,7 @@ public partial class ManageSchedule
     {
         try
         {
-            // 기존 플레이들 가져오기
+            // 1) 기존 활성 플레이 모두 소프트 삭제 (정렬을 Id 순서에 의존하므로 재작성)
             var existingQuery = new Radzen.Query
             {
                 Filter = $"ScheduleId eq {scheduleId} and (DeleteYn eq 'N' or DeleteYn eq null)"
@@ -451,27 +639,26 @@ public partial class ManageSchedule
             var existingResult = await WicsService.GetSchedulePlays(existingQuery);
             var existing = existingResult.Value.AsODataEnumerable().ToList();
 
-            var existingMediaIds = existing.Where(p => p.MediaId.HasValue).Select(p => p.MediaId!.Value).ToHashSet();
-            var existingTtsIds = existing.Where(p => p.TtsId.HasValue).Select(p => p.TtsId!.Value).ToHashSet();
-
-            // 삭제할 미디어 플레이
-            var mediaToRemove = existing.Where(p => p.MediaId.HasValue && !editingSelectedMediaIds.Contains(p.MediaId!.Value));
-            foreach (var play in mediaToRemove)
+            foreach (var play in existing)
             {
                 play.DeleteYn = "Y";
                 play.UpdatedAt = DateTime.UtcNow;
                 await WicsService.UpdateSchedulePlay(play.Id, play);
             }
 
-            // 추가할 미디어 플레이
-            var mediaToAdd = editingSelectedMediaIds.Except(existingMediaIds);
-            foreach (var mediaId in mediaToAdd)
+            // 2) 현재 클릭 순서대로 재생 항목을 재생성 (Delay는 의미 없으므로 0)
+            var ordered = editingSelectionOrder
+                .Where(x => x.IsMedia ? editingSelectedMediaIds.Contains(x.Id) : editingSelectedTtsIds.Contains(x.Id))
+                .OrderBy(x => x.Seq)
+                .ToList();
+
+            foreach (var item in ordered)
             {
                 var newPlay = new SchedulePlay
                 {
                     ScheduleId = scheduleId,
-                    MediaId = mediaId,
-                    TtsId = null,
+                    MediaId = item.IsMedia ? item.Id : null,
+                    TtsId = item.IsMedia ? (ulong?)null : item.Id,
                     Delay = 0,
                     DeleteYn = "N",
                     CreatedAt = DateTime.UtcNow,
@@ -480,37 +667,11 @@ public partial class ManageSchedule
                 await WicsService.CreateSchedulePlay(newPlay);
             }
 
-            // 삭제할 TTS 플레이
-            var ttsToRemove = existing.Where(p => p.TtsId.HasValue && !editingSelectedTtsIds.Contains(p.TtsId!.Value));
-            foreach (var play in ttsToRemove)
-            {
-                play.DeleteYn = "Y";
-                play.UpdatedAt = DateTime.UtcNow;
-                await WicsService.UpdateSchedulePlay(play.Id, play);
-            }
-
-            // 추가할 TTS 플레이
-            var ttsToAdd = editingSelectedTtsIds.Except(existingTtsIds);
-            foreach (var ttsId in ttsToAdd)
-            {
-                var newPlay = new SchedulePlay
-                {
-                    ScheduleId = scheduleId,
-                    MediaId = null,
-                    TtsId = ttsId,
-                    Delay = 0,
-                    DeleteYn = "N",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await WicsService.CreateSchedulePlay(newPlay);
-            }
-
-            Logger.LogInformation($"Updated schedule plays for schedule {scheduleId}");
+            Logger.LogInformation($"Recreated schedule plays for schedule {scheduleId} in click order: {ordered.Count} items");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, $"Failed to update schedule plays for schedule {scheduleId}");
+            Logger.LogError(ex, $"Failed to update schedule plays (recreate in order) for schedule {scheduleId}");
             throw;
         }
     }
@@ -521,10 +682,12 @@ public partial class ManageSchedule
         if (editingSelectedMediaIds.Contains(mediaId))
         {
             editingSelectedMediaIds.Remove(mediaId);
+            RemoveFromSelectionOrder(true, mediaId);
         }
         else
         {
             editingSelectedMediaIds.Add(mediaId);
+            AddToSelectionOrder(true, mediaId);
         }
         StateHasChanged();
     }
@@ -535,13 +698,372 @@ public partial class ManageSchedule
         if (editingSelectedTtsIds.Contains(ttsId))
         {
             editingSelectedTtsIds.Remove(ttsId);
+            RemoveFromSelectionOrder(false, ttsId);
         }
         else
         {
             editingSelectedTtsIds.Add(ttsId);
+            AddToSelectionOrder(false, ttsId);
         }
         StateHasChanged();
     }
+
+    // 선택 순서 유틸리티
+    private void AddToSelectionOrder(bool isMedia, ulong id)
+    {
+        if (!editingSelectionOrder.Any(x => x.IsMedia == isMedia && x.Id == id))
+        {
+            editingSelectionOrder.Add(new SelectedContent
+            {
+                IsMedia = isMedia,
+                Id = id,
+                Seq = ++nextSelectionSeq
+            });
+        }
+    }
+
+    private void RemoveFromSelectionOrder(bool isMedia, ulong id)
+    {
+        editingSelectionOrder.RemoveAll(x => x.IsMedia == isMedia && x.Id == id);
+    }
+
+    private void BuildInitialSelectionOrder()
+    {
+        editingSelectionOrder.Clear();
+        nextSelectionSeq = 0;
+
+        // 1) 가능한 경우 기존 SchedulePlay의 저장 순서(Id asc)를 그대로 초기 순서로 사용
+        if (existingPlayOrder.Any())
+        {
+            foreach (var item in existingPlayOrder)
+            {
+                // 현재 선택된 항목만 반영
+                if ((item.IsMedia && editingSelectedMediaIds.Contains(item.Id)) ||
+                    (!item.IsMedia && editingSelectedTtsIds.Contains(item.Id)))
+                {
+                    AddToSelectionOrder(item.IsMedia, item.Id);
+                }
+            }
+        }
+        else
+        {
+            // 2) 폴백: 생성일/ID 기준
+            var initial = new List<(bool IsMedia, ulong Id, DateTime CreatedAt, ulong Ord)>();
+            foreach (var m in currentScheduleMedia)
+            {
+                if (editingSelectedMediaIds.Contains(m.Id))
+                    initial.Add((true, m.Id, m.CreatedAt, m.Id));
+            }
+            foreach (var t in currentScheduleTts)
+            {
+                if (editingSelectedTtsIds.Contains(t.Id))
+                    initial.Add((false, t.Id, t.CreatedAt, t.Id));
+            }
+
+            foreach (var item in initial.OrderBy(x => x.CreatedAt).ThenBy(x => x.Ord))
+            {
+                AddToSelectionOrder(item.IsMedia, item.Id);
+            }
+        }
+    }
+
+    // UI 표시용 이름 조회
+    private string GetContentName(bool isMedia, ulong id)
+    {
+        if (isMedia)
+        {
+            var m = availableMedia.FirstOrDefault(x => x.Id == id);
+            return m?.FileName ?? $"미디어 #{id}";
+        }
+        else
+        {
+            var t = availableTts.FirstOrDefault(x => x.Id == id);
+            return t?.Name ?? $"TTS #{id}";
+        }
+    }
+
+    // ===== 스피커/그룹 편집 동작 =====
+    private async Task InitializeChannelSpeakerSelections(ulong channelId)
+    {
+        try
+        {
+            // 그룹 매핑 로드
+            var groupQuery = new Radzen.Query
+            {
+                Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)"
+            };
+            var groupMaps = await WicsService.GetMapChannelGroups(groupQuery);
+            var groups = groupMaps.Value.AsODataEnumerable().ToList();
+            editingSelectedGroupIds = groups.Select(g => g.GroupId).ToHashSet();
+
+            // 스피커 매핑 로드
+            var spQuery = new Radzen.Query
+            {
+                Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)"
+            };
+            var spMaps = await WicsService.GetMapChannelSpeakers(spQuery);
+            var speakers = spMaps.Value.AsODataEnumerable().ToList();
+            var mappedSpeakerIds = speakers.Select(s => s.SpeakerId).ToHashSet();
+
+            if (mappedSpeakerIds.Any())
+            {
+                editingSelectedSpeakerIds = mappedSpeakerIds;
+            }
+            else if (editingSelectedGroupIds.Any())
+            {
+                // 그룹에서 스피커 유추
+                var union = new HashSet<ulong>();
+                foreach (var gid in editingSelectedGroupIds)
+                {
+                    foreach (var s in GetSpeakersInGroupSync(gid))
+                    {
+                        union.Add(s.Id);
+                    }
+                }
+                editingSelectedSpeakerIds = union;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"Failed to initialize channel speaker selections for channel {channelId}");
+        }
+    }
+
+    private async Task UpdateChannelSpeakerMappings(ulong channelId)
+    {
+        try
+        {
+            // 기존 그룹 매핑 읽기
+            var existingGroupsQuery = new Radzen.Query
+            {
+                Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)"
+            };
+            var existingGroupsResult = await WicsService.GetMapChannelGroups(existingGroupsQuery);
+            var existingGroupMaps = existingGroupsResult.Value.AsODataEnumerable().ToList();
+
+            var existingGroupIds = existingGroupMaps.Select(m => m.GroupId).ToHashSet();
+
+            // 삭제할 그룹 매핑
+            foreach (var toRemove in existingGroupMaps.Where(m => !editingSelectedGroupIds.Contains(m.GroupId)))
+            {
+                toRemove.DeleteYn = "Y";
+                toRemove.UpdatedAt = DateTime.UtcNow;
+                await WicsService.UpdateMapChannelGroup(toRemove.Id, toRemove);
+            }
+
+            // 추가할 그룹 매핑
+            var groupsToAdd = editingSelectedGroupIds.Except(existingGroupIds);
+            foreach (var gid in groupsToAdd)
+            {
+                var newMap = new MapChannelGroup
+                {
+                    ChannelId = channelId,
+                    GroupId = gid,
+                    DeleteYn = "N",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await WicsService.CreateMapChannelGroup(newMap);
+            }
+
+            // 기존 스피커 매핑 읽기
+            var existingSpeakersQuery = new Radzen.Query
+            {
+                Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)"
+            };
+            var existingSpeakersResult = await WicsService.GetMapChannelSpeakers(existingSpeakersQuery);
+            var existingSpeakerMaps = existingSpeakersResult.Value.AsODataEnumerable().ToList();
+            var existingSpeakerIds = existingSpeakerMaps.Select(m => m.SpeakerId).ToHashSet();
+
+            // 삭제할 스피커 매핑
+            foreach (var toRemove in existingSpeakerMaps.Where(m => !editingSelectedSpeakerIds.Contains(m.SpeakerId)))
+            {
+                toRemove.DeleteYn = "Y";
+                toRemove.UpdatedAt = DateTime.UtcNow;
+                await WicsService.UpdateMapChannelSpeaker(toRemove.Id, toRemove);
+            }
+
+            // 추가할 스피커 매핑
+            var speakersToAdd = editingSelectedSpeakerIds.Except(existingSpeakerIds);
+            foreach (var sid in speakersToAdd)
+            {
+                var newMap = new MapChannelSpeaker
+                {
+                    ChannelId = channelId,
+                    SpeakerId = sid,
+                    DeleteYn = "N",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await WicsService.CreateMapChannelSpeaker(newMap);
+            }
+
+            Logger.LogInformation($"Updated channel-speaker mappings for channel {channelId}: groups={editingSelectedGroupIds.Count}, speakers={editingSelectedSpeakerIds.Count}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"Failed to update channel speaker mappings for channel {channelId}");
+            throw;
+        }
+    }
+
+    private bool IsGroupSelectedEdit(ulong groupId) => editingSelectedGroupIds.Contains(groupId);
+
+    private void ToggleGroupSelectionEdit(ulong groupId)
+    {
+        if (editingSelectedGroupIds.Contains(groupId))
+        {
+            editingSelectedGroupIds.Remove(groupId);
+            // 그룹 내 스피커 제거 (다른 선택된 그룹에도 속한 스피커는 유지)
+            var groupSpeakerIds = GetSpeakersInGroupSync(groupId).Select(s => s.Id).ToList();
+            foreach (var sid in groupSpeakerIds)
+            {
+                // 이 스피커가 다른 선택 그룹에도 포함되지 않으면 제거
+                var inOther = editingSelectedGroupIds.Any(gid => GetSpeakersInGroupSync(gid).Any(s => s.Id == sid));
+                if (!inOther && editingSelectedSpeakerIds.Contains(sid))
+                {
+                    editingSelectedSpeakerIds.Remove(sid);
+                }
+            }
+        }
+        else
+        {
+            editingSelectedGroupIds.Add(groupId);
+            // 그룹 내 스피커 모두 추가
+            foreach (var s in GetSpeakersInGroupSync(groupId))
+            {
+                editingSelectedSpeakerIds.Add(s.Id);
+            }
+        }
+        StateHasChanged();
+    }
+
+    private void SetGroupSelectionEdit(ulong groupId, bool selected)
+    {
+        var currentlySelected = editingSelectedGroupIds.Contains(groupId);
+        if (selected == currentlySelected)
+        {
+            return;
+        }
+        ToggleGroupSelectionEdit(groupId);
+    }
+
+    private void ToggleGroupExpansion(ulong groupId)
+    {
+        if (!expandedGroups.Add(groupId))
+        {
+            expandedGroups.Remove(groupId);
+        }
+        StateHasChanged();
+    }
+
+    private bool IsExpanded(ulong groupId) => expandedGroups.Contains(groupId);
+
+    private void ViewGroupDetailsEdit(Server.Models.wics.Group group)
+    {
+        viewingGroup = group;
+        StateHasChanged();
+    }
+
+    private bool IsSpeakerSelectedEdit(ulong speakerId) => editingSelectedSpeakerIds.Contains(speakerId);
+
+    private void ToggleSpeakerSelectionEditById(ulong speakerId)
+    {
+        if (editingSelectedSpeakerIds.Contains(speakerId))
+        {
+            editingSelectedSpeakerIds.Remove(speakerId);
+        }
+        else
+        {
+            editingSelectedSpeakerIds.Add(speakerId);
+        }
+        StateHasChanged();
+    }
+
+    private void SetSpeakerSelectionEditById(ulong speakerId, bool selected)
+    {
+        if (selected)
+        {
+            editingSelectedSpeakerIds.Add(speakerId);
+        }
+        else
+        {
+            editingSelectedSpeakerIds.Remove(speakerId);
+        }
+        StateHasChanged();
+    }
+
+    private void SelectAllSpeakersInViewingGroup()
+    {
+        if (viewingGroup == null) return;
+        foreach (var s in GetSpeakersInGroupSync(viewingGroup.Id))
+        {
+            editingSelectedSpeakerIds.Add(s.Id);
+        }
+        StateHasChanged();
+    }
+
+    private void DeselectAllSpeakersInViewingGroup()
+    {
+        if (viewingGroup == null) return;
+        var ids = GetSpeakersInGroupSync(viewingGroup.Id).Select(s => s.Id).ToHashSet();
+        editingSelectedSpeakerIds.RemoveWhere(id => ids.Contains(id));
+        StateHasChanged();
+    }
+
+    private void ClearSpeakerSelectionsEdit()
+    {
+        editingSelectedGroupIds.Clear();
+        editingSelectedSpeakerIds.Clear();
+        viewingGroup = null;
+        expandedGroups.Clear();
+        StateHasChanged();
+    }
+
+    private IEnumerable<Speaker> GetSpeakersInGroupSync(ulong groupId)
+    {
+        var speakerIds = speakerGroupMappings
+            .Where(m => m.GroupId == groupId && m.LastYn == "Y")
+            .Select(m => m.SpeakerId)
+            .Distinct();
+
+        return allSpeakers.Where(s => speakerIds.Contains(s.Id));
+    }
+
+    private int GetSpeakerCountInGroup(ulong groupId)
+    {
+        return speakerGroupMappings
+            .Where(m => m.GroupId == groupId && m.LastYn == "Y")
+            .Select(m => m.SpeakerId)
+            .Distinct()
+            .Count();
+    }
+
+    private int GetOnlineSpeakerCount(ulong groupId)
+    {
+        var ids = speakerGroupMappings
+            .Where(m => m.GroupId == groupId && m.LastYn == "Y")
+            .Select(m => m.SpeakerId)
+            .Distinct();
+        return allSpeakers.Count(s => ids.Contains(s.Id) && s.State == 1);
+    }
+
+    private List<Speaker> GetOnlineSpeakersSelected() => allSpeakers.Where(s => editingSelectedSpeakerIds.Contains(s.Id) && s.State == 1).ToList();
+    private List<Speaker> GetOfflineSpeakersSelected() => allSpeakers.Where(s => editingSelectedSpeakerIds.Contains(s.Id) && s.State != 1).ToList();
+
+    private BadgeStyle GetSpeakerStatusBadgeStyle(byte state) => state switch
+    {
+        1 => BadgeStyle.Success,
+        2 => BadgeStyle.Info,
+        _ => BadgeStyle.Secondary
+    };
+
+    private string GetSpeakerStatusText(byte state) => state switch
+    {
+        1 => "온라인",
+        2 => "유휴",
+        _ => "오프라인"
+    };
 
     // 편집 모드에서 요일 선택 여부 확인
     private bool IsWeekdaySelectedInEdit(string dayCode)
@@ -667,13 +1189,20 @@ public partial class ManageSchedule
                editingSchedule.Sunday == "Y";
     }
 
-    // 스케줄 상태 배지 스타일 (DeleteYn 기반)
-    private BadgeStyle GetScheduleBadgeStyle(string deleteYn) =>
-        (deleteYn == "Y") ? BadgeStyle.Danger : BadgeStyle.Success;
+    // 스케줄 상태 배지/텍스트 (콘텐츠+스피커 설정 여부 기준)
+    private BadgeStyle GetScheduleBadgeStyle(Schedule schedule)
+    {
+        if (schedule.DeleteYn == "Y") return BadgeStyle.Danger;
+        var status = GetActivationStatus(schedule.Id);
+        return (status.HasContent && status.HasSpeakers) ? BadgeStyle.Success : BadgeStyle.Warning;
+    }
 
-    // 스케줄 상태 텍스트
-    private string GetScheduleStateText(string deleteYn) =>
-        (deleteYn == "Y") ? "비활성" : "활성";
+    private string GetScheduleStateText(Schedule schedule)
+    {
+        if (schedule.DeleteYn == "Y") return "비활성";
+        var status = GetActivationStatus(schedule.Id);
+        return (status.HasContent && status.HasSpeakers) ? "활성" : "미설정";
+    }
 
     // 요일 표시 문자열 생성
     private string GetWeekdaysDisplay(Schedule schedule)
@@ -762,7 +1291,7 @@ public partial class ManageSchedule
     {
         var chName = GetChannelNameForSchedule(schedule);
         var result = await DialogService.Confirm(
-            $"'{chName}' 스케줄을 삭제하시겠습니까?\n연결된 콘텐츠도 함께 삭제됩니다.",
+            $"'{chName}' 스케줄을 삭제하시겠습니까?\n연결된 콘텐츠 및 채널 매핑도 함께 삭제됩니다.",
             "스케줄 삭제 확인",
             new ConfirmOptions
             {
@@ -789,6 +1318,14 @@ public partial class ManageSchedule
             var chName = GetChannelNameForSchedule(schedule);
             Logger.LogInformation($"Deleting schedule: {chName} (ID: {schedule.Id})");
 
+            // 0. 스케줄과 연결된 채널 목록 가져오기
+            var channelsQuery = new Radzen.Query
+            {
+                Filter = $"ScheduleId eq {schedule.Id} and (DeleteYn eq 'N' or DeleteYn eq null)"
+            };
+            var channelsResult = await WicsService.GetChannels(channelsQuery);
+            var linkedChannels = channelsResult.Value.AsODataEnumerable().ToList();
+
             // 1. 스케줄과 연결된 SchedulePlay 소프트 삭제
             var playsQuery = new Radzen.Query
             {
@@ -804,12 +1341,62 @@ public partial class ManageSchedule
                 Logger.LogInformation($"Soft deleted schedule play: {play.Id}");
             }
 
-            // 2. 스케줄 자체 소프트 삭제
+            // 2. 채널 관련 맵 데이터 소프트 삭제 (미디어/tts/그룹/스피커)
+            foreach (var ch in linkedChannels)
+            {
+                // MapChannelMedia
+                var mapMediaQuery = new Radzen.Query { Filter = $"ChannelId eq {ch.Id} and (DeleteYn eq 'N' or DeleteYn eq null)" };
+                var mapMediaResult = await WicsService.GetMapChannelMedia(mapMediaQuery);
+                foreach (var m in mapMediaResult.Value.AsODataEnumerable())
+                {
+                    m.DeleteYn = "Y";
+                    m.UpdatedAt = DateTime.UtcNow;
+                    await WicsService.UpdateMapChannelMedium(m.Id, m);
+                }
+
+                // MapChannelTts
+                var mapTtsQuery = new Radzen.Query { Filter = $"ChannelId eq {ch.Id} and (DeleteYn eq 'N' or DeleteYn eq null)" };
+                var mapTtsResult = await WicsService.GetMapChannelTts(mapTtsQuery);
+                foreach (var t in mapTtsResult.Value.AsODataEnumerable())
+                {
+                    t.DeleteYn = "Y";
+                    t.UpdatedAt = DateTime.UtcNow;
+                    await WicsService.UpdateMapChannelTt(t.Id, t);
+                }
+
+                // MapChannelGroups
+                var mapGroupsQuery = new Radzen.Query { Filter = $"ChannelId eq {ch.Id} and (DeleteYn eq 'N' or DeleteYn eq null)" };
+                var mapGroupsResult = await WicsService.GetMapChannelGroups(mapGroupsQuery);
+                foreach (var g in mapGroupsResult.Value.AsODataEnumerable())
+                {
+                    g.DeleteYn = "Y";
+                    g.UpdatedAt = DateTime.UtcNow;
+                    await WicsService.UpdateMapChannelGroup(g.Id, g);
+                }
+
+                // MapChannelSpeakers
+                var mapSpeakersQuery = new Radzen.Query { Filter = $"ChannelId eq {ch.Id} and (DeleteYn eq 'N' or DeleteYn eq null)" };
+                var mapSpeakersResult = await WicsService.GetMapChannelSpeakers(mapSpeakersQuery);
+                foreach (var s in mapSpeakersResult.Value.AsODataEnumerable())
+                {
+                    s.DeleteYn = "Y";
+                    s.UpdatedAt = DateTime.UtcNow;
+                    await WicsService.UpdateMapChannelSpeaker(s.Id, s);
+                }
+
+                // 채널 소프트 삭제
+                ch.DeleteYn = "Y";
+                ch.UpdatedAt = DateTime.UtcNow;
+                await WicsService.UpdateChannel(ch.Id, ch);
+                Logger.LogInformation($"Soft deleted channel: {ch.Id}");
+            }
+
+            // 3. 스케줄 자체 소프트 삭제
             schedule.DeleteYn = "Y";
             schedule.UpdatedAt = DateTime.UtcNow;
             await WicsService.UpdateSchedule(schedule.Id, schedule);
 
-            Logger.LogInformation($"Successfully soft deleted schedule: {chName}");
+            Logger.LogInformation($"Successfully soft deleted schedule and related data: {chName}");
 
             // 선택된 스케줄이 삭제된 스케줄이면 선택 해제
             if (selectedSchedule?.Id == schedule.Id)

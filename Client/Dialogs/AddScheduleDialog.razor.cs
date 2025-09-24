@@ -61,12 +61,7 @@ public partial class AddScheduleDialog
         new AudioChannelOption { Value = 2, Text = "스테레오 (2채널)" }
     };
 
-    // 콘텐츠 관련
-    protected IEnumerable<WicsPlatform.Server.Models.wics.Medium> availableMedia = new List<WicsPlatform.Server.Models.wics.Medium>();
-    protected IEnumerable<WicsPlatform.Server.Models.wics.Tt> availableTts = new List<WicsPlatform.Server.Models.wics.Tt>();
-    protected HashSet<ulong> selectedMediaIds = new HashSet<ulong>();
-    protected HashSet<ulong> selectedTtsIds = new HashSet<ulong>();
-    protected int selectedTabIndex = 0;
+    // 콘텐츠 선택은 생성 후 편집 화면에서 설정하도록 단순화
 
     protected override async Task OnInitializedAsync()
     {
@@ -81,38 +76,7 @@ public partial class AddScheduleDialog
         model.Monday = model.Tuesday = model.Wednesday = model.Thursday =
         model.Friday = model.Saturday = model.Sunday = "Y";
 
-        // 미디어 및 TTS 목록 로드
-        await LoadAvailableContent();
-    }
-
-    // 사용 가능한 콘텐츠 로드
-    private async Task LoadAvailableContent()
-    {
-        try
-        {
-            // 미디어 로드
-            var mediaQuery = new Radzen.Query
-            {
-                Filter = "(DeleteYn eq 'N' or DeleteYn eq null)",
-                OrderBy = "CreatedAt desc"
-            };
-            var mediaResult = await WicsService.GetMedia(mediaQuery);
-            availableMedia = mediaResult.Value.AsODataEnumerable();
-
-            // TTS 로드
-            var ttsQuery = new Radzen.Query
-            {
-                Filter = "(DeleteYn eq 'N' or DeleteYn eq null)",
-                OrderBy = "CreatedAt desc"
-            };
-            var ttsResult = await WicsService.GetTts(ttsQuery);
-            availableTts = ttsResult.Value.AsODataEnumerable();
-        }
-        catch (Exception ex)
-        {
-            errorVisible = true;
-            error = $"콘텐츠 목록을 불러오는 중 오류가 발생했습니다: {ex.Message}";
-        }
+        // 콘텐츠는 이후 편집 화면에서 설정
     }
 
     // 요일 관련 메서드
@@ -185,32 +149,6 @@ public partial class AddScheduleDialog
         model.Friday = model.Saturday = model.Sunday = "N";
     }
 
-    // 미디어 선택 토글
-    protected void ToggleMediaSelection(ulong mediaId)
-    {
-        if (selectedMediaIds.Contains(mediaId))
-        {
-            selectedMediaIds.Remove(mediaId);
-        }
-        else
-        {
-            selectedMediaIds.Add(mediaId);
-        }
-    }
-
-    // TTS 선택 토글
-    protected void ToggleTtsSelection(ulong ttsId)
-    {
-        if (selectedTtsIds.Contains(ttsId))
-        {
-            selectedTtsIds.Remove(ttsId);
-        }
-        else
-        {
-            selectedTtsIds.Add(ttsId);
-        }
-    }
-
     // 폼 제출
     protected async Task FormSubmit()
     {
@@ -234,15 +172,6 @@ public partial class AddScheduleDialog
             {
                 errorVisible = true;
                 error = "최소 하나 이상의 요일을 선택해야 합니다.";
-                isProcessing = false;
-                return;
-            }
-
-            // 최소 하나의 콘텐츠가 선택되어야 함
-            if (!selectedMediaIds.Any() && !selectedTtsIds.Any())
-            {
-                errorVisible = true;
-                error = "최소 하나 이상의 미디어 또는 TTS를 선택해야 합니다.";
                 isProcessing = false;
                 return;
             }
@@ -287,7 +216,6 @@ public partial class AddScheduleDialog
                 MicVolume = 0.5f,
                 MediaVolume = 0.5f,
                 TtsVolume = 0.5f,
-                State = 1, // 활성
                 AudioMethod = 0, // 기본 오디오 메서드
                 Codec = null,
                 BitRate = 0,
@@ -305,39 +233,6 @@ public partial class AddScheduleDialog
                 error = "채널 생성에 실패했습니다.";
                 isProcessing = false;
                 return;
-            }
-
-            // 3) SchedulePlay 생성 (선택된 콘텐츠 각각)
-            // 미디어 매핑
-            foreach (var mediaId in selectedMediaIds)
-            {
-                var play = new WicsPlatform.Server.Models.wics.SchedulePlay
-                {
-                    ScheduleId = createdSchedule.Id,
-                    MediaId = mediaId,
-                    TtsId = null,
-                    Delay = 0,
-                    DeleteYn = "N",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await WicsService.CreateSchedulePlay(play);
-            }
-
-            // TTS 매핑
-            foreach (var ttsId in selectedTtsIds)
-            {
-                var play = new WicsPlatform.Server.Models.wics.SchedulePlay
-                {
-                    ScheduleId = createdSchedule.Id,
-                    MediaId = null,
-                    TtsId = ttsId,
-                    Delay = 0,
-                    DeleteYn = "N",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await WicsService.CreateSchedulePlay(play);
             }
 
             // 성공 알림 표시

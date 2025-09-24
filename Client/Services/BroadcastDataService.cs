@@ -123,7 +123,8 @@ namespace WicsPlatform.Client.Services
             {
                 var query = new Query
                 {
-                    Filter = "DeleteYn eq 'N' or DeleteYn eq null",
+                    // 예약방송 채널 제외: ScheduleId eq null 만 표시, 소프트삭제 제외
+                    Filter = "(DeleteYn eq 'N' or DeleteYn eq null) and ScheduleId eq null",
                     OrderBy = "CreatedAt desc"
                 };
                 var result = await _wicsService.GetChannels(query);

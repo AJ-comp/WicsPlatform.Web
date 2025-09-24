@@ -15,7 +15,7 @@
 
     <RadzenRow Gap="0.75rem">
         <!-- 좌측: 스케줄 리스트 -->
-        <RadzenColumn Size="12" SizeMD="4">
+        <RadzenColumn Size="12" SizeMD="3">
             <RadzenCard class="schedule-list-panel">
                 <RadzenStack Gap="0.75rem">
                     <RadzenRow AlignItems="AlignItems.Center" class="section-header">
@@ -70,9 +70,9 @@
                                                 </RadzenStack>
                                             </RadzenColumn>
                                             <RadzenColumn Size="3" class="text-center">
-                                                <RadzenBadge BadgeStyle="@GetScheduleBadgeStyle(schedule.DeleteYn)"
+                                                <RadzenBadge BadgeStyle="@GetScheduleBadgeStyle(schedule)"
                                                              IsPill="true"
-                                                             Text="@GetScheduleStateText(schedule.DeleteYn)"
+                                                             Text="@GetScheduleStateText(schedule)"
                                                              class="state-badge" />
                                             </RadzenColumn>
                                             <RadzenColumn Size="2" class="text-end">
@@ -116,7 +116,7 @@
         </RadzenColumn>
 
         <!-- 우측: 선택된 스케줄 상세 정보 -->
-        <RadzenColumn Size="12" SizeMD="8">
+        <RadzenColumn Size="12" SizeMD="9">
             <RadzenCard class="schedule-detail-panel">
                 @if (selectedSchedule == null)
                 {
@@ -192,107 +192,317 @@
                                 </RadzenRow>
                             </RadzenCard>
 
-                            <!-- 오디오 설정 섹션 (편집 가능) -->
-                            <RadzenCard class="info-section editing">
-                                <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
-                                    <RadzenIcon Icon="tune" class="info-section-icon" />
-                                    오디오 설정
-                                </RadzenText>
-                                <RadzenRow Gap="0.5rem" class="mt-2">
-                                    <RadzenColumn Size="6" SizeMD="3">
-                                        <div class="info-item">
-                                            <RadzenText TextStyle="TextStyle.Caption" class="info-label">샘플레이트</RadzenText>
-                                            <RadzenDropDown @bind-Value="@editingChannel.SamplingRate"
-                                                            Data="@sampleRates"
-                                                            ValueProperty="Value"
-                                                            TextProperty="Text"
-                                                            class="info-input editable" />
-                                        </div>
-                                    </RadzenColumn>
-                                    <RadzenColumn Size="6" SizeMD="3">
-                                        <div class="info-item">
-                                            <RadzenText TextStyle="TextStyle.Caption" class="info-label">채널 수</RadzenText>
-                                            <RadzenDropDown @bind-Value="@editingChannel.ChannelCount"
-                                                            Data="@audioChannels"
-                                                            ValueProperty="Value"
-                                                            TextProperty="Text"
-                                                            class="info-input editable" />
-                                        </div>
-                                    </RadzenColumn>
-                                    <RadzenColumn Size="12" SizeMD="6">
-                                        <div class="info-item">
-                                            <RadzenText TextStyle="TextStyle.Caption" class="info-label">
-                                                볼륨 <span class="volume-percentage">(@((editingChannel.Volume * 100).ToString("0"))%)</span>
-                                            </RadzenText>
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenSlider @bind-Value="@editingChannel.Volume"
-                                                              Min="0" Max="1" Step="0.01"
-                                                              class="volume-slider editable" />
-                                            </RadzenStack>
-                                        </div>
-                                    </RadzenColumn>
-                                </RadzenRow>
-                            </RadzenCard>
+                            <!-- 오디오 설정 + 예약 시간 섹션을 한 행 두 컬럼으로 구성 -->
+                            <RadzenRow Gap="0.75rem" class="settings-row">
+                                <!-- 왼쪽: 오디오 설정 섹션 -->
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenCard class="info-section editing">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
+                                            <RadzenIcon Icon="tune" class="info-section-icon" />
+                                            오디오 설정
+                                        </RadzenText>
+                                        <RadzenRow Gap="0.5rem" class="mt-2">
+                                            <RadzenColumn Size="6" SizeMD="6">
+                                                <div class="info-item">
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="info-label">샘플레이트</RadzenText>
+                                                    <RadzenDropDown @bind-Value="@editingChannel.SamplingRate"
+                                                                    Data="@sampleRates"
+                                                                    ValueProperty="Value"
+                                                                    TextProperty="Text"
+                                                                    class="info-input editable" />
+                                                </div>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="6" SizeMD="6">
+                                                <div class="info-item">
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="info-label">채널 수</RadzenText>
+                                                    <RadzenDropDown @bind-Value="@editingChannel.ChannelCount"
+                                                                    Data="@audioChannels"
+                                                                    ValueProperty="Value"
+                                                                    TextProperty="Text"
+                                                                    class="info-input editable" />
+                                                </div>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12">
+                                                <div class="info-item">
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="info-label">
+                                                        볼륨 <span class="volume-percentage">(@((editingChannel.Volume * 100).ToString("0"))%)</span>
+                                                    </RadzenText>
+                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                        <RadzenSlider @bind-Value="@editingChannel.Volume"
+                                                                      Min="0" Max="1" Step="0.01"
+                                                                      class="volume-slider editable" />
+                                                    </RadzenStack>
+                                                </div>
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                    </RadzenCard>
+                                </RadzenColumn>
+
+                                <!-- 오른쪽: 예약 시간 섹션 -->
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenCard class="info-section editing compact" Style="padding: 0.5rem 0.75rem;">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
+                                            <RadzenIcon Icon="schedule" class="info-section-icon" />
+                                            예약 시간 설정
+                                        </RadzenText>
+
+                                        <RadzenRow Gap="0.5rem" Class="reservation-row">
+                                            <!-- 요일 선택과 빠른 선택: 전체 너비 사용 -->
+                                            <RadzenColumn Size="12" Class="reservation-left-col">
+                                                <div class="weekday-section">
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="info-label small mb-1">반복 요일</RadzenText>
+                                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.35rem" AlignItems="AlignItems.Center" Class="flex-wrap">
+                                                        @foreach (var day in weekdays)
+                                                        {
+                                                            <div class="@($"weekday-item {(IsWeekdaySelectedInEdit(day.Value) ? "selected" : "")} ")"
+                                                                 @onclick="@(() => ToggleWeekdayInEdit(day.Value))">
+                                                                @day.Key
+                                                            </div>
+                                                        }
+                                                    </RadzenStack>
+                                                    <div class="quick-select-buttons mt-2 compact">
+                                                        <RadzenButton Text="매일" Size="ButtonSize.Small"
+                                                                      ButtonStyle="ButtonStyle.Light"
+                                                                      Click="@SelectAllDaysEdit" />
+                                                        <RadzenButton Text="평일" Size="ButtonSize.Small"
+                                                                      ButtonStyle="ButtonStyle.Light"
+                                                                      Click="@SelectWeekdaysEdit" />
+                                                        <RadzenButton Text="주말" Size="ButtonSize.Small"
+                                                                      ButtonStyle="ButtonStyle.Light"
+                                                                      Click="@SelectWeekendEdit" />
+                                                        <RadzenButton Text="초기화" Size="ButtonSize.Small"
+                                                                      ButtonStyle="ButtonStyle.Light"
+                                                                      Click="@ClearWeekdaysEdit" />
+                                                    </div>
+                                                </div>
+                                            </RadzenColumn>
+
+                                            <!-- 하단: 예약 시간(좌) + 반복 횟수(우) -->
+                                            <RadzenColumn Size="12">
+                                                <RadzenRow Gap="0.5rem">
+                                                    <RadzenColumn Size="12" SizeMD="6">
+                                                        <div class="info-item compact-item">
+                                                            <RadzenText TextStyle="TextStyle.Caption" class="info-label small">예약 시간</RadzenText>
+                                                            <RadzenDatePicker @bind-Value="@tempStartDateTime"
+                                                                              ShowTime="true"
+                                                                              TimeOnly="true"
+                                                                              DateFormat="HH:mm"
+                                                                              HoursStep="1"
+                                                                              MinutesStep="1"
+                                                                              class="info-input editable compact-input" />
+                                                        </div>
+                                                    </RadzenColumn>
+                                                    <RadzenColumn Size="12" SizeMD="6">
+                                                        <div class="info-item compact-item">
+                                                            <RadzenText TextStyle="TextStyle.Caption" class="info-label small">반복 횟수</RadzenText>
+                                                            <RadzenNumeric @bind-Value="@tempRepeatCount"
+                                                                           Min="0" Max="255"
+                                                                           ShowUpDown="true"
+                                                                           Placeholder="0 = 무한 반복"
+                                                                           class="info-input editable compact-input" />
+                                                        </div>
+                                                    </RadzenColumn>
+                                                </RadzenRow>
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                    </RadzenCard>
+                                </RadzenColumn>
+                            </RadzenRow>
                         }
 
-                        <!-- 예약 시간 섹션 (편집 가능) -->
+                        <!-- 스피커 설정 섹션 (편집 가능) -->
                         <RadzenCard class="info-section editing">
                             <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
-                                <RadzenIcon Icon="schedule" class="info-section-icon" />
-                                예약 시간 설정
+                                <RadzenIcon Icon="speaker" class="info-section-icon" />
+                                스피커 설정
                             </RadzenText>
-                            <RadzenRow Gap="0.5rem" class="mt-2">
-                                <RadzenColumn Size="12" SizeMD="6">
-                                    <div class="info-item">
-                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">예약 시간</RadzenText>
-                                        <RadzenDatePicker @bind-Value="@tempStartDateTime"
-                                                          ShowTime="true"
-                                                          TimeOnly="true"
-                                                          DateFormat="HH:mm"
-                                                          HoursStep="1"
-                                                          MinutesStep="1"
-                                                          class="info-input editable" />
-                                    </div>
+                            <RadzenRow Gap="0.75rem" class="mt-2">
+                                <!-- 좌측: 그룹 리스트 -->
+                                <RadzenColumn Size="12" SizeMD="5">
+                                    <RadzenCard class="group-section" style="padding: 0.5rem;">
+                                        <RadzenText TextStyle="TextStyle.Body2" class="mb-2" style="font-weight:600; font-size:0.8rem;">
+                                            <RadzenIcon Icon="folder_special" class="me-1" style="font-size:0.875rem; color: var(--rz-primary);" />
+                                            스피커 그룹 목록
+                                        </RadzenText>
+
+                                        @if (isLoadingGroups)
+                                        {
+                                            <div class="text-center py-2">
+                                                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
+                                                                   Style="width: 60%; height: 4px; margin: 0 auto;" />
+                                                <RadzenText Text="스피커 그룹을 불러오는 중..." TextStyle="TextStyle.Caption" class="mt-1" Style="font-size: 0.7rem;" />
+                                            </div>
+                                        }
+                                        else if (speakerGroups.Any())
+                                        {
+                                            <div style="max-height: 320px; overflow-y: auto; border: 1px solid var(--rz-border-color); border-radius: var(--rz-border-radius);">
+                                                @foreach (var group in speakerGroups)
+                                                {
+                                                    var isExpanded = IsExpanded(group.Id);
+                                                    var groupSpeakerCount = GetSpeakerCountInGroup(group.Id);
+                                                    <RadzenCard class="@($"group-item {(viewingGroup?.Id == group.Id ? "viewing" : "")} {(IsGroupSelectedEdit(group.Id) ? "selected" : "")}")"
+                                                                Style="margin: 3px; cursor: pointer; padding: 0.5rem;">
+                                                        <RadzenStack Gap="0.25rem">
+                                                            <RadzenRow AlignItems="AlignItems.Center">
+                                                                <RadzenColumn Size="8">
+                                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem"
+                                                                                 @onclick="@(() => ViewGroupDetailsEdit(group))">
+                                                                        <RadzenCheckBox Value="@IsGroupSelectedEdit(group.Id)"
+                                                                                        Change="@((bool value) => SetGroupSelectionEdit(group.Id, value))"
+                                                                                        Style="width: 14px; height: 14px;"
+                                                                                        @onclick:stopPropagation="true" />
+                                                                        <RadzenIcon Icon="@(isExpanded ? "folder_open" : "folder")" Style="color: var(--rz-secondary); font-size: 0.875rem;" />
+                                                                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight:600; font-size:0.8rem;">
+                                                                            @group.Name
+                                                                        </RadzenText>
+                                                                    </RadzenStack>
+                                                                </RadzenColumn>
+                                                                <RadzenColumn Size="4" class="text-end">
+                                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.15rem">
+                                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true"
+                                                                                     Text="@($"{groupSpeakerCount}개")"
+                                                                                     Style="font-size: 0.6rem; padding: 1px 6px;" />
+                                                                        <RadzenButton Icon="@(isExpanded ? "expand_less" : "expand_more")"
+                                                                                      ButtonStyle="ButtonStyle.Light"
+                                                                                      Variant="Variant.Flat"
+                                                                                      Size="ButtonSize.Small"
+                                                                                      class="expand-button"
+                                                                                      Click="@(() => ToggleGroupExpansion(group.Id))"
+                                                                                      @onclick:stopPropagation="true" />
+                                                                    </RadzenStack>
+                                                                </RadzenColumn>
+                                                            </RadzenRow>
+                                                            @if (!string.IsNullOrEmpty(group.Description))
+                                                            {
+                                                                <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="margin-left: 1.5rem; font-size: 0.7rem;">
+                                                                    @group.Description
+                                                                </RadzenText>
+                                                            }
+                                                            @if (isExpanded && groupSpeakerCount > 0)
+                                                            {
+                                                                <div class="group-speakers-preview" style="margin-left: 1.5rem; margin-top: 0.25rem;">
+                                                                    @{
+                                                                        var speakersInGroup = GetSpeakersInGroupSync(group.Id).Take(3);
+                                                                    }
+                                                                    @foreach (var speaker in speakersInGroup)
+                                                                    {
+                                                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem" Style="padding: 2px 0;">
+                                                                            <RadzenIcon Icon="speaker" Style="font-size: 0.7rem; color: #6c757d;" />
+                                                                            <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.65rem;">@speaker.Name</RadzenText>
+                                                                            <RadzenBadge BadgeStyle="@GetSpeakerStatusBadgeStyle(speaker.State)" IsPill="true" Text="@GetSpeakerStatusText(speaker.State)" Style="font-size: 0.55rem; padding: 1px 4px;" />
+                                                                        </RadzenStack>
+                                                                    }
+                                                                    @if (groupSpeakerCount > 3)
+                                                                    {
+                                                                        <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0" Style="font-size: 0.6rem; font-style: italic;">
+                                                                            ... 외 @(groupSpeakerCount - 3)개
+                                                                        </RadzenText>
+                                                                    }
+                                                                </div>
+                                                            }
+                                                        </RadzenStack>
+                                                    </RadzenCard>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="text-center py-3">
+                                                <RadzenIcon Icon="folder_off" Style="font-size: 2rem; color: var(--rz-text-disabled-color);" />
+                                                <RadzenText TextStyle="TextStyle.Caption" class="mt-2 mb-0">스피커 그룹이 없습니다</RadzenText>
+                                            </div>
+                                        }
+                                    </RadzenCard>
                                 </RadzenColumn>
-                                <RadzenColumn Size="12" SizeMD="6">
-                                    <div class="info-item">
-                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">반복 횟수</RadzenText>
-                                        <RadzenNumeric @bind-Value="@tempRepeatCount"
-                                                       Min="0" Max="255"
-                                                       ShowUpDown="true"
-                                                       Placeholder="0 = 무한 반복"
-                                                       class="info-input editable" />
-                                    </div>
+
+                                <!-- 우측: 스피커 리스트 -->
+                                <RadzenColumn Size="12" SizeMD="7">
+                                    <RadzenCard class="speakers-section" style="padding: 0.5rem;">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="mb-2">
+                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                                <RadzenIcon Icon="speaker" Style="font-size: 0.875rem; color: var(--rz-primary);" />
+                                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight:600; font-size:0.8rem;">
+                                                    스피커 목록
+                                                    @if (viewingGroup != null)
+                                                    {
+                                                        <span class="text-muted ms-1" style="font-size: 0.75rem;">(@viewingGroup.Name)</span>
+                                                    }
+                                                </RadzenText>
+                                            </RadzenStack>
+                                            @if (viewingGroup != null)
+                                            {
+                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                    <RadzenButton Text="전체선택" Icon="done_all" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Click="@SelectAllSpeakersInViewingGroup" />
+                                                    <RadzenButton Text="선택해제" Icon="clear" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Click="@DeselectAllSpeakersInViewingGroup" />
+                                                </RadzenStack>
+                                            }
+                                        </RadzenStack>
+
+                                        @if (viewingGroup == null)
+                                        {
+                                            <div class="text-center py-3">
+                                                <RadzenIcon Icon="touch_app" Style="font-size: 2rem; color: var(--rz-text-disabled-color);" />
+                                                <RadzenText TextStyle="TextStyle.Caption" class="mt-2 mb-0">스피커 그룹을 선택하세요</RadzenText>
+                                            </div>
+                                        }
+                                        else if (isLoadingSpeakers)
+                                        {
+                                            <div class="text-center py-2">
+                                                <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="width: 60%; height: 4px; margin: 0 auto;" />
+                                                <RadzenText Text="스피커 목록을 불러오는 중..." TextStyle="TextStyle.Caption" class="mt-1" Style="font-size: 0.7rem;" />
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            var groupSpeakers = GetSpeakersInGroupSync(viewingGroup.Id);
+                                            if (groupSpeakers.Any())
+                                            {
+                                                <div style="max-height: 320px; overflow-y: auto; border: 1px solid var(--rz-border-color); border-radius: var(--rz-border-radius);">
+                                                    @foreach (var sp in groupSpeakers)
+                                                    {
+                                                        <div class="content-item @(IsSpeakerSelectedEdit(sp.Id) ? "selected" : "")" @onclick="@(() => ToggleSpeakerSelectionEditById(sp.Id))">
+                                                            <RadzenCheckBox Value="@IsSpeakerSelectedEdit(sp.Id)" Change="@((bool value) => SetSpeakerSelectionEditById(sp.Id, value))" TValue="bool" class="content-checkbox" />
+                                                            <RadzenIcon Icon="speaker" class="content-icon media" />
+                                                            <div class="content-info">
+                                                                <span class="content-name">@sp.Name</span>
+                                                                <span class="content-text">@sp.Ip</span>
+                                                            </div>
+                                                            <RadzenBadge BadgeStyle="@GetSpeakerStatusBadgeStyle(sp.State)" IsPill="true" Text="@GetSpeakerStatusText(sp.State)" Style="margin-left:auto; font-size:0.6rem; padding:1px 6px;" />
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="text-center py-3">
+                                                    <RadzenIcon Icon="speaker_notes_off" Style="font-size: 2rem; color: var(--rz-text-disabled-color);" />
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="mt-2 mb-0">이 그룹에 스피커가 없습니다</RadzenText>
+                                                </div>
+                                            }
+                                        }
+                                    </RadzenCard>
                                 </RadzenColumn>
                             </RadzenRow>
 
-                            <!-- 요일 선택 (편집 가능) -->
-                            <div class="weekday-section mt-3">
-                                <RadzenText TextStyle="TextStyle.Caption" class="info-label mb-2">반복 요일</RadzenText>
-                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                    @foreach (var day in weekdays)
-                                    {
-                                        <div class="@($"weekday-item editable {(IsWeekdaySelectedInEdit(day.Value) ? "selected" : "")}")"
-                                             @onclick="@(() => ToggleWeekdayInEdit(day.Value))">
-                                            @day.Key
-                                        </div>
-                                    }
-                                </RadzenStack>
-                                <div class="quick-select-buttons mt-2">
-                                    <RadzenButton Text="매일" Size="ButtonSize.Small"
-                                                  ButtonStyle="ButtonStyle.Light"
-                                                  Click="@SelectAllDaysEdit" />
-                                    <RadzenButton Text="평일" Size="ButtonSize.Small"
-                                                  ButtonStyle="ButtonStyle.Light"
-                                                  Click="@SelectWeekdaysEdit" />
-                                    <RadzenButton Text="주말" Size="ButtonSize.Small"
-                                                  ButtonStyle="ButtonStyle.Light"
-                                                  Click="@SelectWeekendEdit" />
-                                    <RadzenButton Text="초기화" Size="ButtonSize.Small"
-                                                  ButtonStyle="ButtonStyle.Light"
-                                                  Click="@ClearWeekdaysEdit" />
-                                </div>
-                            </div>
+                            <!-- 선택 요약 -->
+                            @if (editingSelectedSpeakerIds.Any())
+                            {
+                                <RadzenCard class="mt-2 summary-card" Style="padding: 0.5rem 0.75rem; background-color: var(--rz-primary-lighter);">
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+                                            <RadzenIcon Icon="info" Style="font-size: 0.875rem; color: var(--rz-primary);" />
+                                            <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.75rem;">
+                                                선택된 스피커: @editingSelectedSpeakerIds.Count 개
+                                            </RadzenText>
+                                        </RadzenStack>
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="@($"온라인: {GetOnlineSpeakersSelected().Count}개")" Style="font-size: 0.65rem; padding: 2px 8px;" />
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" IsPill="true" Text="@($"오프라인: {GetOfflineSpeakersSelected().Count}개")" Style="font-size: 0.65rem; padding: 2px 8px;" />
+                                            <RadzenButton Text="선택 초기화" Icon="clear" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Variant="Variant.Flat" Style="height: 24px; font-size: 0.7rem; padding: 0 0.5rem;" Click="@ClearSpeakerSelectionsEdit" />
+                                        </RadzenStack>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            }
                         </RadzenCard>
 
                         <!-- 방송 콘텐츠 섹션 (편집 가능) -->
@@ -387,6 +597,28 @@
                                         }
                                     </span>
                                 </div>
+
+                                <!-- 재생 순서 미리보기 -->
+                                <RadzenCard class="playlist-preview-card">
+                                    <RadzenStack Orientation="Orientation.Vertical" Gap="0.35rem">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.35rem">
+                                            <RadzenIcon Icon="queue_music" class="playlist-icon" />
+                                            <RadzenText TextStyle="TextStyle.Caption" class="playlist-title">재생 순서 미리보기</RadzenText>
+                                        </RadzenStack>
+                                        <div class="playlist-desc">클릭한 순서대로 재생됩니다. 가장 최근에 클릭한 항목이 가장 늦게 재생됩니다.</div>
+                                        <ol class="playlist-list">
+@foreach (var item in editingSelectionOrder
+    .Where(x => x.IsMedia ? editingSelectedMediaIds.Contains(x.Id) : editingSelectedTtsIds.Contains(x.Id))
+    .OrderBy(x => x.Seq))
+{
+    <li class="playlist-item">
+        <span class="playlist-kind">@(item.IsMedia ? "미디어" : "TTS")</span>
+        <span class="playlist-name">@GetContentName(item.IsMedia, item.Id)</span>
+    </li>
+}
+                                        </ol>
+                                    </RadzenStack>
+                                </RadzenCard>
                             }
                         </RadzenCard>
                     </RadzenStack>
@@ -436,91 +668,96 @@
                                         <RadzenText TextStyle="TextStyle.Caption" class="info-label">스케줄 설명</RadzenText>
                                         <RadzenTextArea Value="@(viewChannel?.Description ?? "설명이 없습니다")"
                                                         Disabled="true"
-                                                        Rows="3"
-                                                        class="info-textarea" />
+                                                        Rows="5"
+                                                        class="info-textarea full-width" />
                                     </div>
                                 </RadzenColumn>
                             </RadzenRow>
                         </RadzenCard>
 
-                        <!-- 오디오 설정 섹션 -->
-                        <RadzenCard class="info-section">
-                            <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
-                                <RadzenIcon Icon="tune" class="info-section-icon" />
-                                오디오 설정
-                            </RadzenText>
-                            <RadzenRow Gap="0.5rem" class="mt-2">
-                                <RadzenColumn Size="6" SizeMD="3">
-                                    <div class="info-item">
-                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">샘플레이트</RadzenText>
-                                        <RadzenTextBox Value="@($"{(viewChannel?.SamplingRate ?? 0)} Hz")"
-                                                       Disabled="true"
-                                                       class="info-input" />
-                                    </div>
-                                </RadzenColumn>
-                                <RadzenColumn Size="6" SizeMD="3">
-                                    <div class="info-item">
-                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">채널 수</RadzenText>
-                                        <RadzenTextBox Value="@($"{(viewChannel?.ChannelCount ?? (byte)0)}ch")"
-                                                       Disabled="true"
-                                                       class="info-input" />
-                                    </div>
-                                </RadzenColumn>
-                                <RadzenColumn Size="12" SizeMD="6">
-                                    <div class="info-item">
-                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">볼륨</RadzenText>
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                            <RadzenSlider Value="@((double)((viewChannel?.Volume ?? 0) * 100))"
-                                                          Min="0" Max="100" Step="1"
-                                                          Disabled="true"
-                                                          class="volume-slider" />
-                                            <RadzenText TextStyle="TextStyle.Caption" class="volume-text">
-                                                @($"{(viewChannel?.Volume ?? 0) * 100:0}%")
-                                            </RadzenText>
-                                        </RadzenStack>
-                                    </div>
-                                </RadzenColumn>
-                            </RadzenRow>
-                        </RadzenCard>
+                        <!-- 오디오/예약 시간 섹션 (보기 모드에도 2컬럼 배치) -->
+                        <RadzenRow Gap="0.75rem" class="settings-row">
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenCard class="info-section">
+                                    <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
+                                        <RadzenIcon Icon="tune" class="info-section-icon" />
+                                        오디오 설정
+                                    </RadzenText>
+                                    <RadzenRow Gap="0.5rem" class="mt-2">
+                                        <RadzenColumn Size="6" SizeMD="6">
+                                            <div class="info-item">
+                                                <RadzenText TextStyle="TextStyle.Caption" class="info-label">샘플레이트</RadzenText>
+                                                <RadzenTextBox Value="@($"{(viewChannel?.SamplingRate ?? 0)} Hz")"
+                                                               Disabled="true"
+                                                               class="info-input" />
+                                            </div>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="6" SizeMD="6">
+                                            <div class="info-item">
+                                                <RadzenText TextStyle="TextStyle.Caption" class="info-label">채널 수</RadzenText>
+                                                <RadzenTextBox Value="@($"{(viewChannel?.ChannelCount ?? (byte)0)}ch")"
+                                                               Disabled="true"
+                                                               class="info-input" />
+                                            </div>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="12">
+                                            <div class="info-item">
+                                                <RadzenText TextStyle="TextStyle.Caption" class="info-label">볼륨</RadzenText>
+                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                    <RadzenSlider Value="@((double)((viewChannel?.Volume ?? 0) * 100))"
+                                                                  Min="0" Max="100" Step="1"
+                                                                  Disabled="true"
+                                                                  class="volume-slider" />
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="volume-text">
+                                                        @($"{(viewChannel?.Volume ?? 0) * 100:0}%")
+                                                    </RadzenText>
+                                                </RadzenStack>
+                                            </div>
+                                        </RadzenColumn>
+                                    </RadzenRow>
+                                </RadzenCard>
+                            </RadzenColumn>
 
-                        <!-- 예약 시간 섹션 -->
-                        <RadzenCard class="info-section">
-                            <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
-                                <RadzenIcon Icon="schedule" class="info-section-icon" />
-                                예약 시간 설정
-                            </RadzenText>
-                            <RadzenRow Gap="0.5rem" class="mt-2">
-                                <RadzenColumn Size="12" SizeMD="6">
-                                    <div class="info-item">
-                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">예약 시간</RadzenText>
-                                        <RadzenTextBox Value="@selectedSchedule.StartTime.ToString("HH:mm")"
-                                                       Disabled="true"
-                                                       class="info-input" />
-                                    </div>
-                                </RadzenColumn>
-                                <RadzenColumn Size="12" SizeMD="6">
-                                    <div class="info-item">
-                                        <RadzenText TextStyle="TextStyle.Caption" class="info-label">반복 횟수</RadzenText>
-                                        <RadzenTextBox Value="@GetRepeatText(selectedSchedule.RepeatCount)"
-                                                       Disabled="true"
-                                                       class="info-input" />
-                                    </div>
-                                </RadzenColumn>
-                            </RadzenRow>
-
-                            <!-- 요일 선택 -->
-                            <div class="weekday-section mt-3">
-                                <RadzenText TextStyle="TextStyle.Caption" class="info-label mb-2">반복 요일</RadzenText>
-                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                    @foreach (var day in weekdays)
-                                    {
-                                        <div class="@($"weekday-item {(IsWeekdaySelected(selectedSchedule, day.Value) ? "selected" : "")}")">
-                                            @day.Key
-                                        </div>
-                                    }
-                                </RadzenStack>
-                            </div>
-                        </RadzenCard>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenCard class="info-section">
+                                    <RadzenText TextStyle="TextStyle.Caption" class="info-section-title">
+                                        <RadzenIcon Icon="schedule" class="info-section-icon" />
+                                        예약 시간 설정
+                                    </RadzenText>
+                                    <RadzenRow Gap="0.5rem" class="mt-2">
+                                        <RadzenColumn Size="12" SizeMD="6">
+                                            <div class="info-item">
+                                                <RadzenText TextStyle="TextStyle.Caption" class="info-label">예약 시간</RadzenText>
+                                                <RadzenTextBox Value="@selectedSchedule.StartTime.ToString("HH:mm")"
+                                                               Disabled="true"
+                                                               class="info-input" />
+                                            </div>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="12" SizeMD="6">
+                                            <div class="info-item">
+                                                <RadzenText TextStyle="TextStyle.Caption" class="info-label">반복 횟수</RadzenText>
+                                                <RadzenTextBox Value="@GetRepeatText(selectedSchedule.RepeatCount)"
+                                                               Disabled="true"
+                                                               class="info-input" />
+                                            </div>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="12">
+                                            <div class="weekday-section mt-1">
+                                                <RadzenText TextStyle="TextStyle.Caption" class="info-label mb-2">반복 요일</RadzenText>
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                                    @foreach (var day in weekdays)
+                                                    {
+                                                        <div class="@($"weekday-item {(IsWeekdaySelected(selectedSchedule, day.Value) ? "selected" : "")} ")">
+                                                            @day.Key
+                                                        </div>
+                                                    }
+                                                </RadzenStack>
+                                            </div>
+                                        </RadzenColumn>
+                                    </RadzenRow>
+                                </RadzenCard>
+                            </RadzenColumn>
+                        </RadzenRow>
 
                         <!-- 방송 콘텐츠 섹션 (보기 모드) -->
                         <RadzenCard class="info-section">
@@ -651,6 +888,7 @@
         .info-input.editable:hover,
         .info-textarea.editable:hover {
             border-color: #2980b9 !important;
+            background: #ebf5ff !important;
         }
 
         .info-input.editable:focus,
@@ -690,6 +928,27 @@
             color: white;
             border-color: #3498db;
         }
+
+    /* Weekday badges (view mode) */
+    .weekday-item {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        border: 1px solid #d0d7de;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        color: #6c757d;
+        background: #fff;
+        user-select: none;
+    }
+
+    .weekday-item + .weekday-item { margin-left: 0.35rem; }
+
+    .weekday-item.selected {
+        background: var(--professional-accent);
+        color: #fff;
+        border-color: var(--professional-accent);
+        font-weight: 600;
+    }
 
     .action-button {
         margin-left: 0.5rem;
@@ -899,6 +1158,53 @@
         font-size: 1rem !important;
     }
 
+    /* Playlist preview */
+    .playlist-preview-card {
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: #f8fbff;
+        border: 1px dashed #3498db;
+        border-radius: 4px;
+    }
+    .playlist-icon {
+        font-size: 0.9rem !important;
+        color: #3498db !important;
+    }
+    .playlist-title {
+        font-weight: 600;
+        font-size: 0.8rem !important;
+        color: var(--professional-primary) !important;
+    }
+    .playlist-desc {
+        font-size: 0.7rem;
+        color: #6c757d;
+    }
+    .playlist-list {
+        margin: 0;
+        padding-left: 1.2rem;
+    }
+    .playlist-item {
+        font-size: 0.75rem;
+        color: var(--professional-primary);
+        margin: 0.15rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .playlist-kind {
+        display: inline-block;
+        font-size: 0.65rem;
+        color: #fff;
+        background: #3498db;
+        padding: 0 6px;
+        border-radius: 10px;
+    }
+    .playlist-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     /* 기존 스타일 유지 */
     .page-header {
         border-bottom: 1px solid var(--professional-border);
@@ -976,6 +1282,43 @@
             border-width: 2px !important;
         }
 
+    /* 그룹/스피커 섹션 스타일 일부 */
+    .group-item {
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+
+        .group-item:hover {
+            background-color: var(--professional-hover);
+            transform: translateX(2px);
+        }
+
+        .group-item.viewing {
+            background-color: var(--professional-hover);
+            border-left: 3px solid var(--professional-accent);
+        }
+
+        .group-item.selected {
+            background-color: var(--professional-selected);
+            border-color: var(--professional-accent);
+        }
+
+    .group-speakers-preview {
+        padding: 0.25rem;
+        background-color: rgba(0, 0, 0, 0.02);
+        border-radius: 3px;
+    }
+
+    .expand-button {
+        min-width: 20px !important;
+        padding: 2px !important;
+        height: 20px !important;
+    }
+
+        .expand-button .rz-button-icon {
+            font-size: 0.75rem !important;
+        }
+
     /* 나머지 기존 스타일들... */
     .info-item {
         margin-bottom: 0.5rem;
@@ -1000,5 +1343,413 @@
         font-size: 0.75rem !important;
         background: white !important;
         border-color: #d0d7de !important;
+    }
+
+    /* Compact styles for reservation time section */
+    .info-section.compact .info-section-title {
+        margin-bottom: 0.25rem;
+    }
+
+    .info-section.compact .info-item {
+        margin-bottom: 0.35rem;
+    }
+
+    .settings-row .rz-column {
+        display: flex;
+    }
+
+    .settings-row .rz-card {
+        width: 100%;
+    }
+
+    .reservation-row {
+        align-items: flex-start;
+    }
+
+    .reservation-right-col {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .reservation-right {
+        width: 100%;
+        max-width: 280px;
+    }
+
+    .right-item .info-label.right {
+        display: block;
+        text-align: right;
+        margin-bottom: 0.2rem !important;
+    }
+
+    .reservation-left-col .weekday-section {
+        margin-top: 0.1rem;
+    }
+
+    .info-label.small {
+        font-size: 0.65rem !important;
+        margin-bottom: 0.2rem !important;
+    }
+
+    .compact-input .rz-inputtext {
+        font-size: 0.8rem !important;
+        height: 28px !important;
+        line-height: 28px !important;
+        padding: 0 0.5rem !important;
+    }
+
+    .compact-input .rz-spinner, .compact-input .rz-datepicker, .compact-input .rz-numeric {
+        height: 28px !important;
+    }
+
+    .compact-input .rz-spinner-button, .compact-input .rz-button {
+        height: 28px !important;
+        min-height: 28px !important;
+    }
+
+    .compact-input .rz-button .rz-button-icon, .compact-input .rz-spinner-button .rz-button-icon {
+        font-size: 0.9rem !important;
+    }
+
+    .info-section.compact .weekday-item.editable {
+        border-width: 1px;
+        padding: 0.15rem 0.35rem;
+        font-size: 0.7rem;
+    }
+
+    .info-section.compact .weekday-item.editable.selected {
+        font-weight: 600;
+    }
+
+    .quick-select-buttons.compact {
+        gap: 0.35rem;
+    }
+
+    .quick-select-buttons.compact .rz-button {
+        font-size: 0.65rem !important;
+        padding: 0.15rem 0.4rem !important;
+        height: 24px !important;
+        min-height: 24px !important;
+    }
+
+    /* Playlist preview */
+    .playlist-preview-card {
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: #f8fbff;
+        border: 1px dashed #3498db;
+        border-radius: 4px;
+    }
+    .playlist-icon {
+        font-size: 0.9rem !important;
+        color: #3498db !important;
+    }
+    .playlist-title {
+        font-weight: 600;
+        font-size: 0.8rem !important;
+        color: var(--professional-primary) !important;
+    }
+    .playlist-desc {
+        font-size: 0.7rem;
+        color: #6c757d;
+    }
+    .playlist-list {
+        margin: 0;
+        padding-left: 1.2rem;
+    }
+    .playlist-item {
+        font-size: 0.75rem;
+        color: var(--professional-primary);
+        margin: 0.15rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .playlist-kind {
+        display: inline-block;
+        font-size: 0.65rem;
+        color: #fff;
+        background: #3498db;
+        padding: 0 6px;
+        border-radius: 10px;
+    }
+    .playlist-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* 기존 스타일 유지 */
+    .page-header {
+        border-bottom: 1px solid var(--professional-border);
+        padding-bottom: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .page-title {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+        letter-spacing: -0.5px;
+    }
+
+    .page-subtitle {
+        font-size: 0.75rem !important;
+        color: #6c757d !important;
+        margin-top: 0.25rem !important;
+        font-weight: 400;
+    }
+
+    .section-header {
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #f0f0f0;
+        margin-bottom: 0.5rem;
+    }
+
+    .section-icon {
+        font-size: 1rem !important;
+        color: var(--professional-accent) !important;
+    }
+
+    .section-title {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        color: var(--professional-primary) !important;
+        margin: 0 !important;
+    }
+
+    .schedule-list-panel, .schedule-detail-panel {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid var(--professional-border) !important;
+        border-radius: 6px !important;
+        background: white !important;
+        min-height: calc(100vh - 180px);
+    }
+
+    .schedule-list-container {
+        max-height: calc(100vh - 280px);
+        overflow-y: auto;
+        padding-right: 0.25rem;
+    }
+
+    .schedule-item {
+        padding: 0.625rem !important;
+        margin-bottom: 0.5rem;
+        border: 1px solid #e1e4e8 !important;
+        border-radius: 4px !important;
+        transition: all 0.2s ease !important;
+        background: white !important;
+        cursor: pointer;
+        position: relative;
+    }
+
+        .schedule-item:hover {
+            background: var(--professional-hover) !important;
+            border-color: var(--professional-accent) !important;
+            transform: translateX(2px);
+        }
+
+        .schedule-item.selected {
+            background: var(--professional-selected) !important;
+            border-color: var(--professional-accent) !important;
+            border-width: 2px !important;
+        }
+
+    /* 그룹/스피커 섹션 스타일 일부 */
+    .group-item {
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+
+        .group-item:hover {
+            background-color: var(--professional-hover);
+            transform: translateX(2px);
+        }
+
+        .group-item.viewing {
+            background-color: var(--professional-hover);
+            border-left: 3px solid var(--professional-accent);
+        }
+
+        .group-item.selected {
+            background-color: var(--professional-selected);
+            border-color: var(--professional-accent);
+        }
+
+    .group-speakers-preview {
+        padding: 0.25rem;
+        background-color: rgba(0, 0, 0, 0.02);
+        border-radius: 3px;
+    }
+
+    .expand-button {
+        min-width: 20px !important;
+        padding: 2px !important;
+        height: 20px !important;
+    }
+
+        .expand-button .rz-button-icon {
+            font-size: 0.75rem !important;
+        }
+
+    /* 나머지 기존 스타일들... */
+    .info-item {
+        margin-bottom: 0.5rem;
+    }
+
+    .info-label {
+        font-size: 0.7rem !important;
+        font-weight: 500 !important;
+        color: #6c757d !important;
+        margin-bottom: 0.25rem !important;
+        display: block;
+    }
+
+    .info-input {
+        font-size: 0.75rem !important;
+        height: 32px !important;
+        background: white !important;
+        border-color: #d0d7de !important;
+    }
+
+    .info-textarea {
+        font-size: 0.75rem !important;
+        background: white !important;
+        border-color: #d0d7de !important;
+    }
+
+    /* Compact styles for reservation time section */
+    .info-section.compact .info-section-title {
+        margin-bottom: 0.25rem;
+    }
+
+    .info-section.compact .info-item {
+        margin-bottom: 0.35rem;
+    }
+
+    .settings-row .rz-column {
+        display: flex;
+    }
+
+    .settings-row .rz-card {
+        width: 100%;
+    }
+
+    .reservation-row {
+        align-items: flex-start;
+    }
+
+    .reservation-right-col {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .reservation-right {
+        width: 100%;
+        max-width: 280px;
+    }
+
+    .right-item .info-label.right {
+        display: block;
+        text-align: right;
+        margin-bottom: 0.2rem !important;
+    }
+
+    .reservation-left-col .weekday-section {
+        margin-top: 0.1rem;
+    }
+
+    .info-label.small {
+        font-size: 0.65rem !important;
+        margin-bottom: 0.2rem !important;
+    }
+
+    .compact-input .rz-inputtext {
+        font-size: 0.8rem !important;
+        height: 28px !important;
+        line-height: 28px !important;
+        padding: 0 0.5rem !important;
+    }
+
+    .compact-input .rz-spinner, .compact-input .rz-datepicker, .compact-input .rz-numeric {
+        height: 28px !important;
+    }
+
+    .compact-input .rz-spinner-button, .compact-input .rz-button {
+        height: 28px !important;
+        min-height: 28px !important;
+    }
+
+    .compact-input .rz-button .rz-button-icon, .compact-input .rz-spinner-button .rz-button-icon {
+        font-size: 0.9rem !important;
+    }
+
+    .info-section.compact .weekday-item.editable {
+        border-width: 1px;
+        padding: 0.15rem 0.35rem;
+        font-size: 0.7rem;
+    }
+
+    .info-section.compact .weekday-item.editable.selected {
+        font-weight: 600;
+    }
+
+    .quick-select-buttons.compact {
+        gap: 0.35rem;
+    }
+
+    .quick-select-buttons.compact .rz-button {
+        font-size: 0.65rem !important;
+        padding: 0.15rem 0.4rem !important;
+        height: 24px !important;
+        min-height: 24px !important;
+    }
+
+    /* Playlist preview */
+    .playlist-preview-card {
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: #f8fbff;
+        border: 1px dashed #3498db;
+        border-radius: 4px;
+    }
+    .playlist-icon {
+        font-size: 0.9rem !important;
+        color: #3498db !important;
+    }
+    .playlist-title {
+        font-weight: 600;
+        font-size: 0.8rem !important;
+        color: var(--professional-primary) !important;
+    }
+    .playlist-desc {
+        font-size: 0.7rem;
+        color: #6c757d;
+    }
+    .playlist-list {
+        margin: 0;
+        padding-left: 1.2rem;
+    }
+    .playlist-item {
+        font-size: 0.75rem;
+        color: var(--professional-primary);
+        margin: 0.15rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .playlist-kind {
+        display: inline-block;
+        font-size: 0.65rem;
+        color: #fff;
+        background: #3498db;
+        padding: 0 6px;
+        border-radius: 10px;
+    }
+    .playlist-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 </style>
