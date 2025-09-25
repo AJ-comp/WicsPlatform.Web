@@ -177,9 +177,17 @@ public partial class AddScheduleDialog
             }
 
             // 1) Schedule 생성 (신규 스키마)
+            // StartTime은 로컬 입력값을 UTC로 변환하여 저장
+            static TimeOnly ToUtcTimeOnly(TimeOnly localTime)
+            {
+                var localDateTime = DateTime.SpecifyKind(DateTime.Now.Date.Add(localTime.ToTimeSpan()), DateTimeKind.Local);
+                var utc = localDateTime.ToUniversalTime();
+                return TimeOnly.FromTimeSpan(utc.TimeOfDay);
+            }
+
             var schedule = new WicsPlatform.Server.Models.wics.Schedule
             {
-                StartTime = model.StartTime,
+                StartTime = ToUtcTimeOnly(model.StartTime),
                 Monday = model.Monday,
                 Tuesday = model.Tuesday,
                 Wednesday = model.Wednesday,

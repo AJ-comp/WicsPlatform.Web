@@ -313,6 +313,100 @@ namespace WicsPlatform.Client
             return await httpClient.SendAsync(httpRequestMessage);
         }
 
+        public async System.Threading.Tasks.Task ExportMapChannelGroupsToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelgroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelgroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async System.Threading.Tasks.Task ExportMapChannelGroupsToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelgroups/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelgroups/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnGetMapChannelGroups(HttpRequestMessage requestMessage);
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelGroup>> GetMapChannelGroups(Query query)
+        {
+            return await GetMapChannelGroups(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
+        }
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelGroup>> GetMapChannelGroups(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
+        {
+            var uri = new Uri(baseUri, $"MapChannelGroups");
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetMapChannelGroups(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelGroup>>(response);
+        }
+
+        partial void OnCreateMapChannelGroup(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> CreateMapChannelGroup(WicsPlatform.Server.Models.wics.MapChannelGroup mapChannelGroup = default(WicsPlatform.Server.Models.wics.MapChannelGroup))
+        {
+            var uri = new Uri(baseUri, $"MapChannelGroups");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapChannelGroup), Encoding.UTF8, "application/json");
+
+            OnCreateMapChannelGroup(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapChannelGroup>(response);
+        }
+
+        partial void OnDeleteMapChannelGroup(HttpRequestMessage requestMessage);
+
+        public async Task<HttpResponseMessage> DeleteMapChannelGroup(ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"MapChannelGroups({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
+
+            OnDeleteMapChannelGroup(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
+        partial void OnGetMapChannelGroupById(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> GetMapChannelGroupById(string expand = default(string), ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"MapChannelGroups({id})");
+
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetMapChannelGroupById(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapChannelGroup>(response);
+        }
+
+        partial void OnUpdateMapChannelGroup(HttpRequestMessage requestMessage);
+        
+        public async Task<HttpResponseMessage> UpdateMapChannelGroup(ulong id = default(ulong), WicsPlatform.Server.Models.wics.MapChannelGroup mapChannelGroup = default(WicsPlatform.Server.Models.wics.MapChannelGroup))
+        {
+            var uri = new Uri(baseUri, $"MapChannelGroups({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
+
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapChannelGroup), Encoding.UTF8, "application/json");
+
+            OnUpdateMapChannelGroup(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
         public async System.Threading.Tasks.Task ExportMapChannelMediaToExcel(Query query = null, string fileName = null)
         {
             navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelmedia/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelmedia/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
@@ -403,6 +497,100 @@ namespace WicsPlatform.Client
             httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapChannelMedium), Encoding.UTF8, "application/json");
 
             OnUpdateMapChannelMedium(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
+        public async System.Threading.Tasks.Task ExportMapChannelSpeakersToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelspeakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelspeakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async System.Threading.Tasks.Task ExportMapChannelSpeakersToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelspeakers/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelspeakers/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnGetMapChannelSpeakers(HttpRequestMessage requestMessage);
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelSpeaker>> GetMapChannelSpeakers(Query query)
+        {
+            return await GetMapChannelSpeakers(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
+        }
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelSpeaker>> GetMapChannelSpeakers(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
+        {
+            var uri = new Uri(baseUri, $"MapChannelSpeakers");
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetMapChannelSpeakers(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelSpeaker>>(response);
+        }
+
+        partial void OnCreateMapChannelSpeaker(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> CreateMapChannelSpeaker(WicsPlatform.Server.Models.wics.MapChannelSpeaker mapChannelSpeaker = default(WicsPlatform.Server.Models.wics.MapChannelSpeaker))
+        {
+            var uri = new Uri(baseUri, $"MapChannelSpeakers");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapChannelSpeaker), Encoding.UTF8, "application/json");
+
+            OnCreateMapChannelSpeaker(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapChannelSpeaker>(response);
+        }
+
+        partial void OnDeleteMapChannelSpeaker(HttpRequestMessage requestMessage);
+
+        public async Task<HttpResponseMessage> DeleteMapChannelSpeaker(ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"MapChannelSpeakers({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
+
+            OnDeleteMapChannelSpeaker(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
+        partial void OnGetMapChannelSpeakerById(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> GetMapChannelSpeakerById(string expand = default(string), ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"MapChannelSpeakers({id})");
+
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetMapChannelSpeakerById(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapChannelSpeaker>(response);
+        }
+
+        partial void OnUpdateMapChannelSpeaker(HttpRequestMessage requestMessage);
+        
+        public async Task<HttpResponseMessage> UpdateMapChannelSpeaker(ulong id = default(ulong), WicsPlatform.Server.Models.wics.MapChannelSpeaker mapChannelSpeaker = default(WicsPlatform.Server.Models.wics.MapChannelSpeaker))
+        {
+            var uri = new Uri(baseUri, $"MapChannelSpeakers({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
+
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapChannelSpeaker), Encoding.UTF8, "application/json");
+
+            OnUpdateMapChannelSpeaker(httpRequestMessage);
 
             return await httpClient.SendAsync(httpRequestMessage);
         }
@@ -1343,194 +1531,6 @@ namespace WicsPlatform.Client
             httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(tt), Encoding.UTF8, "application/json");
 
             OnUpdateTt(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        public async System.Threading.Tasks.Task ExportMapChannelSpeakersToExcel(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelspeakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelspeakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        public async System.Threading.Tasks.Task ExportMapChannelSpeakersToCSV(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelspeakers/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelspeakers/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        partial void OnGetMapChannelSpeakers(HttpRequestMessage requestMessage);
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelSpeaker>> GetMapChannelSpeakers(Query query)
-        {
-            return await GetMapChannelSpeakers(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
-        }
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelSpeaker>> GetMapChannelSpeakers(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
-        {
-            var uri = new Uri(baseUri, $"MapChannelSpeakers");
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetMapChannelSpeakers(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelSpeaker>>(response);
-        }
-
-        partial void OnCreateMapChannelSpeaker(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> CreateMapChannelSpeaker(WicsPlatform.Server.Models.wics.MapChannelSpeaker mapChannelSpeaker = default(WicsPlatform.Server.Models.wics.MapChannelSpeaker))
-        {
-            var uri = new Uri(baseUri, $"MapChannelSpeakers");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapChannelSpeaker), Encoding.UTF8, "application/json");
-
-            OnCreateMapChannelSpeaker(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapChannelSpeaker>(response);
-        }
-
-        partial void OnDeleteMapChannelSpeaker(HttpRequestMessage requestMessage);
-
-        public async Task<HttpResponseMessage> DeleteMapChannelSpeaker(ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"MapChannelSpeakers({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
-
-            OnDeleteMapChannelSpeaker(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        partial void OnGetMapChannelSpeakerById(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> GetMapChannelSpeakerById(string expand = default(string), ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"MapChannelSpeakers({id})");
-
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetMapChannelSpeakerById(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapChannelSpeaker>(response);
-        }
-
-        partial void OnUpdateMapChannelSpeaker(HttpRequestMessage requestMessage);
-        
-        public async Task<HttpResponseMessage> UpdateMapChannelSpeaker(ulong id = default(ulong), WicsPlatform.Server.Models.wics.MapChannelSpeaker mapChannelSpeaker = default(WicsPlatform.Server.Models.wics.MapChannelSpeaker))
-        {
-            var uri = new Uri(baseUri, $"MapChannelSpeakers({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
-
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapChannelSpeaker), Encoding.UTF8, "application/json");
-
-            OnUpdateMapChannelSpeaker(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        public async System.Threading.Tasks.Task ExportMapChannelGroupsToExcel(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelgroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelgroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        public async System.Threading.Tasks.Task ExportMapChannelGroupsToCSV(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelgroups/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelgroups/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        partial void OnGetMapChannelGroups(HttpRequestMessage requestMessage);
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelGroup>> GetMapChannelGroups(Query query)
-        {
-            return await GetMapChannelGroups(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
-        }
-
-        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelGroup>> GetMapChannelGroups(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
-        {
-            var uri = new Uri(baseUri, $"MapChannelGroups");
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetMapChannelGroups(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.MapChannelGroup>>(response);
-        }
-
-        partial void OnCreateMapChannelGroup(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> CreateMapChannelGroup(WicsPlatform.Server.Models.wics.MapChannelGroup mapChannelGroup = default(WicsPlatform.Server.Models.wics.MapChannelGroup))
-        {
-            var uri = new Uri(baseUri, $"MapChannelGroups");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapChannelGroup), Encoding.UTF8, "application/json");
-
-            OnCreateMapChannelGroup(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapChannelGroup>(response);
-        }
-
-        partial void OnDeleteMapChannelGroup(HttpRequestMessage requestMessage);
-
-        public async Task<HttpResponseMessage> DeleteMapChannelGroup(ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"MapChannelGroups({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
-
-            OnDeleteMapChannelGroup(httpRequestMessage);
-
-            return await httpClient.SendAsync(httpRequestMessage);
-        }
-
-        partial void OnGetMapChannelGroupById(HttpRequestMessage requestMessage);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> GetMapChannelGroupById(string expand = default(string), ulong id = default(ulong))
-        {
-            var uri = new Uri(baseUri, $"MapChannelGroups({id})");
-
-            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-
-            OnGetMapChannelGroupById(httpRequestMessage);
-
-            var response = await httpClient.SendAsync(httpRequestMessage);
-
-            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.MapChannelGroup>(response);
-        }
-
-        partial void OnUpdateMapChannelGroup(HttpRequestMessage requestMessage);
-        
-        public async Task<HttpResponseMessage> UpdateMapChannelGroup(ulong id = default(ulong), WicsPlatform.Server.Models.wics.MapChannelGroup mapChannelGroup = default(WicsPlatform.Server.Models.wics.MapChannelGroup))
-        {
-            var uri = new Uri(baseUri, $"MapChannelGroups({id})");
-
-            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
-
-
-            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(mapChannelGroup), Encoding.UTF8, "application/json");
-
-            OnUpdateMapChannelGroup(httpRequestMessage);
 
             return await httpClient.SendAsync(httpRequestMessage);
         }

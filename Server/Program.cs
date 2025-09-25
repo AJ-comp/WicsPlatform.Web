@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components.Authorization;
+﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.StaticFiles;
@@ -61,6 +61,9 @@ builder.Services.AddSingleton<IAudioMixingService, AudioMixingService>();
 builder.Services.AddSingleton<IUdpBroadcastService, UdpBroadcastService>();
 builder.Services.AddSingleton<ITtsBroadcastService, TtsBroadcastService>();
 builder.Services.AddSingleton<IMediaBroadcastService, MediaBroadcastService>();
+builder.Services.AddScoped<IBroadcastPreparationService, BroadcastPreparationService>();
+builder.Services.AddSingleton<IScheduleExecutionService, ScheduleExecutionService>();
+builder.Services.AddHostedService<ScheduleScannerService>();
 RegisterDBContext(builder);
 builder.Services.AddControllers().AddOData(opt =>
 {
@@ -68,7 +71,9 @@ builder.Services.AddControllers().AddOData(opt =>
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Broadcast>("Broadcasts");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Channel>("Channels");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Group>("Groups");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelGroup>("MapChannelGroups");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelMedium>("MapChannelMedia");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelSpeaker>("MapChannelSpeakers");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelTt>("MapChannelTts");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapMediaGroup>("MapMediaGroups");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapSpeakerGroup>("MapSpeakerGroups");
@@ -79,8 +84,6 @@ builder.Services.AddControllers().AddOData(opt =>
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Speaker>("Speakers");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>("SpeakerOwnershipStates").EntityType.HasKey(entity => new { entity.SpeakerId, entity.ChannelId });
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Tt>("Tts");
-    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelSpeaker>("MapChannelSpeakers");
-    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.MapChannelGroup>("MapChannelGroups");
     opt.AddRouteComponents("odata/wics", oDataBuilderwics.GetEdmModel()).Count().Filter().OrderBy().Expand().Select().SetMaxTop(null).TimeZone = TimeZoneInfo.Utc;
 });
 builder.Services.AddScoped<WicsPlatform.Client.wicsService>();

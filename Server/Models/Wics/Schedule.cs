@@ -54,6 +54,9 @@ namespace WicsPlatform.Server.Models.wics
         [Required]
         public DateTime UpdatedAt { get; set; }
 
+        [Column("last_execute_at")]
+        public DateTime? LastExecuteAt { get; set; }
+
         public ICollection<Channel> Channels { get; set; }
 
         public ICollection<SchedulePlay> SchedulePlays { get; set; }

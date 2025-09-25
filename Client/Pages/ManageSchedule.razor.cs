@@ -552,10 +552,12 @@ public partial class ManageSchedule
                 return;
             }
 
-            // DateTime을 TimeOnly로 변환
+            // DateTime을 TimeOnly로 변환 (로컬 -> UTC로 저장)
             if (tempStartDateTime.HasValue)
             {
-                editingSchedule.StartTime = TimeOnly.FromDateTime(tempStartDateTime.Value);
+                var local = DateTime.SpecifyKind(tempStartDateTime.Value, DateTimeKind.Local);
+                var utc = local.ToUniversalTime();
+                editingSchedule.StartTime = TimeOnly.FromTimeSpan(utc.TimeOfDay);
             }
 
             editingSchedule.RepeatCount = (byte)tempRepeatCount;
@@ -1391,7 +1393,7 @@ public partial class ManageSchedule
                 Logger.LogInformation($"Soft deleted channel: {ch.Id}");
             }
 
-            // 3. 스케줄 자체 소프트 삭제
+            // 3. 스케줄 자기 소프트 삭제
             schedule.DeleteYn = "Y";
             schedule.UpdatedAt = DateTime.UtcNow;
             await WicsService.UpdateSchedule(schedule.Id, schedule);

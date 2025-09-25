@@ -77,23 +77,28 @@ public class OpusCodec : IDisposable
         var samples = new short[pcmBytes.Length / 2];
         Buffer.BlockCopy(pcmBytes, 0, samples, 0, pcmBytes.Length);
 
-        // 샘플레이트에 따른 60ms 프레임 크기 동적 계산
-        // 16000Hz: 960 샘플
-        // 24000Hz: 1440 샘플
-        // 48000Hz: 2880 샘플
-        int expectedSamples = _sampleRate * _frameDurationMs / 1000;
+        // 샘플레이트에 따른 60ms 프레임 크기(채널당) 계산
+        int frameSizePerChannel = _sampleRate * _frameDurationMs / 1000; // e.g., 16000*0.06=960
+        int requiredTotalSamples = frameSizePerChannel * _channels;
 
-        if (samples.Length != expectedSamples)
+        if (samples.Length < requiredTotalSamples)
         {
-            _logger?.LogWarning($"Expected {expectedSamples} samples ({_frameDurationMs}ms @ {_sampleRate}Hz), but got {samples.Length} samples");
+            _logger?.LogWarning($"Insufficient samples: required {requiredTotalSamples}, got {samples.Length} (frame={_frameDurationMs}ms @ {_sampleRate}Hz, ch={_channels})");
+            return Array.Empty<byte>();
         }
 
-        // Opus 인코딩
-        var output = new byte[1000];
-        int encodedLength = _encoder.Encode(samples, 0, samples.Length, output, 0, output.Length);
+        if (samples.Length > requiredTotalSamples)
+        {
+            // 초과분은 무시 (정확히 프레임 사이즈만 인코딩)
+            Array.Resize(ref samples, requiredTotalSamples);
+        }
+
+        // Opus 인코딩: frame_size는 채널당 샘플 수여야 함
+        var output = new byte[1276]; // 최대 MTU 수준
+        int encodedLength = _encoder.Encode(samples, 0, frameSizePerChannel, output, 0, output.Length);
 
         // 실제 크기만큼만 반환
-        return output.Take(encodedLength).ToArray();
+        return output.AsSpan(0, encodedLength).ToArray();
     }
 
     /// <summary>
@@ -108,7 +113,7 @@ public class OpusCodec : IDisposable
         if (frameSize == 0)
             frameSize = _sampleRate * _frameDurationMs / 1000;
 
-        // Opus 디코딩
+        // Opus 디코딩: frameSize는 채널당 샘플 수
         var samples = new short[frameSize * _channels];
         int decodedSamples = _decoder.Decode(opusBytes, 0, opusBytes.Length, samples, 0, frameSize);
 

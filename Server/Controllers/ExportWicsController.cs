@@ -61,6 +61,20 @@ namespace WicsPlatform.Server.Controllers
             return ToExcel(ApplyQuery(await service.GetGroups(), Request.Query, false), fileName);
         }
 
+        [HttpGet("/export/wics/mapchannelgroups/csv")]
+        [HttpGet("/export/wics/mapchannelgroups/csv(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportMapChannelGroupsToCSV(string fileName = null)
+        {
+            return ToCSV(ApplyQuery(await service.GetMapChannelGroups(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/mapchannelgroups/excel")]
+        [HttpGet("/export/wics/mapchannelgroups/excel(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportMapChannelGroupsToExcel(string fileName = null)
+        {
+            return ToExcel(ApplyQuery(await service.GetMapChannelGroups(), Request.Query, false), fileName);
+        }
+
         [HttpGet("/export/wics/mapchannelmedia/csv")]
         [HttpGet("/export/wics/mapchannelmedia/csv(fileName='{fileName}')")]
         public async Task<FileStreamResult> ExportMapChannelMediaToCSV(string fileName = null)
@@ -73,6 +87,20 @@ namespace WicsPlatform.Server.Controllers
         public async Task<FileStreamResult> ExportMapChannelMediaToExcel(string fileName = null)
         {
             return ToExcel(ApplyQuery(await service.GetMapChannelMedia(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/mapchannelspeakers/csv")]
+        [HttpGet("/export/wics/mapchannelspeakers/csv(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportMapChannelSpeakersToCSV(string fileName = null)
+        {
+            return ToCSV(ApplyQuery(await service.GetMapChannelSpeakers(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/mapchannelspeakers/excel")]
+        [HttpGet("/export/wics/mapchannelspeakers/excel(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportMapChannelSpeakersToExcel(string fileName = null)
+        {
+            return ToExcel(ApplyQuery(await service.GetMapChannelSpeakers(), Request.Query, false), fileName);
         }
 
         [HttpGet("/export/wics/mapchanneltts/csv")]
@@ -213,34 +241,6 @@ namespace WicsPlatform.Server.Controllers
         public async Task<FileStreamResult> ExportTtsToExcel(string fileName = null)
         {
             return ToExcel(ApplyQuery(await service.GetTts(), Request.Query, false), fileName);
-        }
-
-        [HttpGet("/export/wics/mapchannelspeakers/csv")]
-        [HttpGet("/export/wics/mapchannelspeakers/csv(fileName='{fileName}')")]
-        public async Task<FileStreamResult> ExportMapChannelSpeakersToCSV(string fileName = null)
-        {
-            return ToCSV(ApplyQuery(await service.GetMapChannelSpeakers(), Request.Query, false), fileName);
-        }
-
-        [HttpGet("/export/wics/mapchannelspeakers/excel")]
-        [HttpGet("/export/wics/mapchannelspeakers/excel(fileName='{fileName}')")]
-        public async Task<FileStreamResult> ExportMapChannelSpeakersToExcel(string fileName = null)
-        {
-            return ToExcel(ApplyQuery(await service.GetMapChannelSpeakers(), Request.Query, false), fileName);
-        }
-
-        [HttpGet("/export/wics/mapchannelgroups/csv")]
-        [HttpGet("/export/wics/mapchannelgroups/csv(fileName='{fileName}')")]
-        public async Task<FileStreamResult> ExportMapChannelGroupsToCSV(string fileName = null)
-        {
-            return ToCSV(ApplyQuery(await service.GetMapChannelGroups(), Request.Query, false), fileName);
-        }
-
-        [HttpGet("/export/wics/mapchannelgroups/excel")]
-        [HttpGet("/export/wics/mapchannelgroups/excel(fileName='{fileName}')")]
-        public async Task<FileStreamResult> ExportMapChannelGroupsToExcel(string fileName = null)
-        {
-            return ToExcel(ApplyQuery(await service.GetMapChannelGroups(), Request.Query, false), fileName);
         }
     }
 }

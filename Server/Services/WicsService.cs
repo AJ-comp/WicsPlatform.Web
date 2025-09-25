@@ -564,6 +564,171 @@ namespace WicsPlatform.Server
             return itemToDelete;
         }
     
+        public async Task ExportMapChannelGroupsToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelgroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelgroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async Task ExportMapChannelGroupsToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelgroups/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelgroups/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnMapChannelGroupsRead(ref IQueryable<WicsPlatform.Server.Models.wics.MapChannelGroup> items);
+
+        public async Task<IQueryable<WicsPlatform.Server.Models.wics.MapChannelGroup>> GetMapChannelGroups(Query query = null)
+        {
+            var items = Context.MapChannelGroups.AsQueryable();
+
+            items = items.Include(i => i.Channel);
+            items = items.Include(i => i.Group);
+
+            if (query != null)
+            {
+                if (!string.IsNullOrEmpty(query.Expand))
+                {
+                    var propertiesToExpand = query.Expand.Split(',');
+                    foreach(var p in propertiesToExpand)
+                    {
+                        items = items.Include(p.Trim());
+                    }
+                }
+
+                ApplyQuery(ref items, query);
+            }
+
+            OnMapChannelGroupsRead(ref items);
+
+            return await Task.FromResult(items);
+        }
+
+        partial void OnMapChannelGroupGet(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+        partial void OnGetMapChannelGroupById(ref IQueryable<WicsPlatform.Server.Models.wics.MapChannelGroup> items);
+
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> GetMapChannelGroupById(ulong id)
+        {
+            var items = Context.MapChannelGroups
+                              .AsNoTracking()
+                              .Where(i => i.Id == id);
+
+            items = items.Include(i => i.Channel);
+            items = items.Include(i => i.Group);
+ 
+            OnGetMapChannelGroupById(ref items);
+
+            var itemToReturn = items.FirstOrDefault();
+
+            OnMapChannelGroupGet(itemToReturn);
+
+            return await Task.FromResult(itemToReturn);
+        }
+
+        partial void OnMapChannelGroupCreated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+        partial void OnAfterMapChannelGroupCreated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> CreateMapChannelGroup(WicsPlatform.Server.Models.wics.MapChannelGroup mapchannelgroup)
+        {
+            OnMapChannelGroupCreated(mapchannelgroup);
+
+            var existingItem = Context.MapChannelGroups
+                              .Where(i => i.Id == mapchannelgroup.Id)
+                              .FirstOrDefault();
+
+            if (existingItem != null)
+            {
+               throw new Exception("Item already available");
+            }            
+
+            try
+            {
+                Context.MapChannelGroups.Add(mapchannelgroup);
+                Context.SaveChanges();
+            }
+            catch
+            {
+                Context.Entry(mapchannelgroup).State = EntityState.Detached;
+                throw;
+            }
+
+            OnAfterMapChannelGroupCreated(mapchannelgroup);
+
+            return mapchannelgroup;
+        }
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> CancelMapChannelGroupChanges(WicsPlatform.Server.Models.wics.MapChannelGroup item)
+        {
+            var entityToCancel = Context.Entry(item);
+            if (entityToCancel.State == EntityState.Modified)
+            {
+              entityToCancel.CurrentValues.SetValues(entityToCancel.OriginalValues);
+              entityToCancel.State = EntityState.Unchanged;
+            }
+
+            return item;
+        }
+
+        partial void OnMapChannelGroupUpdated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+        partial void OnAfterMapChannelGroupUpdated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> UpdateMapChannelGroup(ulong id, WicsPlatform.Server.Models.wics.MapChannelGroup mapchannelgroup)
+        {
+            OnMapChannelGroupUpdated(mapchannelgroup);
+
+            var itemToUpdate = Context.MapChannelGroups
+                              .Where(i => i.Id == mapchannelgroup.Id)
+                              .FirstOrDefault();
+
+            if (itemToUpdate == null)
+            {
+               throw new Exception("Item no longer available");
+            }
+                
+            var entryToUpdate = Context.Entry(itemToUpdate);
+            entryToUpdate.CurrentValues.SetValues(mapchannelgroup);
+            entryToUpdate.State = EntityState.Modified;
+
+            Context.SaveChanges();
+
+            OnAfterMapChannelGroupUpdated(mapchannelgroup);
+
+            return mapchannelgroup;
+        }
+
+        partial void OnMapChannelGroupDeleted(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+        partial void OnAfterMapChannelGroupDeleted(WicsPlatform.Server.Models.wics.MapChannelGroup item);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> DeleteMapChannelGroup(ulong id)
+        {
+            var itemToDelete = Context.MapChannelGroups
+                              .Where(i => i.Id == id)
+                              .FirstOrDefault();
+
+            if (itemToDelete == null)
+            {
+               throw new Exception("Item no longer available");
+            }
+
+            OnMapChannelGroupDeleted(itemToDelete);
+
+
+            Context.MapChannelGroups.Remove(itemToDelete);
+
+            try
+            {
+                Context.SaveChanges();
+            }
+            catch
+            {
+                Context.Entry(itemToDelete).State = EntityState.Unchanged;
+                throw;
+            }
+
+            OnAfterMapChannelGroupDeleted(itemToDelete);
+
+            return itemToDelete;
+        }
+    
         public async Task ExportMapChannelMediaToExcel(Query query = null, string fileName = null)
         {
             navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelmedia/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelmedia/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
@@ -725,6 +890,171 @@ namespace WicsPlatform.Server
             }
 
             OnAfterMapChannelMediumDeleted(itemToDelete);
+
+            return itemToDelete;
+        }
+    
+        public async Task ExportMapChannelSpeakersToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelspeakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelspeakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async Task ExportMapChannelSpeakersToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelspeakers/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelspeakers/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnMapChannelSpeakersRead(ref IQueryable<WicsPlatform.Server.Models.wics.MapChannelSpeaker> items);
+
+        public async Task<IQueryable<WicsPlatform.Server.Models.wics.MapChannelSpeaker>> GetMapChannelSpeakers(Query query = null)
+        {
+            var items = Context.MapChannelSpeakers.AsQueryable();
+
+            items = items.Include(i => i.Channel);
+            items = items.Include(i => i.Speaker);
+
+            if (query != null)
+            {
+                if (!string.IsNullOrEmpty(query.Expand))
+                {
+                    var propertiesToExpand = query.Expand.Split(',');
+                    foreach(var p in propertiesToExpand)
+                    {
+                        items = items.Include(p.Trim());
+                    }
+                }
+
+                ApplyQuery(ref items, query);
+            }
+
+            OnMapChannelSpeakersRead(ref items);
+
+            return await Task.FromResult(items);
+        }
+
+        partial void OnMapChannelSpeakerGet(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
+        partial void OnGetMapChannelSpeakerById(ref IQueryable<WicsPlatform.Server.Models.wics.MapChannelSpeaker> items);
+
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> GetMapChannelSpeakerById(ulong id)
+        {
+            var items = Context.MapChannelSpeakers
+                              .AsNoTracking()
+                              .Where(i => i.Id == id);
+
+            items = items.Include(i => i.Channel);
+            items = items.Include(i => i.Speaker);
+ 
+            OnGetMapChannelSpeakerById(ref items);
+
+            var itemToReturn = items.FirstOrDefault();
+
+            OnMapChannelSpeakerGet(itemToReturn);
+
+            return await Task.FromResult(itemToReturn);
+        }
+
+        partial void OnMapChannelSpeakerCreated(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
+        partial void OnAfterMapChannelSpeakerCreated(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> CreateMapChannelSpeaker(WicsPlatform.Server.Models.wics.MapChannelSpeaker mapchannelspeaker)
+        {
+            OnMapChannelSpeakerCreated(mapchannelspeaker);
+
+            var existingItem = Context.MapChannelSpeakers
+                              .Where(i => i.Id == mapchannelspeaker.Id)
+                              .FirstOrDefault();
+
+            if (existingItem != null)
+            {
+               throw new Exception("Item already available");
+            }            
+
+            try
+            {
+                Context.MapChannelSpeakers.Add(mapchannelspeaker);
+                Context.SaveChanges();
+            }
+            catch
+            {
+                Context.Entry(mapchannelspeaker).State = EntityState.Detached;
+                throw;
+            }
+
+            OnAfterMapChannelSpeakerCreated(mapchannelspeaker);
+
+            return mapchannelspeaker;
+        }
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> CancelMapChannelSpeakerChanges(WicsPlatform.Server.Models.wics.MapChannelSpeaker item)
+        {
+            var entityToCancel = Context.Entry(item);
+            if (entityToCancel.State == EntityState.Modified)
+            {
+              entityToCancel.CurrentValues.SetValues(entityToCancel.OriginalValues);
+              entityToCancel.State = EntityState.Unchanged;
+            }
+
+            return item;
+        }
+
+        partial void OnMapChannelSpeakerUpdated(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
+        partial void OnAfterMapChannelSpeakerUpdated(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> UpdateMapChannelSpeaker(ulong id, WicsPlatform.Server.Models.wics.MapChannelSpeaker mapchannelspeaker)
+        {
+            OnMapChannelSpeakerUpdated(mapchannelspeaker);
+
+            var itemToUpdate = Context.MapChannelSpeakers
+                              .Where(i => i.Id == mapchannelspeaker.Id)
+                              .FirstOrDefault();
+
+            if (itemToUpdate == null)
+            {
+               throw new Exception("Item no longer available");
+            }
+                
+            var entryToUpdate = Context.Entry(itemToUpdate);
+            entryToUpdate.CurrentValues.SetValues(mapchannelspeaker);
+            entryToUpdate.State = EntityState.Modified;
+
+            Context.SaveChanges();
+
+            OnAfterMapChannelSpeakerUpdated(mapchannelspeaker);
+
+            return mapchannelspeaker;
+        }
+
+        partial void OnMapChannelSpeakerDeleted(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
+        partial void OnAfterMapChannelSpeakerDeleted(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
+
+        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> DeleteMapChannelSpeaker(ulong id)
+        {
+            var itemToDelete = Context.MapChannelSpeakers
+                              .Where(i => i.Id == id)
+                              .FirstOrDefault();
+
+            if (itemToDelete == null)
+            {
+               throw new Exception("Item no longer available");
+            }
+
+            OnMapChannelSpeakerDeleted(itemToDelete);
+
+
+            Context.MapChannelSpeakers.Remove(itemToDelete);
+
+            try
+            {
+                Context.SaveChanges();
+            }
+            catch
+            {
+                Context.Entry(itemToDelete).State = EntityState.Unchanged;
+                throw;
+            }
+
+            OnAfterMapChannelSpeakerDeleted(itemToDelete);
 
             return itemToDelete;
         }
@@ -2361,336 +2691,6 @@ namespace WicsPlatform.Server
             }
 
             OnAfterTtDeleted(itemToDelete);
-
-            return itemToDelete;
-        }
-    
-        public async Task ExportMapChannelSpeakersToExcel(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelspeakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelspeakers/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        public async Task ExportMapChannelSpeakersToCSV(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelspeakers/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelspeakers/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        partial void OnMapChannelSpeakersRead(ref IQueryable<WicsPlatform.Server.Models.wics.MapChannelSpeaker> items);
-
-        public async Task<IQueryable<WicsPlatform.Server.Models.wics.MapChannelSpeaker>> GetMapChannelSpeakers(Query query = null)
-        {
-            var items = Context.MapChannelSpeakers.AsQueryable();
-
-            items = items.Include(i => i.Channel);
-            items = items.Include(i => i.Speaker);
-
-            if (query != null)
-            {
-                if (!string.IsNullOrEmpty(query.Expand))
-                {
-                    var propertiesToExpand = query.Expand.Split(',');
-                    foreach(var p in propertiesToExpand)
-                    {
-                        items = items.Include(p.Trim());
-                    }
-                }
-
-                ApplyQuery(ref items, query);
-            }
-
-            OnMapChannelSpeakersRead(ref items);
-
-            return await Task.FromResult(items);
-        }
-
-        partial void OnMapChannelSpeakerGet(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
-        partial void OnGetMapChannelSpeakerById(ref IQueryable<WicsPlatform.Server.Models.wics.MapChannelSpeaker> items);
-
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> GetMapChannelSpeakerById(ulong id)
-        {
-            var items = Context.MapChannelSpeakers
-                              .AsNoTracking()
-                              .Where(i => i.Id == id);
-
-            items = items.Include(i => i.Channel);
-            items = items.Include(i => i.Speaker);
- 
-            OnGetMapChannelSpeakerById(ref items);
-
-            var itemToReturn = items.FirstOrDefault();
-
-            OnMapChannelSpeakerGet(itemToReturn);
-
-            return await Task.FromResult(itemToReturn);
-        }
-
-        partial void OnMapChannelSpeakerCreated(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
-        partial void OnAfterMapChannelSpeakerCreated(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> CreateMapChannelSpeaker(WicsPlatform.Server.Models.wics.MapChannelSpeaker mapchannelspeaker)
-        {
-            OnMapChannelSpeakerCreated(mapchannelspeaker);
-
-            var existingItem = Context.MapChannelSpeakers
-                              .Where(i => i.Id == mapchannelspeaker.Id)
-                              .FirstOrDefault();
-
-            if (existingItem != null)
-            {
-               throw new Exception("Item already available");
-            }            
-
-            try
-            {
-                Context.MapChannelSpeakers.Add(mapchannelspeaker);
-                Context.SaveChanges();
-            }
-            catch
-            {
-                Context.Entry(mapchannelspeaker).State = EntityState.Detached;
-                throw;
-            }
-
-            OnAfterMapChannelSpeakerCreated(mapchannelspeaker);
-
-            return mapchannelspeaker;
-        }
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> CancelMapChannelSpeakerChanges(WicsPlatform.Server.Models.wics.MapChannelSpeaker item)
-        {
-            var entityToCancel = Context.Entry(item);
-            if (entityToCancel.State == EntityState.Modified)
-            {
-              entityToCancel.CurrentValues.SetValues(entityToCancel.OriginalValues);
-              entityToCancel.State = EntityState.Unchanged;
-            }
-
-            return item;
-        }
-
-        partial void OnMapChannelSpeakerUpdated(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
-        partial void OnAfterMapChannelSpeakerUpdated(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> UpdateMapChannelSpeaker(ulong id, WicsPlatform.Server.Models.wics.MapChannelSpeaker mapchannelspeaker)
-        {
-            OnMapChannelSpeakerUpdated(mapchannelspeaker);
-
-            var itemToUpdate = Context.MapChannelSpeakers
-                              .Where(i => i.Id == mapchannelspeaker.Id)
-                              .FirstOrDefault();
-
-            if (itemToUpdate == null)
-            {
-               throw new Exception("Item no longer available");
-            }
-                
-            var entryToUpdate = Context.Entry(itemToUpdate);
-            entryToUpdate.CurrentValues.SetValues(mapchannelspeaker);
-            entryToUpdate.State = EntityState.Modified;
-
-            Context.SaveChanges();
-
-            OnAfterMapChannelSpeakerUpdated(mapchannelspeaker);
-
-            return mapchannelspeaker;
-        }
-
-        partial void OnMapChannelSpeakerDeleted(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
-        partial void OnAfterMapChannelSpeakerDeleted(WicsPlatform.Server.Models.wics.MapChannelSpeaker item);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelSpeaker> DeleteMapChannelSpeaker(ulong id)
-        {
-            var itemToDelete = Context.MapChannelSpeakers
-                              .Where(i => i.Id == id)
-                              .FirstOrDefault();
-
-            if (itemToDelete == null)
-            {
-               throw new Exception("Item no longer available");
-            }
-
-            OnMapChannelSpeakerDeleted(itemToDelete);
-
-
-            Context.MapChannelSpeakers.Remove(itemToDelete);
-
-            try
-            {
-                Context.SaveChanges();
-            }
-            catch
-            {
-                Context.Entry(itemToDelete).State = EntityState.Unchanged;
-                throw;
-            }
-
-            OnAfterMapChannelSpeakerDeleted(itemToDelete);
-
-            return itemToDelete;
-        }
-    
-        public async Task ExportMapChannelGroupsToExcel(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelgroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelgroups/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        public async Task ExportMapChannelGroupsToCSV(Query query = null, string fileName = null)
-        {
-            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/mapchannelgroups/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/mapchannelgroups/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
-        }
-
-        partial void OnMapChannelGroupsRead(ref IQueryable<WicsPlatform.Server.Models.wics.MapChannelGroup> items);
-
-        public async Task<IQueryable<WicsPlatform.Server.Models.wics.MapChannelGroup>> GetMapChannelGroups(Query query = null)
-        {
-            var items = Context.MapChannelGroups.AsQueryable();
-
-            items = items.Include(i => i.Channel);
-            items = items.Include(i => i.Group);
-
-            if (query != null)
-            {
-                if (!string.IsNullOrEmpty(query.Expand))
-                {
-                    var propertiesToExpand = query.Expand.Split(',');
-                    foreach(var p in propertiesToExpand)
-                    {
-                        items = items.Include(p.Trim());
-                    }
-                }
-
-                ApplyQuery(ref items, query);
-            }
-
-            OnMapChannelGroupsRead(ref items);
-
-            return await Task.FromResult(items);
-        }
-
-        partial void OnMapChannelGroupGet(WicsPlatform.Server.Models.wics.MapChannelGroup item);
-        partial void OnGetMapChannelGroupById(ref IQueryable<WicsPlatform.Server.Models.wics.MapChannelGroup> items);
-
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> GetMapChannelGroupById(ulong id)
-        {
-            var items = Context.MapChannelGroups
-                              .AsNoTracking()
-                              .Where(i => i.Id == id);
-
-            items = items.Include(i => i.Channel);
-            items = items.Include(i => i.Group);
- 
-            OnGetMapChannelGroupById(ref items);
-
-            var itemToReturn = items.FirstOrDefault();
-
-            OnMapChannelGroupGet(itemToReturn);
-
-            return await Task.FromResult(itemToReturn);
-        }
-
-        partial void OnMapChannelGroupCreated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
-        partial void OnAfterMapChannelGroupCreated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> CreateMapChannelGroup(WicsPlatform.Server.Models.wics.MapChannelGroup mapchannelgroup)
-        {
-            OnMapChannelGroupCreated(mapchannelgroup);
-
-            var existingItem = Context.MapChannelGroups
-                              .Where(i => i.Id == mapchannelgroup.Id)
-                              .FirstOrDefault();
-
-            if (existingItem != null)
-            {
-               throw new Exception("Item already available");
-            }            
-
-            try
-            {
-                Context.MapChannelGroups.Add(mapchannelgroup);
-                Context.SaveChanges();
-            }
-            catch
-            {
-                Context.Entry(mapchannelgroup).State = EntityState.Detached;
-                throw;
-            }
-
-            OnAfterMapChannelGroupCreated(mapchannelgroup);
-
-            return mapchannelgroup;
-        }
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> CancelMapChannelGroupChanges(WicsPlatform.Server.Models.wics.MapChannelGroup item)
-        {
-            var entityToCancel = Context.Entry(item);
-            if (entityToCancel.State == EntityState.Modified)
-            {
-              entityToCancel.CurrentValues.SetValues(entityToCancel.OriginalValues);
-              entityToCancel.State = EntityState.Unchanged;
-            }
-
-            return item;
-        }
-
-        partial void OnMapChannelGroupUpdated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
-        partial void OnAfterMapChannelGroupUpdated(WicsPlatform.Server.Models.wics.MapChannelGroup item);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> UpdateMapChannelGroup(ulong id, WicsPlatform.Server.Models.wics.MapChannelGroup mapchannelgroup)
-        {
-            OnMapChannelGroupUpdated(mapchannelgroup);
-
-            var itemToUpdate = Context.MapChannelGroups
-                              .Where(i => i.Id == mapchannelgroup.Id)
-                              .FirstOrDefault();
-
-            if (itemToUpdate == null)
-            {
-               throw new Exception("Item no longer available");
-            }
-                
-            var entryToUpdate = Context.Entry(itemToUpdate);
-            entryToUpdate.CurrentValues.SetValues(mapchannelgroup);
-            entryToUpdate.State = EntityState.Modified;
-
-            Context.SaveChanges();
-
-            OnAfterMapChannelGroupUpdated(mapchannelgroup);
-
-            return mapchannelgroup;
-        }
-
-        partial void OnMapChannelGroupDeleted(WicsPlatform.Server.Models.wics.MapChannelGroup item);
-        partial void OnAfterMapChannelGroupDeleted(WicsPlatform.Server.Models.wics.MapChannelGroup item);
-
-        public async Task<WicsPlatform.Server.Models.wics.MapChannelGroup> DeleteMapChannelGroup(ulong id)
-        {
-            var itemToDelete = Context.MapChannelGroups
-                              .Where(i => i.Id == id)
-                              .FirstOrDefault();
-
-            if (itemToDelete == null)
-            {
-               throw new Exception("Item no longer available");
-            }
-
-            OnMapChannelGroupDeleted(itemToDelete);
-
-
-            Context.MapChannelGroups.Remove(itemToDelete);
-
-            try
-            {
-                Context.SaveChanges();
-            }
-            catch
-            {
-                Context.Entry(itemToDelete).State = EntityState.Unchanged;
-                throw;
-            }
-
-            OnAfterMapChannelGroupDeleted(itemToDelete);
 
             return itemToDelete;
         }

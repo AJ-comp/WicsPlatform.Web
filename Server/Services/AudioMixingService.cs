@@ -131,7 +131,9 @@ public class AudioMixingService : IAudioMixingService, IDisposable
     // 초기화
     public async Task<bool> InitializeMixer(ulong broadcastId, ulong channelId, List<SpeakerInfo> speakers)
     {
-        int mixSampleRate = 16000; byte mixChannels = 1;
+        int mixSampleRate = 16000;
+        byte mixChannels = 1;
+
         using (var scope = scopeFactory.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<wicsContext>();
