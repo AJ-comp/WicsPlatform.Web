@@ -61,7 +61,7 @@ builder.Services.AddSingleton<IAudioMixingService, AudioMixingService>();
 builder.Services.AddSingleton<IUdpBroadcastService, UdpBroadcastService>();
 builder.Services.AddSingleton<ITtsBroadcastService, TtsBroadcastService>();
 builder.Services.AddSingleton<IMediaBroadcastService, MediaBroadcastService>();
-builder.Services.AddScoped<IBroadcastPreparationService, BroadcastPreparationService>();
+builder.Services.AddSingleton<IBroadcastPreparationService, BroadcastPreparationService>();
 builder.Services.AddSingleton<IScheduleExecutionService, ScheduleExecutionService>();
 builder.Services.AddHostedService<ScheduleScannerService>();
 RegisterDBContext(builder);

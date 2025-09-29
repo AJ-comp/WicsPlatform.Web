@@ -575,8 +575,14 @@ public partial class ManageSchedule
                 scheduleChannels[editingSchedule.Id] = editingChannel;
             }
 
-            // 콘텐츠 매핑 업데이트 -> SchedulePlay 기반
+            // 콘텐츠 매핑 업데이트 -> SchedulePlay 기반 (순서 저장)
             await UpdateSchedulePlays(editingSchedule.Id);
+
+            // 채널의 미디어 / TTS 매핑 (map_channel_media / map_channel_tts) 동기화
+            if (editingChannel != null)
+            {
+                await UpdateChannelContentMappings(editingChannel.Id);
+            }
 
             // 스피커/그룹 매핑 업데이트 -> 채널 기준
             if (editingChannel != null)
@@ -625,6 +631,85 @@ public partial class ManageSchedule
         {
             isSaving = false;
             StateHasChanged();
+        }
+    }
+
+    // 채널의 map_channel_media / map_channel_tts 테이블을 현재 선택 상태(editingSelectedMediaIds, editingSelectedTtsIds)와 동기화
+    private async Task UpdateChannelContentMappings(ulong channelId)
+    {
+        try
+        {
+            // 1) 기존 활성 미디어 매핑 로드
+            var existingMediaQuery = new Radzen.Query
+            {
+                Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)"
+            };
+            var existingMediaResult = await WicsService.GetMapChannelMedia(existingMediaQuery);
+            var existingMediaMaps = existingMediaResult.Value.AsODataEnumerable().ToList();
+            var existingMediaIds = existingMediaMaps.Select(m => m.MediaId).ToHashSet();
+
+            // 제거될 매핑: 현재 선택에 없음
+            foreach (var map in existingMediaMaps.Where(m => !editingSelectedMediaIds.Contains(m.MediaId)))
+            {
+                map.DeleteYn = "Y";
+                map.UpdatedAt = DateTime.UtcNow;
+                await WicsService.UpdateMapChannelMedium(map.Id, map);
+            }
+
+            // 추가될 매핑
+            var mediaToAdd = editingSelectedMediaIds.Except(existingMediaIds);
+            foreach (var mid in mediaToAdd)
+            {
+                var newMap = new MapChannelMedium
+                {
+                    ChannelId = channelId,
+                    MediaId = mid,
+                    DeleteYn = "N",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await WicsService.CreateMapChannelMedium(newMap);
+            }
+
+            // 2) 기존 활성 TTS 매핑 로드
+            var existingTtsQuery = new Radzen.Query
+            {
+                Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)"
+            };
+            var existingTtsResult = await WicsService.GetMapChannelTts(existingTtsQuery);
+            var existingTtsMaps = existingTtsResult.Value.AsODataEnumerable().ToList();
+            var existingTtsIds = existingTtsMaps.Select(t => t.TtsId).ToHashSet();
+
+            // 제거될 TTS 매핑
+            foreach (var map in existingTtsMaps.Where(t => !editingSelectedTtsIds.Contains(t.TtsId)))
+            {
+                map.DeleteYn = "Y";
+                // UpdatedAt 속성이 모델에 존재한다는 전제 (다른 코드에서도 사용)
+                map.UpdatedAt = DateTime.UtcNow;
+                await WicsService.UpdateMapChannelTt(map.Id, map);
+            }
+
+            // 추가될 TTS 매핑
+            var ttsToAdd = editingSelectedTtsIds.Except(existingTtsIds);
+            foreach (var tid in ttsToAdd)
+            {
+                var newMap = new MapChannelTt
+                {
+                    ChannelId = channelId,
+                    TtsId = tid,
+                    DeleteYn = "N",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await WicsService.CreateMapChannelTt(newMap);
+            }
+
+            Logger.LogInformation($"Updated channel content mappings for channel {channelId}: media={editingSelectedMediaIds.Count}, tts={editingSelectedTtsIds.Count}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"Failed to update channel content mappings for channel {channelId}");
+            throw; // 상위에서 실패 알림 처리
         }
     }
 

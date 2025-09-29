@@ -3,7 +3,6 @@ using System.Net.WebSockets;
 using System.Text.Json;
 using WicsPlatform.Server.Contracts;
 using WicsPlatform.Server.Data;
-using WicsPlatform.Server.Models.wics;
 using WicsPlatform.Server.Services;
 using WicsPlatform.Shared;
 

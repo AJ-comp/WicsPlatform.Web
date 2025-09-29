@@ -1,9 +1,5 @@
-﻿using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using WicsPlatform.Server.Middleware;
 using WicsPlatform.Server.Models.wics;
-using WicsPlatform.Shared;
-using WicsPlatform.Server.Middleware;
 
 namespace WicsPlatform.Server.Services
 {
@@ -14,7 +10,11 @@ namespace WicsPlatform.Server.Services
         List<SpeakerInfo> Speakers,
         List<WebSocketMiddleware.MediaInfo> Media,
         List<WebSocketMiddleware.TtsInfo> Tts,
-        List<TakeoverInfo> Takeovers);
+        List<TakeoverInfo> Takeovers)
+    {
+        // 새로 추가: schedule_play 순서를 보존한 혼합 재생 목록 (Media/TTS 교차)
+        public List<PlaylistEntry>? OrderedPlaylist { get; init; }
+    }
 
     public interface IBroadcastPreparationService
     {
