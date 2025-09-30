@@ -176,17 +176,6 @@ public class ScheduleExecutionService : IScheduleExecutionService
 
         // 3. 재생 종료 감시 (주문형 플레이리스트 사용 시 마지막 항목 종료 후 빠르게 통과)
         _logger.LogInformation("[ScheduleExecution] Waiting for playback completion for broadcast {BroadcastId}", broadcastId);
-        while (true)
-        {
-            var hasMedia = _mixer.HasActiveMediaStream(broadcastId);
-            var hasTts = _mixer.HasActiveTtsStream(broadcastId);
-            if (!hasMedia && !hasTts)
-            {
-                _logger.LogInformation("[ScheduleExecution] Playback finished for broadcast {BroadcastId}", broadcastId);
-                break;
-            }
-            await Task.Delay(500);
-        }
     }
 
     private async Task FinalizeBroadcastAsync(IServiceScope scope, ulong broadcastId, ulong channelId)
@@ -198,8 +187,20 @@ public class ScheduleExecutionService : IScheduleExecutionService
         var db = scope.ServiceProvider.GetRequiredService<wicsContext>();
         var b = await db.Broadcasts.FirstOrDefaultAsync(x => x.Id == broadcastId);
         if (b != null) { b.OngoingYn = "N"; b.UpdatedAt = DateTime.UtcNow; }
+
         var ch = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId);
         if (ch != null) { ch.State = 0; ch.UpdatedAt = DateTime.UtcNow; }
+
+        // (변경) 해당 채널의 스피커 소유권 레코드 하드삭제
+        var removeOwnerships = await db.SpeakerOwnershipStates
+            .Where(o => o.ChannelId == channelId)
+            .ToListAsync();
+        if (removeOwnerships.Count > 0)
+        {
+            db.SpeakerOwnershipStates.RemoveRange(removeOwnerships);
+            _logger.LogInformation("[ScheduleExecution] Deleted {Count} speaker ownership record(s) for channel {ChannelId}", removeOwnerships.Count, channelId);
+        }
+
         await db.SaveChangesAsync();
         _logger.LogInformation("[ScheduleExecution] Broadcast {BroadcastId} finalized for channel {ChannelId}", broadcastId, channelId);
     }

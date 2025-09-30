@@ -1,6 +1,4 @@
-﻿using ManagedBass;
-using ManagedBass.Mix;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text.Json;
 using WicsPlatform.Server.Contracts;
 using static WicsPlatform.Server.Middleware.WebSocketMiddleware;
@@ -12,7 +10,6 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
     private readonly ILogger<MediaBroadcastService> logger;
     private readonly IAudioMixingService audioMixingService;
     private readonly ConcurrentDictionary<ulong, MediaSession> _sessions = new();
-    private bool _bassInitialized = false;
 
     public event Action<ulong> OnPlaybackCompleted;
 
@@ -32,27 +29,6 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
     {
         this.logger = logger;
         this.audioMixingService = audioMixingService;
-        InitializeBass();
-    }
-
-    private void InitializeBass()
-    {
-        try
-        {
-            if (!Bass.Init(-1, 48000, DeviceInitFlags.Mono))
-            {
-                logger.LogWarning($"Failed to initialize BASS: {Bass.LastError}");
-            }
-            else
-            {
-                _bassInitialized = true;
-                logger.LogInformation("BASS initialized for Media Service");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error initializing BASS");
-        }
     }
 
     public async Task<MediaPlaybackResult> HandlePlayRequestAsync(
@@ -150,30 +126,8 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
             return;
         }
 
-        // BASS 스트림 생성
-        var stream = Bass.CreateStream(fullPath, 0, 0, BassFlags.Decode | BassFlags.Float);
-        if (stream == 0)
-        {
-            logger.LogError($"Failed to create stream for {media.FileName}: {Bass.LastError}");
-            session.CurrentIndex++;
-            await PlayNextFile(broadcastId);
-            return;
-        }
-
-        session.CurrentStream = stream;
-
         // 믹서에 추가
         await audioMixingService.AddMediaStream(broadcastId, media.FullPath);
-
-        // 재생 종료 감지를 위한 동기화 플래그 설정
-        var syncEnd = Bass.ChannelSetSync(stream, SyncFlags.End, 0, (handle, channel, data, user) =>
-        {
-            logger.LogInformation($"Media ended: {media.FileName}");
-
-            // 다음 파일로 이동
-            session.CurrentIndex++;
-            _ = Task.Run(async () => await PlayNextFile(broadcastId));
-        });
 
         logger.LogInformation($"Playing: {media.FileName} ({session.CurrentIndex + 1}/{session.MediaFiles.Count})");
     }
@@ -191,12 +145,6 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
             if (_sessions.TryRemove(broadcastId, out var session))
             {
                 session.IsPlaying = false;
-
-                // BASS 스트림 정리
-                if (session.CurrentStream != 0)
-                {
-                    Bass.StreamFree(session.CurrentStream);
-                }
 
                 logger.LogInformation($"Media stopped for broadcast {broadcastId}");
             }
@@ -216,18 +164,6 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
         {
             var currentPosition = TimeSpan.Zero;
             var duration = TimeSpan.Zero;
-
-            if (session.CurrentStream != 0)
-            {
-                var posBytes = Bass.ChannelGetPosition(session.CurrentStream);
-                var lenBytes = Bass.ChannelGetLength(session.CurrentStream);
-
-                if (posBytes >= 0)
-                    currentPosition = TimeSpan.FromSeconds(Bass.ChannelBytes2Seconds(session.CurrentStream, posBytes));
-
-                if (lenBytes >= 0)
-                    duration = TimeSpan.FromSeconds(Bass.ChannelBytes2Seconds(session.CurrentStream, lenBytes));
-            }
 
             return new MediaPlaybackStatus
             {
@@ -282,12 +218,5 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
         }
 
         _sessions.Clear();
-
-        // BASS 종료
-        if (_bassInitialized)
-        {
-            Bass.Free();
-            logger.LogInformation("BASS freed");
-        }
     }
 }

@@ -1,5 +1,4 @@
-﻿using ManagedBass;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Speech.Synthesis;
 using System.Text.Json;
 using WicsPlatform.Server.Contracts;
@@ -13,7 +12,6 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
     private readonly IAudioMixingService audioMixingService;
     private readonly ConcurrentDictionary<ulong, TtsSession> _sessions = new();
     private readonly string _ttsFilePath;
-    private bool _bassInitialized = false;
 
     public event Action<ulong> OnPlaybackCompleted;
 
@@ -44,30 +42,10 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
             Directory.CreateDirectory(_ttsFilePath);
         }
 
-        InitializeBass();
+        // InitializeBass(); // BASS 제거
 
         // 애플리케이션 종료 시 임시 파일 정리
         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
-    }
-
-    private void InitializeBass()
-    {
-        try
-        {
-            if (!Bass.Init(-1, 48000, DeviceInitFlags.Mono))
-            {
-                logger.LogWarning($"Failed to initialize BASS: {Bass.LastError}");
-            }
-            else
-            {
-                _bassInitialized = true;
-                logger.LogInformation("BASS initialized for TTS Service");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error initializing BASS");
-        }
     }
 
     public async Task<TtsPlaybackResult> HandlePlayRequestAsync(
@@ -224,25 +202,13 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
             return;
         }
 
-        // BASS 스트림 생성
-        var stream = Bass.CreateStream(fullPath, 0, 0, BassFlags.Decode | BassFlags.Float);
-        if (stream == 0)
-        {
-            logger.LogError($"Failed to create stream for TTS: {Bass.LastError}");
-            session.CurrentIndex++;
-            await PlayNextFile(broadcastId);
-            return;
-        }
-
-        session.CurrentStream = stream;
-
         // AddTtsStream 사용
         var ttsStreamId = await audioMixingService.AddTtsStream(broadcastId, audioPath);
 
         if (ttsStreamId == 0)
         {
             logger.LogError($"Failed to add TTS to mixer");
-            Bass.StreamFree(stream);
+            // Bass.StreamFree(stream); // BASS 제거
             session.CurrentIndex++;
             await PlayNextFile(broadcastId);
             return;
@@ -250,27 +216,6 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
 
         // 스트림 ID와 파일 경로 매핑 저장
         session.StreamToFileMap[ttsStreamId] = fullPath;
-
-        // 재생 종료 감지를 위한 동기화 플래그 설정
-        var syncEnd = Bass.ChannelSetSync(stream, SyncFlags.End, 0, async (handle, channel, data, user) =>
-        {
-            var currentTts = session.TtsItems[session.CurrentIndex];
-            logger.LogInformation($"TTS ended: {currentTts.Name}");
-
-            // TTS 스트림 제거
-            await audioMixingService.RemoveTtsStream(broadcastId, ttsStreamId);
-
-            // 재생이 끝난 임시 파일 삭제
-            if (session.StreamToFileMap.TryGetValue(ttsStreamId, out var filePath))
-            {
-                DeleteTempFile(filePath);
-                session.StreamToFileMap.Remove(ttsStreamId);
-            }
-
-            // 다음 파일로 이동
-            session.CurrentIndex++;
-            _ = Task.Run(async () => await PlayNextFile(broadcastId));
-        });
 
         var currentTtsInfo = session.TtsItems[session.CurrentIndex];
         logger.LogInformation($"Playing TTS: {currentTtsInfo.Name} ({session.CurrentIndex + 1}/{session.GeneratedFiles.Count})");
@@ -289,12 +234,6 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
             if (_sessions.TryRemove(broadcastId, out var session))
             {
                 session.IsPlaying = false;
-
-                // BASS 스트림 정리
-                if (session.CurrentStream != 0)
-                {
-                    Bass.StreamFree(session.CurrentStream);
-                }
 
                 // 모든 임시 파일 삭제
                 DeleteAllTempFiles(session);
@@ -442,12 +381,5 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
 
         // 이벤트 핸들러 제거
         AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
-
-        // BASS 종료
-        if (_bassInitialized)
-        {
-            Bass.Free();
-            logger.LogInformation("BASS freed in TTS Service");
-        }
     }
 }
