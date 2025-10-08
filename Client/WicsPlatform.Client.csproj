@@ -40,5 +40,8 @@
 		<Compile Update="Pages\ManageBroadCast.Microphone.razor.cs">
 			<DependentUpon>ManageBroadCast.razor</DependentUpon>
 		</Compile>
+		<Compile Update="Pages\ManageBroadCast.Setting.razor.cs">
+			<DependentUpon>ManageBroadCast.razor</DependentUpon>
+		</Compile>
 	</ItemGroup>
 </Project>

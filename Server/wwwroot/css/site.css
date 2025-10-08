@@ -1,4 +1,4 @@
-#blazor-error-ui {
+﻿#blazor-error-ui {
     background: lightyellow;
     bottom: 0;
     box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
@@ -83,4 +83,107 @@ a:focus {
 
 .loading-progress-text:after {
     content: var(--blazor-load-percentage-text, "Loading");
+}
+
+/* Radzen 알림창(Notification) 스타일 커스터마이징 */
+.rz-notification {
+    min-width: 280px !important;
+    max-width: 400px !important;
+    padding: 0.75rem !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    border-radius: 8px !important;
+}
+
+.rz-notification-summary {
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.25rem !important;
+    line-height: 1.3 !important;
+}
+
+.rz-notification-detail {
+    font-size: 0.7rem !important;
+    line-height: 1.4 !important;
+    opacity: 0.9 !important;
+    margin-top: 0.25rem !important;
+}
+
+.rz-notification-icon {
+    font-size: 1rem !important;
+    margin-right: 0.5rem !important;
+}
+
+.rz-notification-close {
+    font-size: 1rem !important;
+    width: 20px !important;
+    height: 20px !important;
+    padding: 0 !important;
+}
+
+/* 알림 타입별 스타일 */
+.rz-notification-success {
+    background-color: #d4edda !important;
+    border-left: 4px solid #28a745 !important;
+    color: #155724 !important;
+}
+
+.rz-notification-info {
+    background-color: #d1ecf1 !important;
+    border-left: 4px solid #17a2b8 !important;
+    color: #0c5460 !important;
+}
+
+.rz-notification-warning {
+    background-color: #fff3cd !important;
+    border-left: 4px solid #ffc107 !important;
+    color: #856404 !important;
+}
+
+.rz-notification-error {
+    background-color: #f8d7da !important;
+    border-left: 4px solid #dc3545 !important;
+    color: #721c24 !important;
+}
+
+/* 알림창 애니메이션 개선 */
+.rz-notification {
+    animation: slideInRight 0.3s ease-out !important;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* 다크 모드 지원 */
+@media (prefers-color-scheme: dark) {
+    .rz-notification {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    .rz-notification-success {
+        background-color: #1e4620 !important;
+        color: #d4edda !important;
+    }
+
+    .rz-notification-info {
+        background-color: #1a4d5c !important;
+        color: #d1ecf1 !important;
+    }
+
+    .rz-notification-warning {
+        background-color: #664d03 !important;
+        color: #fff3cd !important;
+    }
+
+    .rz-notification-error {
+        background-color: #58151c !important;
+        color: #f8d7da !important;
+    }
 }

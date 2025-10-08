@@ -93,6 +93,7 @@ public class ScheduleExecutionService : IScheduleExecutionService
     {
         var prepared = await prepService.PrepareAsync(channelId, null);
         List<PlaylistEntry> playlist;
+
         if (prepared.OrderedPlaylist != null && prepared.OrderedPlaylist.Count > 0)
         {
             playlist = prepared.OrderedPlaylist.Select(p => p).ToList();

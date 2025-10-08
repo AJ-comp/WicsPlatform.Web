@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Radzen;
 using WicsPlatform.Client.Dialogs;
+using WicsPlatform.Client.Services;
 using WicsPlatform.Server.Models.wics;
 
 namespace WicsPlatform.Client.Pages;
@@ -11,6 +12,7 @@ public partial class ManageSchedule
     [Inject] protected NotificationService NotificationService { get; set; }
     [Inject] protected DialogService DialogService { get; set; }
     [Inject] protected ILogger<ManageSchedule> Logger { get; set; }
+    [Inject] protected BroadcastWebSocketService WebSocketService { get; set; }
 
     // 스케줄 관련 필드
     private IEnumerable<Schedule> schedules = new List<Schedule>();
@@ -19,9 +21,8 @@ public partial class ManageSchedule
     private bool isDeletingSchedule = false;
 
     // 편집 관련 필드
-    private bool isEditMode = false;
     private Schedule editingSchedule = null;
-    private Channel editingChannel = null; // 채널 편집 데이터 (이름/오디오 설정)
+    private Channel editingChannel = null;
     private bool isSaving = false;
     private DateTime? tempStartDateTime;
     private int tempRepeatCount;
@@ -36,7 +37,7 @@ public partial class ManageSchedule
     private IEnumerable<Medium> availableMedia = new List<Medium>();
     private IEnumerable<Tt> availableTts = new List<Tt>();
 
-    // 현재 스케줄의 콘텐츠 (보기 모드)
+    // 현재 스케줄의 콘텐츠
     private IEnumerable<Medium> currentScheduleMedia = new List<Medium>();
     private IEnumerable<Tt> currentScheduleTts = new List<Tt>();
 
@@ -398,33 +399,9 @@ public partial class ManageSchedule
 
     private async Task SelectSchedule(Schedule schedule)
     {
-        // 편집 중이면 경고
-        if (isEditMode && editingSchedule != null)
-        {
-            CancelEdit();
-        }
-
         selectedSchedule = schedule;
-        isEditMode = false;
-        editingSchedule = null;
-        editingChannel = null;
 
-        // 선택된 스케줄의 콘텐츠 로드
-        await LoadScheduleContent(schedule.Id);
-
-        var name = GetChannelNameForSchedule(schedule);
-        Logger.LogInformation($"Selected schedule: {name} (ID: {schedule.Id})");
-        StateHasChanged();
-    }
-
-    // 편집 시작
-    private async Task StartEdit()
-    {
-        if (selectedSchedule == null) return;
-
-        isEditMode = true;
-
-        // 깊은 복사로 편집용 객체 생성 (스케줄 필드만)
+        // 편집용 객체 생성
         editingSchedule = new Schedule
         {
             Id = selectedSchedule.Id,
@@ -470,18 +447,21 @@ public partial class ManageSchedule
             };
         }
 
-        // TimeOnly를 DateTime으로 변환 (편집용)
+        // TimeOnly를 DateTime으로 변환
         tempStartDateTime = DateTime.Today.Add(editingSchedule.StartTime.ToTimeSpan());
         tempRepeatCount = editingSchedule.RepeatCount;
+
+        // 선택된 스케줄의 콘텐츠 로드
+        await LoadScheduleContent(schedule.Id);
 
         // 현재 선택된 콘텐츠 ID 복사
         editingSelectedMediaIds = new HashSet<ulong>(currentScheduleMedia.Select(m => m.Id));
         editingSelectedTtsIds = new HashSet<ulong>(currentScheduleTts.Select(t => t.Id));
 
-        // 초기 선택 순서 구성: 기존 콘텐츠를 생성일/ID 기준으로 결합하여 순서 부여
+        // 초기 선택 순서 구성
         BuildInitialSelectionOrder();
 
-        // 스피커/그룹 선택 초기화 (채널 기준)
+        // 스피커/그룹 선택 초기화
         editingSelectedGroupIds.Clear();
         editingSelectedSpeakerIds.Clear();
         viewingGroup = null;
@@ -492,25 +472,8 @@ public partial class ManageSchedule
             await InitializeChannelSpeakerSelections(editingChannel.Id);
         }
 
-        StateHasChanged();
-    }
-
-    // 편집 취소
-    private void CancelEdit()
-    {
-        isEditMode = false;
-        editingSchedule = null;
-        editingChannel = null;
-        tempStartDateTime = null;
-        tempRepeatCount = 0;
-        editingSelectedMediaIds.Clear();
-        editingSelectedTtsIds.Clear();
-        editingSelectedGroupIds.Clear();
-        editingSelectedSpeakerIds.Clear();
-        viewingGroup = null;
-        expandedGroups.Clear();
-        editingSelectionOrder.Clear();
-        nextSelectionSeq = 0;
+        var name = GetChannelNameForSchedule(schedule);
+        Logger.LogInformation($"Selected schedule: {name} (ID: {schedule.Id})");
         StateHasChanged();
     }
 
@@ -608,11 +571,6 @@ public partial class ManageSchedule
 
             // 목록 새로고침 (채널 캐시 포함)
             await LoadSchedules();
-
-            // 편집 모드 종료
-            isEditMode = false;
-            editingSchedule = null;
-            editingChannel = null;
 
             Logger.LogInformation($"Schedule updated: {name} (ID: {selectedSchedule.Id})");
         }
@@ -764,7 +722,7 @@ public partial class ManageSchedule
     }
 
     // 편집 모드에서 미디어 선택 토글
-    private void ToggleMediaSelectionEdit(ulong mediaId)
+    private void ToggleMediaSelection(ulong mediaId)
     {
         if (editingSelectedMediaIds.Contains(mediaId))
         {
@@ -780,7 +738,7 @@ public partial class ManageSchedule
     }
 
     // 편집 모드에서 TTS 선택 토글
-    private void ToggleTtsSelectionEdit(ulong ttsId)
+    private void ToggleTtsSelection(ulong ttsId)
     {
         if (editingSelectedTtsIds.Contains(ttsId))
         {
@@ -994,9 +952,9 @@ public partial class ManageSchedule
         }
     }
 
-    private bool IsGroupSelectedEdit(ulong groupId) => editingSelectedGroupIds.Contains(groupId);
+    private bool IsGroupSelected(ulong groupId) => editingSelectedGroupIds.Contains(groupId);
 
-    private void ToggleGroupSelectionEdit(ulong groupId)
+    private void ToggleGroupSelection(ulong groupId)
     {
         if (editingSelectedGroupIds.Contains(groupId))
         {
@@ -1025,14 +983,14 @@ public partial class ManageSchedule
         StateHasChanged();
     }
 
-    private void SetGroupSelectionEdit(ulong groupId, bool selected)
+    private void SetGroupSelection(ulong groupId, bool selected)
     {
         var currentlySelected = editingSelectedGroupIds.Contains(groupId);
         if (selected == currentlySelected)
         {
             return;
         }
-        ToggleGroupSelectionEdit(groupId);
+        ToggleGroupSelection(groupId);
     }
 
     private void ToggleGroupExpansion(ulong groupId)
@@ -1046,15 +1004,15 @@ public partial class ManageSchedule
 
     private bool IsExpanded(ulong groupId) => expandedGroups.Contains(groupId);
 
-    private void ViewGroupDetailsEdit(Server.Models.wics.Group group)
+    private void ViewGroupDetails(Server.Models.wics.Group group)
     {
         viewingGroup = group;
         StateHasChanged();
     }
 
-    private bool IsSpeakerSelectedEdit(ulong speakerId) => editingSelectedSpeakerIds.Contains(speakerId);
+    private bool IsSpeakerSelected(ulong speakerId) => editingSelectedSpeakerIds.Contains(speakerId);
 
-    private void ToggleSpeakerSelectionEditById(ulong speakerId)
+    private void ToggleSpeakerSelection(ulong speakerId)
     {
         if (editingSelectedSpeakerIds.Contains(speakerId))
         {
@@ -1067,7 +1025,7 @@ public partial class ManageSchedule
         StateHasChanged();
     }
 
-    private void SetSpeakerSelectionEditById(ulong speakerId, bool selected)
+    private void SetSpeakerSelection(ulong speakerId, bool selected)
     {
         if (selected)
         {
@@ -1098,7 +1056,7 @@ public partial class ManageSchedule
         StateHasChanged();
     }
 
-    private void ClearSpeakerSelectionsEdit()
+    private void ClearSpeakerSelections()
     {
         editingSelectedGroupIds.Clear();
         editingSelectedSpeakerIds.Clear();
@@ -1107,53 +1065,8 @@ public partial class ManageSchedule
         StateHasChanged();
     }
 
-    private IEnumerable<Speaker> GetSpeakersInGroupSync(ulong groupId)
-    {
-        var speakerIds = speakerGroupMappings
-            .Where(m => m.GroupId == groupId && m.LastYn == "Y")
-            .Select(m => m.SpeakerId)
-            .Distinct();
-
-        return allSpeakers.Where(s => speakerIds.Contains(s.Id));
-    }
-
-    private int GetSpeakerCountInGroup(ulong groupId)
-    {
-        return speakerGroupMappings
-            .Where(m => m.GroupId == groupId && m.LastYn == "Y")
-            .Select(m => m.SpeakerId)
-            .Distinct()
-            .Count();
-    }
-
-    private int GetOnlineSpeakerCount(ulong groupId)
-    {
-        var ids = speakerGroupMappings
-            .Where(m => m.GroupId == groupId && m.LastYn == "Y")
-            .Select(m => m.SpeakerId)
-            .Distinct();
-        return allSpeakers.Count(s => ids.Contains(s.Id) && s.State == 1);
-    }
-
-    private List<Speaker> GetOnlineSpeakersSelected() => allSpeakers.Where(s => editingSelectedSpeakerIds.Contains(s.Id) && s.State == 1).ToList();
-    private List<Speaker> GetOfflineSpeakersSelected() => allSpeakers.Where(s => editingSelectedSpeakerIds.Contains(s.Id) && s.State != 1).ToList();
-
-    private BadgeStyle GetSpeakerStatusBadgeStyle(byte state) => state switch
-    {
-        1 => BadgeStyle.Success,
-        2 => BadgeStyle.Info,
-        _ => BadgeStyle.Secondary
-    };
-
-    private string GetSpeakerStatusText(byte state) => state switch
-    {
-        1 => "온라인",
-        2 => "유휴",
-        _ => "오프라인"
-    };
-
-    // 편집 모드에서 요일 선택 여부 확인
-    private bool IsWeekdaySelectedInEdit(string dayCode)
+    // 요일 선택 여부 확인
+    private bool IsWeekdaySelected(string dayCode)
     {
         if (editingSchedule == null) return false;
 
@@ -1170,8 +1083,8 @@ public partial class ManageSchedule
         };
     }
 
-    // 편집 모드에서 요일 토글
-    private void ToggleWeekdayInEdit(string dayCode)
+    // 요일 토글
+    private void ToggleWeekday(string dayCode)
     {
         if (editingSchedule == null) return;
 
@@ -1202,8 +1115,8 @@ public partial class ManageSchedule
         StateHasChanged();
     }
 
-    // 편집 모드 - 모든 요일 선택
-    private void SelectAllDaysEdit()
+    // 모든 요일 선택
+    private void SelectAllDays()
     {
         if (editingSchedule == null) return;
 
@@ -1217,8 +1130,8 @@ public partial class ManageSchedule
         StateHasChanged();
     }
 
-    // 편집 모드 - 평일만 선택
-    private void SelectWeekdaysEdit()
+    // 평일만 선택
+    private void SelectWeekdays()
     {
         if (editingSchedule == null) return;
 
@@ -1232,8 +1145,8 @@ public partial class ManageSchedule
         StateHasChanged();
     }
 
-    // 편집 모드 - 주말만 선택
-    private void SelectWeekendEdit()
+    // 주말만 선택
+    private void SelectWeekend()
     {
         if (editingSchedule == null) return;
 
@@ -1247,8 +1160,8 @@ public partial class ManageSchedule
         StateHasChanged();
     }
 
-    // 편집 모드 - 모든 요일 선택 해제
-    private void ClearWeekdaysEdit()
+    // 모든 요일 선택 해제
+    private void ClearWeekdays()
     {
         if (editingSchedule == null) return;
 
@@ -1280,6 +1193,11 @@ public partial class ManageSchedule
     private BadgeStyle GetScheduleBadgeStyle(Schedule schedule)
     {
         if (schedule.DeleteYn == "Y") return BadgeStyle.Danger;
+        
+        // 채널 상태가 1이면 방송 중
+        var channel = GetChannelForSchedule(schedule.Id);
+        if (channel?.State == 1) return BadgeStyle.Primary;
+        
         var status = GetActivationStatus(schedule.Id);
         return (status.HasContent && status.HasSpeakers) ? BadgeStyle.Success : BadgeStyle.Warning;
     }
@@ -1287,8 +1205,89 @@ public partial class ManageSchedule
     private string GetScheduleStateText(Schedule schedule)
     {
         if (schedule.DeleteYn == "Y") return "비활성";
+        
+        // 채널 상태가 1이면 방송 중
+        var channel = GetChannelForSchedule(schedule.Id);
+        if (channel?.State == 1) return "방송 중";
+        
         var status = GetActivationStatus(schedule.Id);
-        return (status.HasContent && status.HasSpeakers) ? "활성" : "미설정";
+        return (status.HasContent && status.HasSpeakers) ? "대기 중" : "미설정";
+    }
+
+    // 스케줄이 방송 중인지 확인
+    private bool IsScheduleBroadcasting(Schedule schedule)
+    {
+        var channel = GetChannelForSchedule(schedule.Id);
+        return channel?.State == 1;
+    }
+
+    // 예약 방송 정지 핸들러
+    private async Task StopScheduleBroadcast(Schedule schedule)
+    {
+        try
+        {
+            var channel = GetChannelForSchedule(schedule.Id);
+            if (channel == null)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "정지 실패",
+                    Detail = "채널 정보를 찾을 수 없습니다.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            // 1. 진행 중인 Broadcast ID 찾기
+            var query = new Radzen.Query
+            {
+                Filter = $"ChannelId eq {channel.Id} and OngoingYn eq 'Y'"
+            };
+            var broadcasts = await WicsService.GetBroadcasts(query);
+            var ongoingBroadcast = broadcasts.Value.FirstOrDefault();
+
+            if (ongoingBroadcast == null)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "정지 실패",
+                    Detail = "진행 중인 방송을 찾을 수 없습니다.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            Logger.LogInformation($"Stopping scheduled broadcast: {channel.Name} (Broadcast ID: {ongoingBroadcast.Id})");
+
+            // 2. 방송 중지 - WebSocket을 통한 모든 정리 작업 수행
+            await WebSocketService.StopBroadcastAsync(ongoingBroadcast.Id);
+
+            // 3. 캐시 갱신
+            await LoadSchedules();
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "방송 중지 완료",
+                Detail = $"'{channel.Name}' 예약 방송이 중지되었습니다.",
+                Duration = 4000
+            });
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"Failed to stop scheduled broadcast for schedule {schedule.Id}");
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "오류",
+                Detail = "방송 중지 중 오류가 발생했습니다.",
+                Duration = 4000
+            });
+        }
     }
 
     // 요일 표시 문자열 생성
@@ -1312,24 +1311,6 @@ public partial class ManageSchedule
         if (days.Count == 2 && days.Contains("토") && days.Contains("일")) return "주말";
 
         return string.Join(",", days);
-    }
-
-    // 특정 요일이 선택되었는지 확인
-    private bool IsWeekdaySelected(Schedule schedule, string dayCode)
-    {
-        if (schedule == null) return false;
-
-        return dayCode switch
-        {
-            "monday" => schedule.Monday == "Y",
-            "tuesday" => schedule.Tuesday == "Y",
-            "wednesday" => schedule.Wednesday == "Y",
-            "thursday" => schedule.Thursday == "Y",
-            "friday" => schedule.Friday == "Y",
-            "saturday" => schedule.Saturday == "Y",
-            "sunday" => schedule.Sunday == "Y",
-            _ => false
-        };
     }
 
     // 반복 횟수 텍스트
@@ -1489,7 +1470,6 @@ public partial class ManageSchedule
             if (selectedSchedule?.Id == schedule.Id)
             {
                 selectedSchedule = null;
-                isEditMode = false;
                 editingSchedule = null;
                 editingChannel = null;
             }
@@ -1523,4 +1503,49 @@ public partial class ManageSchedule
             StateHasChanged();
         }
     }
+
+    private IEnumerable<Speaker> GetSpeakersInGroupSync(ulong groupId)
+    {
+        var speakerIds = speakerGroupMappings
+            .Where(m => m.GroupId == groupId && m.LastYn == "Y")
+            .Select(m => m.SpeakerId)
+            .Distinct();
+
+        return allSpeakers.Where(s => speakerIds.Contains(s.Id));
+    }
+
+    private int GetSpeakerCountInGroup(ulong groupId)
+    {
+        return speakerGroupMappings
+            .Where(m => m.GroupId == groupId && m.LastYn == "Y")
+            .Select(m => m.SpeakerId)
+            .Distinct()
+            .Count();
+    }
+
+    private int GetOnlineSpeakerCount(ulong groupId)
+    {
+        var ids = speakerGroupMappings
+            .Where(m => m.GroupId == groupId && m.LastYn == "Y")
+            .Select(m => m.SpeakerId)
+            .Distinct();
+        return allSpeakers.Count(s => ids.Contains(s.Id) && s.State == 1);
+    }
+
+    private List<Speaker> GetOnlineSpeakersSelected() => allSpeakers.Where(s => editingSelectedSpeakerIds.Contains(s.Id) && s.State == 1).ToList();
+    private List<Speaker> GetOfflineSpeakersSelected() => allSpeakers.Where(s => editingSelectedSpeakerIds.Contains(s.Id) && s.State != 1).ToList();
+
+    private BadgeStyle GetSpeakerStatusBadgeStyle(byte state) => state switch
+    {
+        1 => BadgeStyle.Success,
+        2 => BadgeStyle.Info,
+        _ => BadgeStyle.Secondary
+    };
+
+    private string GetSpeakerStatusText(byte state) => state switch
+    {
+        1 => "온라인",
+        2 => "유휴",
+        _ => "오프라인"
+    };
 }

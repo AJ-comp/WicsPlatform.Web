@@ -71,33 +71,12 @@
                         <span class="field-hint">대소문자를 구분합니다</span>
                     </div>
 
-                    <div class="form-options">
-                        <label class="remember-me">
-                            <RadzenCheckBox TValue="bool" />
-                            <span class="remember-text">로그인 상태 유지</span>
-                        </label>
-                        <a href="#" class="forgot-link">비밀번호를 잊으셨나요?</a>
-                    </div>
-
                     <input type="hidden" name="redirectUrl" value="@loginModel.redirectUrl" />
 
                     <div class="button-group">
                         <button type="submit" class="elegant-button primary">
                             <span class="button-text">로그인</span>
                             <RadzenIcon Icon="arrow_forward" class="button-icon" />
-                        </button>
-                    </div>
-
-                    <div class="divider-section">
-                        <span class="divider-line"></span>
-                        <span class="divider-text">또는</span>
-                        <span class="divider-line"></span>
-                    </div>
-
-                    <div class="alternative-actions">
-                        <button type="button" class="elegant-button secondary" @onclick="@(() => NavigationManager.NavigateTo("/register"))">
-                            <RadzenIcon Icon="person_add" class="button-icon-left" />
-                            <span class="button-text">새 계정 만들기</span>
                         </button>
                     </div>
                 }
@@ -107,7 +86,6 @@
         <!-- 푸터 -->
         <div class="login-footer">
             <p class="copyright">© 2024 WICS Broadcasting System. All rights reserved.</p>
-            <p class="version">Version 1.0.0</p>
         </div>
     </div>
 
@@ -255,6 +233,7 @@
                 border-color: var(--elegant-gold) !important;
                 background: white !important;
                 box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.1) !important;
+                outline: none !important;
             }
 
     .field-hint {
@@ -266,42 +245,9 @@
         opacity: 0.7;
     }
 
-    /* 폼 옵션 */
-    .form-options {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-    }
-
-    .remember-me {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        cursor: pointer;
-    }
-
-    .remember-text {
-        font-size: 0.8rem;
-        color: var(--elegant-secondary);
-    }
-
-    .forgot-link {
-        font-size: 0.8rem;
-        color: var(--elegant-gold);
-        text-decoration: none;
-        font-style: italic;
-        transition: color 0.3s ease;
-    }
-
-        .forgot-link:hover {
-            color: var(--elegant-bronze);
-            text-decoration: underline;
-        }
-
     /* 버튼 스타일 */
     .button-group {
-        margin-bottom: 1.5rem;
+        margin-top: 2rem;
     }
 
     .elegant-button {
@@ -332,44 +278,12 @@
                 box-shadow: 0 6px 20px rgba(184, 134, 11, 0.4);
             }
 
-        .elegant-button.secondary {
-            background: white;
-            color: var(--elegant-primary);
-            border: 1px solid var(--elegant-border);
-        }
-
-            .elegant-button.secondary:hover {
-                background: var(--elegant-cream);
-                border-color: var(--elegant-gold);
+            .elegant-button.primary:active {
+                transform: translateY(0);
             }
 
     .button-icon {
         font-size: 1.1rem !important;
-    }
-
-    .button-icon-left {
-        font-size: 1.1rem !important;
-        order: -1;
-    }
-
-    /* 구분선 섹션 */
-    .divider-section {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .divider-line {
-        flex: 1;
-        height: 1px;
-        background: var(--elegant-border);
-    }
-
-    .divider-text {
-        font-size: 0.75rem;
-        color: var(--elegant-secondary);
-        font-style: italic;
     }
 
     /* 알림 메시지 */
@@ -416,12 +330,9 @@
     }
 
     @@keyframes spin {
-        to
-
-    {
-        transform: rotate(360deg);
-    }
-
+        to {
+            transform: rotate(360deg);
+        }
     }
 
     .loading-text {
@@ -441,14 +352,7 @@
     .copyright {
         font-size: 0.7rem;
         color: var(--elegant-secondary);
-        margin: 0 0 0.25rem;
-    }
-
-    .version {
-        font-size: 0.65rem;
-        color: var(--elegant-silver);
         margin: 0;
-        font-style: italic;
     }
 
     /* 배경 장식 */
@@ -494,24 +398,21 @@
 
     /* 반응형 디자인 */
     @@media (max-width: 480px) {
-        .login-card
+        .login-card {
+            margin: 1rem;
+        }
 
-    {
-        margin: 1rem;
-    }
+        .login-header {
+            padding: 2rem 1.5rem 1rem;
+        }
 
-    .login-header {
-        padding: 2rem 1.5rem 1rem;
-    }
+        .login-body {
+            padding: 1.5rem;
+        }
 
-    .login-body {
-        padding: 1.5rem;
-    }
-
-    .login-title {
-        font-size: 1.25rem;
-    }
-
+        .login-title {
+            font-size: 1.25rem;
+        }
     }
 
     /* 다크 테마 지원 */

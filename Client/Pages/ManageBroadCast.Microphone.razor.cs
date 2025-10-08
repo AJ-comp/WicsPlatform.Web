@@ -50,10 +50,8 @@ public partial class ManageBroadCast
     {
         try
         {
-            // 마이크 상태 확인 함수 호출
+            // 마이크 상태 확인
             if (await IsMicrophoneActive()) return true;
-
-            _dotNetRef = DotNetObjectReference.Create(this);
 
             // 믹서 모듈이 없을 때만 import
             if (_mixerModule == null)
@@ -72,13 +70,6 @@ public partial class ManageBroadCast
             }
 
             LogMicrophoneInitialization();
-
-            // 루프백 설정이 있으면 스피커 모듈 초기화
-            if (_currentLoopbackSetting && _speakerModule == null)
-            {
-                await InitializeSpeakerModule();
-            }
-
             return true;
         }
         catch (Exception ex)
@@ -109,22 +100,6 @@ public partial class ManageBroadCast
             { "mediaVolume", mediaVolume / 100.0 },
             { "ttsVolume", ttsVolume / 100.0 }
         };
-    }
-
-    /// <summary>
-    /// 스피커 모듈 초기화 (루프백용)
-    /// </summary>
-    private async Task InitializeSpeakerModule()
-    {
-        try
-        {
-            _speakerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/speaker.js");
-            await _speakerModule.InvokeVoidAsync("init");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "스피커 모듈 초기화 실패");
-        }
     }
 
     /// <summary>
@@ -176,6 +151,7 @@ public partial class ManageBroadCast
         {
             _logger.LogError(ex, "마이크 활성화 실패");
             NotifyError("마이크 활성화", ex);
+
             return false;
         }
     }
@@ -278,7 +254,7 @@ public partial class ManageBroadCast
     /// </summary>
     private async Task ProcessLoopback(string base64Data)
     {
-        if (_currentLoopbackSetting && _speakerModule != null)
+        if (_currentLoopbackSetting)
         {
             await _speakerModule.InvokeVoidAsync("feed", base64Data);
         }
@@ -322,41 +298,24 @@ public partial class ManageBroadCast
     {
         try
         {
-            if (_mixerModule != null)
+            if (_mixerModule == null) return;
+
+            try
             {
-                try
-                {
-                    await _mixerModule.InvokeVoidAsync("dispose");
-                    await _mixerModule.DisposeAsync();
-                    _logger.LogInformation("믹서 모듈 정리 완료");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "믹서 모듈 정리 실패");
-                }
-                finally
-                {
-                    _mixerModule = null;
-                    _jsModule = null;
-                }
+                await _mixerModule.InvokeVoidAsync("dispose");
+                await _mixerModule.DisposeAsync();
+                _logger.LogInformation("믹서 모듈 정리 완료");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "믹서 모듈 정리 실패");
+            }
+            finally
+            {
+                _mixerModule = null;
             }
 
-            if (_speakerModule != null)
-            {
-                try
-                {
-                    await _speakerModule.DisposeAsync();
-                    _logger.LogInformation("스피커 모듈 정리 완료");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "스피커 모듈 정리 실패");
-                }
-                finally
-                {
-                    _speakerModule = null;
-                }
-            }
+            // _speakerModule은 정리하지 않음 (재사용)
         }
         catch (Exception ex)
         {
@@ -373,13 +332,12 @@ public partial class ManageBroadCast
     /// </summary>
     public async Task SetMicrophoneVolume(float volume)
     {
-        if (_mixerModule != null)
-        {
-            await _mixerModule.InvokeVoidAsync("setVolumes",
-                volume,
-                mediaVolume / 100.0,
-                ttsVolume / 100.0);
-        }
+        if (_mixerModule == null) return;
+
+        await _mixerModule.InvokeVoidAsync("setVolumes",
+            volume,
+            mediaVolume / 100.0,
+            ttsVolume / 100.0);
     }
 
     /// <summary>
@@ -387,13 +345,12 @@ public partial class ManageBroadCast
     /// </summary>
     public async Task UpdateAllVolumes()
     {
-        if (_mixerModule != null)
-        {
-            await _mixerModule.InvokeVoidAsync("setVolumes",
-                micVolume / 100.0,
-                mediaVolume / 100.0,
-                ttsVolume / 100.0);
-        }
+        if (_mixerModule == null) return;
+
+        await _mixerModule.InvokeVoidAsync("setVolumes",
+            micVolume / 100.0,
+            mediaVolume / 100.0,
+            ttsVolume / 100.0);
     }
 
     #endregion
