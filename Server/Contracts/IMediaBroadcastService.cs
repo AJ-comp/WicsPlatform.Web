@@ -18,6 +18,12 @@ namespace WicsPlatform.Server.Contracts
         Task<bool> StopMediaByBroadcastIdAsync(ulong broadcastId);
         Task<MediaPlaybackStatus> GetStatusByBroadcastIdAsync(ulong broadcastId);
 
+        // 현재 재생중인 곡 간단 정보
+        (ulong? mediaId, string fileName)? GetCurrentMedia(ulong broadcastId);
+
+        // 다음 트랙으로 이동
+        Task<bool> SkipToNextAsync(ulong broadcastId);
+
         public event Action<ulong> OnPlaybackCompleted;
 
         void Dispose();

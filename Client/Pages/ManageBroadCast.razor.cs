@@ -10,7 +10,7 @@ using WicsPlatform.Client.Services.Interfaces;
 
 namespace WicsPlatform.Client.Pages;
 
-public partial class ManageBroadCast : IDisposable
+public partial class ManageBroadCast : IDisposable, IAsyncDisposable
 {
     #region Dependency Injection
     [Inject] protected IJSRuntime JSRuntime { get; set; }
@@ -118,11 +118,54 @@ public partial class ManageBroadCast : IDisposable
         ttsVolume = (int)(selectedChannel.TtsVolume * 100);
     }
 
+    // 기존 IDisposable은 최소 정리만 수행하고, 실제 JS/Interop 정리는 DisposeAsync에서 처리
     public void Dispose()
     {
         UnsubscribeFromWebSocketEvents();
         UnsubscribeFromRecordingEvents();
-        DisposeResources();
+        // JS 및 DotNetObjectReference 정리는 DisposeAsync에서 안전하게 수행됨
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            UnsubscribeFromWebSocketEvents();
+            UnsubscribeFromRecordingEvents();
+
+            // 1) JS 쪽 믹서를 먼저 안전하게 종료하여 JS → .NET 콜백을 중단
+            await CleanupMicrophone();
+
+            // 2) 타이머 및 서비스 정리
+            _broadcastTimer?.Dispose();
+            RecordingService?.Dispose();
+
+            // 3) JS 모듈 정리 (스피커는 재사용 대상이 아니므로 안전 종료)
+            try
+            {
+                if (_speakerModule != null)
+                {
+                    await _speakerModule.DisposeAsync();
+                    _speakerModule = null;
+                }
+
+                if (_mixerModule != null)
+                {
+                    await _mixerModule.DisposeAsync();
+                    _mixerModule = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "JS 모듈 정리 실패");
+            }
+        }
+        finally
+        {
+            // 4) 마지막에 DotNetObjectReference 해제 (JS에서 더 이상 참조하지 않도록 위에서 dispose 호출 선행)
+            _dotNetRef?.Dispose();
+            _dotNetRef = null;
+        }
     }
     #endregion
 
@@ -702,24 +745,6 @@ public partial class ManageBroadCast : IDisposable
     {
         speakerGroupPanelCollapsed =
             playlistPanelCollapsed = ttsPanelCollapsed = monitoringPanelCollapsed = false;
-    }
-
-    private void DisposeResources()
-    {
-        _dotNetRef?.Dispose();
-        _broadcastTimer?.Dispose();
-        RecordingService?.Dispose();
-        
-        // JS 모듈 정리
-        try
-        {
-            _speakerModule?.DisposeAsync();
-            _mixerModule?.DisposeAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "JS 모듈 정리 실패");
-        }
     }
 
     // UI Helpers

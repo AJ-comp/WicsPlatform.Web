@@ -11,6 +11,8 @@ namespace WicsPlatform.Shared
     {
         public ulong BroadcastId { get; set; }
         public List<ulong> MediaIds { get; set; }
+        // When true, server should shuffle the playback order
+        public bool Shuffle { get; set; }
     }
 
     public class MediaPlayResponse
@@ -37,5 +39,18 @@ namespace WicsPlatform.Shared
     {
         public bool Success { get; set; }
         public string Message { get; set; }
+    }
+
+    // Status response for simple now-playing UI
+    public class MediaStatusResponse
+    {
+        public bool Success { get; set; }
+        public ulong BroadcastId { get; set; }
+        public bool IsPlaying { get; set; }
+        public int CurrentTrackIndex { get; set; }
+        public string CurrentPosition { get; set; }
+        public string TotalDuration { get; set; }
+        public ulong? CurrentMediaId { get; set; }
+        public string CurrentMediaFileName { get; set; }
     }
 }

@@ -29,6 +29,9 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
     {
         this.logger = logger;
         this.audioMixingService = audioMixingService;
+
+        // 이벤트 구독: 믹서에서 미디어 종료 -> 다음 트랙 자동 진행
+        this.audioMixingService.OnMediaEnded += HandleMediaEnded;
     }
 
     public async Task<MediaPlaybackResult> HandlePlayRequestAsync(
@@ -68,7 +71,7 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
             _sessions[broadcastId] = session;
 
             // 4. 첫 번째 파일 재생 시작
-            await PlayNextFile(broadcastId);
+            await PlayCurrentIndex(broadcastId);
 
             // 5. 결과 반환
             var result = new MediaPlaybackResult
@@ -101,7 +104,7 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
         }
     }
 
-    private async Task PlayNextFile(ulong broadcastId)
+    private async Task PlayCurrentIndex(ulong broadcastId)
     {
         if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsPlaying)
             return;
@@ -122,14 +125,49 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
         {
             logger.LogError($"Media file not found: {fullPath}");
             session.CurrentIndex++;
-            await PlayNextFile(broadcastId); // 다음 파일로 이동
+            await PlayCurrentIndex(broadcastId); // 다음 파일로 이동
             return;
         }
 
-        // 믹서에 추가
         await audioMixingService.AddMediaStream(broadcastId, media.FullPath);
-
         logger.LogInformation($"Playing: {media.FileName} ({session.CurrentIndex + 1}/{session.MediaFiles.Count})");
+    }
+
+    private async void HandleMediaEnded(ulong broadcastId)
+    {
+        try
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsPlaying)
+                return;
+
+            // 다음 트랙으로 이동
+            session.CurrentIndex++;
+            await PlayCurrentIndex(broadcastId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, $"Error advancing to next media for broadcast {broadcastId}");
+        }
+    }
+
+    public async Task<bool> SkipToNextAsync(ulong broadcastId)
+    {
+        try
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsPlaying)
+                return false;
+
+            // 현재 미디어 제거 후 인덱스 증가
+            await audioMixingService.RemoveMediaStream(broadcastId);
+            session.CurrentIndex++;
+            await PlayCurrentIndex(broadcastId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, $"Error skipping to next media for broadcast {broadcastId}");
+            return false;
+        }
     }
 
     public async Task<bool> StopMediaByBroadcastIdAsync(ulong broadcastId)
@@ -141,12 +179,10 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
             // 1. 믹서에서 미디어 제거
             await audioMixingService.RemoveMediaStream(broadcastId);
 
-            // 2. 세션 정리
-            if (_sessions.TryRemove(broadcastId, out var session))
+            // 2. 세션 정리 (남기되 IsPlaying false)
+            if (_sessions.TryGetValue(broadcastId, out var session))
             {
                 session.IsPlaying = false;
-
-                logger.LogInformation($"Media stopped for broadcast {broadcastId}");
             }
 
             return true;
@@ -182,6 +218,20 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
         };
     }
 
+    // expose now-playing info
+    public (ulong? mediaId, string fileName)? GetCurrentMedia(ulong broadcastId)
+    {
+        if (_sessions.TryGetValue(broadcastId, out var session) &&
+            session.IsPlaying &&
+            session.CurrentIndex >= 0 &&
+            session.CurrentIndex < session.MediaFiles?.Count)
+        {
+            var m = session.MediaFiles[session.CurrentIndex];
+            return (m.Id, m.FileName);
+        }
+        return null;
+    }
+
     private List<MediaInfo> SelectMediaToPlay(List<MediaInfo> availableMedia, JsonElement requestData)
     {
         if (availableMedia == null || !availableMedia.Any())
@@ -201,17 +251,59 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
 
             if (requestedIds.Any())
             {
-                return availableMedia.Where(m => requestedIds.Contains(m.Id)).ToList();
+                var selected = availableMedia.Where(m => requestedIds.Contains(m.Id)).ToList();
+
+                // 셔플 지정 여부 확인
+                bool shuffle = false;
+                if (requestData.TryGetProperty("shuffle", out var shuffleElement) && shuffleElement.ValueKind == JsonValueKind.True)
+                {
+                    shuffle = true;
+                }
+
+                if (shuffle)
+                {
+                    var rnd = new Random();
+                    // Fisher–Yates shuffle
+                    for (int i = selected.Count - 1; i > 0; i--)
+                    {
+                        int j = rnd.Next(i + 1);
+                        (selected[i], selected[j]) = (selected[j], selected[i]);
+                    }
+                }
+
+                return selected;
             }
         }
 
         // 요청된 ID가 없으면 모든 미디어 재생
-        return availableMedia.ToList();
+        var all = availableMedia.ToList();
+
+        // 셔플 지정 여부 확인
+        if (requestData.TryGetProperty("shuffle", out var shuffleAll) && shuffleAll.ValueKind == JsonValueKind.True)
+        {
+            var rnd = new Random();
+            for (int i = all.Count - 1; i > 0; i--)
+            {
+                int j = rnd.Next(i + 1);
+                (all[i], all[j]) = (all[j], all[i]);
+            }
+        }
+
+        return all;
     }
 
     public void Dispose()
     {
-        // 모든 세션 정리
+        try
+        {
+            if (audioMixingService != null)
+            {
+                audioMixingService.OnMediaEnded -= HandleMediaEnded;
+            }
+        }
+        catch { }
+
+        // 모든 세션 정리 시도
         foreach (var kvp in _sessions)
         {
             _ = StopMediaByBroadcastIdAsync(kvp.Key);

@@ -26,9 +26,25 @@
                                           Click="@PlayMedia"
                                           class="control-button play"
                                           Title="@(!HasSelectedMedia() ? "미디어를 선택하세요" : "선택된 미디어 재생")" />
+                            <RadzenButton Icon="shuffle"
+                                          Text="랜덤재생"
+                                          ButtonStyle="ButtonStyle.Info"
+                                          Size="ButtonSize.Small"
+                                          Disabled="@(!HasSelectedMedia() || isMediaActionInProgress)"
+                                          Click="@PlayMediaRandom"
+                                          class="control-button shuffle"
+                                          Title="선택된 미디어를 랜덤으로 재생" />
                         }
                         else
                         {
+                            <RadzenButton Icon="skip_next"
+                                          Text="다음"
+                                          ButtonStyle="ButtonStyle.Info"
+                                          Size="ButtonSize.Small"
+                                          Disabled="@isMediaActionInProgress"
+                                          Click="@SkipNext"
+                                          class="control-button play"
+                                          Title="다음 미디어로 이동" />
                             <RadzenButton Icon="stop"
                                           Text="중지"
                                           ButtonStyle="ButtonStyle.Warning"
@@ -85,8 +101,19 @@
                         @if (HasSelectedMedia())
                         {
                             <RadzenBadge BadgeStyle="BadgeStyle.Info"
-                                         Text="@($"{GetSelectedMedia().Count()}개 선택")"
+                                         Text="@($"제시된 미디어 수: {GetSelectedMedia().Count()} 개")"
                                          class="status-badge selected" />
+                        }
+                        @* 간단 플레이어: 현재 곡, 10초 뒤/앞 *@
+                        @if (isMediaPlaying)
+                        {
+                            <div class="mini-player">
+                                <RadzenIcon Icon="music_note" class="mini-icon" />
+                                <span class="now-playing">@_nowPlayingText</span>
+                                <RadzenButton Icon="replay_10" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(()=>OnSeek(-10))" class="mini-btn" />
+                                <RadzenButton Icon="forward_10" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(()=>OnSeek(10))" class="mini-btn" />
+                                <span class="time-text">@_nowPlayingTime</span>
+                            </div>
                         }
                     </RadzenStack>
                 </RadzenAlert>
@@ -116,14 +143,11 @@
                                     <div class="playlist-container">
                                         @foreach (var playlist in playlists)
                                         {
-                                            <div class="@($"playlist-item {(selectedPlaylist?.Id == playlist.Id ? "selected" : "")}")"
-                                                 @onclick="@(() => OnPlaylistCardClicked(playlist))">
+                                            <div class="@GetPlaylistItemClass(playlist.Id)" @onclick="@(() => OnPlaylistCardClicked(playlist))">
                                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
                                                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
                                                         <span @onclick:stopPropagation="true">
-                                                            <RadzenCheckBox Value="@IsPlaylistSelected(playlist.Id)"
-                                                                            Change="@((bool value) => OnPlaylistCheckChanged(playlist.Id, value))"
-                                                                            class="compact-checkbox" />
+                                                            <RadzenCheckBox Value="@IsPlaylistSelected(playlist.Id)" Change="@((bool value) => OnPlaylistCheckChanged(playlist.Id, value))" class="compact-checkbox" />
                                                         </span>
                                                         <RadzenIcon Icon="album" class="playlist-icon" />
                                                         <RadzenStack Gap="0">
@@ -138,9 +162,7 @@
                                                             }
                                                         </RadzenStack>
                                                     </RadzenStack>
-                                                    <RadzenBadge BadgeStyle="BadgeStyle.Light" IsPill="true"
-                                                                 Text="@GetPlaylistMediaCount(playlist.Id)"
-                                                                 class="count-badge" />
+                                                    <RadzenBadge BadgeStyle="BadgeStyle.Light" IsPill="true" Text="@GetPlaylistMediaCount(playlist.Id)" class="count-badge" />
                                                 </RadzenStack>
                                             </div>
                                         }
@@ -177,15 +199,13 @@
                                     @if (playlistMedia.Any())
                                     {
                                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                                            <RadzenCheckBox Value="@selectAllMedia"
-                                                            Change="@((bool value) => OnSelectAllMediaChanged(value))"
-                                                            class="compact-checkbox" />
+                                            <RadzenCheckBox Value="@selectAllMedia" Change="@((bool value) => OnSelectAllMediaChanged(value))" class="compact-checkbox" />
                                             <RadzenText TextStyle="TextStyle.Caption" class="select-all-text">전체 선택</RadzenText>
                                         </RadzenStack>
                                     }
                                 </RadzenStack>
 
-                                @if (selectedPlaylist == null)
+                                @if (!HasAnyPlaylistSelected())
                                 {
                                     <div class="empty-state">
                                         <RadzenIcon Icon="touch_app" class="empty-icon" />
@@ -204,18 +224,11 @@
                                 else if (playlistMedia.Any())
                                 {
                                     <div class="media-container">
-                                        <RadzenDataGrid Data="@playlistMedia"
-                                                        TItem="Medium"
-                                                        AllowAlternatingRows="false"
-                                                        AllowPaging="true"
-                                                        PageSize="8"
-                                                        class="compact-grid">
+                                        <RadzenDataGrid Data="@playlistMedia" TItem="Medium" AllowAlternatingRows="false" AllowPaging="true" PageSize="8" class="compact-grid">
                                             <Columns>
                                                 <RadzenDataGridColumn TItem="Medium" Width="35px" TextAlign="TextAlign.Center">
                                                     <Template Context="media">
-                                                        <RadzenCheckBox Value="@IsMediaSelected(media.Id)"
-                                                                        Change="@((bool value) => OnMediaCheckChanged(media.Id, value))"
-                                                                        class="compact-checkbox" />
+                                                        <RadzenCheckBox Value="@IsMediaSelected(media.Id)" Change="@((bool value) => OnMediaCheckChanged(media.Id, value))" class="compact-checkbox" />
                                                     </Template>
                                                 </RadzenDataGridColumn>
                                                 <RadzenDataGridColumn TItem="Medium" Width="30px" TextAlign="TextAlign.Center">
@@ -257,378 +270,74 @@
 
 <style>
     /* 전문적인 패널 디자인 */
-    .professional-panel {
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-        border: 1px solid #dde2e6 !important;
-        border-radius: 6px !important;
-        background: white !important;
-        overflow: hidden;
-    }
-
-    .panel-header {
-        background: #fafbfc;
-        padding: 0.625rem 0.875rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        border-bottom: 1px solid #e1e4e8;
-        user-select: none;
-    }
-
-        .panel-header:hover {
-            background: #f5f6f8;
-        }
-
-    .panel-icon.primary {
-        font-size: 1rem !important;
-        color: #3498db !important;
-    }
-
-    .panel-title {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        color: #2c3e50 !important;
-        margin: 0 !important;
-    }
-
-    .expand-icon {
-        font-size: 1rem !important;
-        color: #6c757d !important;
-        transition: transform 0.2s ease;
-    }
-
-    .panel-content {
-        padding: 0.875rem;
-        animation: slideDown 0.2s ease-out;
-    }
-
-    /* 방송 컨트롤 */
-    .broadcast-controls {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-    }
-
-    .control-button {
-        font-size: 0.7rem !important;
-        padding: 0.2rem 0.5rem !important;
-        height: 24px !important;
-    }
-
-        .control-button.play {
-            background: #27ae60 !important;
-            border-color: #27ae60 !important;
-        }
-
-        .control-button.stop {
-            background: #f39c12 !important;
-            border-color: #f39c12 !important;
-        }
-
-    .progress-spinner {
-        width: 16px !important;
-        height: 16px !important;
-    }
-
-    .divider {
-        width: 1px;
-        height: 16px;
-        background-color: #e1e4e8;
-        margin: 0 0.25rem;
-    }
-
-    /* 방송 알림 */
-    .broadcast-alert {
-        padding: 0.5rem 0.625rem !important;
-        background-color: #e8f4fd !important;
-        border: 1px solid #b8daff !important;
-        margin-bottom: 0.75rem;
-    }
-
-    .broadcast-icon {
-        font-size: 0.875rem !important;
-        color: #3498db !important;
-    }
-
-    .broadcast-text {
-        font-size: 0.7rem !important;
-        color: #2c3e50 !important;
-        margin: 0 !important;
-    }
-
-    .status-badge {
-        font-size: 0.6rem !important;
-        padding: 2px 5px !important;
-    }
-
-        .status-badge.playing {
-            animation: pulse 2s infinite;
-        }
-
-    /* 섹션 스타일 */
-    .section-icon {
-        font-size: 0.875rem !important;
-        color: #3498db !important;
-    }
-
-    .section-title {
-        font-size: 0.8rem !important;
-        font-weight: 600 !important;
-        color: #2c3e50 !important;
-        margin: 0 !important;
-    }
-
-    .playlist-indicator {
-        font-size: 0.7rem !important;
-        color: #6c757d !important;
-        font-weight: 400 !important;
-    }
-
-    /* 플레이리스트 카드 */
-    .playlist-card, .media-card {
-        padding: 0.75rem !important;
-        background: white !important;
-        border: 1px solid #e1e4e8 !important;
-        height: 100%;
-        min-height: 320px;
-    }
-
-    .playlist-container {
-        max-height: 260px;
-        overflow-y: auto;
-        padding-right: 0.25rem;
-    }
-
-    .playlist-item {
-        padding: 0.5rem;
-        margin-bottom: 0.375rem;
-        border-radius: 4px;
-        background: #fafbfc;
-        border: 1px solid #e1e4e8;
-        cursor: pointer;
-        transition: all 0.15s ease;
-    }
-
-        .playlist-item:hover {
-            background: #f5f6f8;
-            border-color: #3498db;
-            transform: translateX(2px);
-        }
-
-        .playlist-item.selected {
-            background: #e8f4fd;
-            border-color: #3498db;
-        }
-
-    .playlist-icon {
-        font-size: 0.875rem !important;
-        color: #34495e !important;
-    }
-
-    .playlist-name {
-        font-size: 0.75rem !important;
-        font-weight: 500 !important;
-        color: #2c3e50 !important;
-        margin: 0 !important;
-    }
-
-    .playlist-desc {
-        font-size: 0.65rem !important;
-        color: #6c757d !important;
-        margin: 0 !important;
-    }
-
-    .count-badge {
-        font-size: 0.6rem !important;
-        padding: 2px 6px !important;
-    }
-
-    /* 미디어 섹션 */
-    .media-container {
-        max-height: 260px;
-        overflow: hidden;
-    }
-
-    .compact-checkbox {
-        transform: scale(0.8);
-    }
-
-    .select-all-text {
-        font-size: 0.7rem !important;
-        color: #6c757d !important;
-        margin: 0 !important;
-    }
-
-    .media-icon {
-        font-size: 0.75rem !important;
-        color: #6c757d !important;
-    }
-
-    .media-name {
-        font-size: 0.7rem !important;
-        color: #2c3e50 !important;
-        margin: 0 !important;
-    }
-
-    .media-date {
-        font-size: 0.65rem !important;
-        color: #6c757d !important;
-        margin: 0 !important;
-    }
-
-    /* 데이터그리드 */
-    .compact-grid {
-        font-size: 0.7rem !important;
-    }
-
-        .compact-grid .rz-datatable-data td {
-            padding: 0.3rem 0.4rem !important;
-            font-size: 0.7rem !important;
-        }
-
-        .compact-grid .rz-datatable-thead th {
-            padding: 0.35rem 0.4rem !important;
-            font-size: 0.7rem !important;
-            font-weight: 600 !important;
-            background: #fafbfc !important;
-        }
-
-        .compact-grid .rz-paginator {
-            font-size: 0.65rem !important;
-            padding: 0.3rem !important;
-        }
-
-            .compact-grid .rz-paginator .rz-button {
-                height: 24px !important;
-                min-width: 24px !important;
-            }
-
-    /* 로딩 및 빈 상태 */
-    .loading-container, .empty-state {
-        text-align: center;
-        padding: 1.5rem 0;
-    }
-
-    .slim-progress {
-        width: 80px !important;
-        height: 3px !important;
-        margin: 0 auto !important;
-    }
-
-    .loading-text {
-        margin-top: 0.5rem !important;
-        font-size: 0.65rem !important;
-        color: #6c757d !important;
-    }
-
-    .empty-icon {
-        font-size: 1.5rem !important;
-        color: #d0d7de !important;
-        margin-bottom: 0.375rem;
-    }
-
-    .empty-text {
-        font-size: 0.7rem !important;
-        color: #6c757d !important;
-        margin: 0 !important;
-    }
-
-    /* 스크롤바 */
-    .playlist-container::-webkit-scrollbar {
-        width: 4px;
-    }
-
-    .playlist-container::-webkit-scrollbar-track {
-        background: #f0f0f0;
-        border-radius: 2px;
-    }
-
-    .playlist-container::-webkit-scrollbar-thumb {
-        background: #c0c0c0;
-        border-radius: 2px;
-    }
-
-        .playlist-container::-webkit-scrollbar-thumb:hover {
-            background: #a0a0a0;
-        }
-
-    /* 애니메이션 */
-    @@keyframes slideDown {
-        from
-
-    {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-
-    }
-
-    @@keyframes pulse {
-        0%
-
-    {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.6;
-    }
-
-    100% {
-        opacity: 1;
-    }
-
-    }
-
-    /* 다크 테마 */
-    :root[data-theme='dark'] .professional-panel {
-        background: #0d1117 !important;
-        border-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .panel-header {
-        background: #161b22;
-        border-bottom-color: #30363d;
-    }
-
-        :root[data-theme='dark'] .panel-header:hover {
-            background: #1f2937;
-        }
-
-    :root[data-theme='dark'] .playlist-card,
-    :root[data-theme='dark'] .media-card {
-        background: #0d1117 !important;
-        border-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .playlist-item {
-        background: #161b22;
-        border-color: #30363d;
-    }
-
-        :root[data-theme='dark'] .playlist-item:hover {
-            background: #1f2937;
-        }
-
-        :root[data-theme='dark'] .playlist-item.selected {
-            background: #1f2937;
-            border-color: #3498db;
-        }
-
-    :root[data-theme='dark'] .broadcast-alert {
-        background-color: #1f2937 !important;
-        border-color: #374151 !important;
-    }
-
-    :root[data-theme='dark'] .divider {
-        background-color: #30363d;
-    }
-
-    :root[data-theme='dark'] .compact-grid .rz-datatable-thead th {
-        background: #161b22 !important;
-    }
+    .professional-panel { box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; border: 1px solid #dde2e6 !important; border-radius: 6px !important; background: white !important; overflow: hidden; }
+    .panel-header { background:#fafbfc; padding:0.625rem 0.875rem; cursor:pointer; transition:all .2s ease; border-bottom:1px solid #e1e4e8; user-select:none; }
+    .panel-header:hover { background:#f5f6f8; }
+    .panel-icon.primary{ font-size:1rem !important; color:#3498db !important; }
+    .panel-title{ font-size:0.875rem !important; font-weight:600 !important; color:#2c3e50 !important; margin:0 !important; }
+    .expand-icon{ font-size:1rem !important; color:#6c757d !important; transition:transform .2s ease; }
+    .panel-content{ padding:0.875rem; animation: slideDown .2s ease-out; }
+    .broadcast-controls{ display:flex; align-items:center; gap:0.375rem; }
+    .control-button{ font-size:.7rem !important; padding:.2rem .65rem !important; height:24px !important; white-space: nowrap !important; }
+    .control-button.play{ background:#27ae60 !important; border-color:#27ae60 !important; }
+    .control-button.shuffle{ background:#3498db !important; border-color:#3498db !important; min-width: 88px; }
+    .control-button.stop{ background:#f39c12 !important; border-color:#f39c12 !important; }
+    .progress-spinner{ width:16px !important; height:16px !important; }
+    .divider{ width:1px; height:16px; background-color:#e1e4e8; margin:0 .25rem; }
+    .broadcast-alert{ padding:.5rem .625rem !important; background-color:#e8f4fd !important; border:1px solid #b8daff !important; margin-bottom:.75rem; }
+    .broadcast-icon{ font-size:.875rem !important; color:#3498db !important; }
+    .broadcast-text{ font-size:.7rem !important; color:#2c3e50 !important; margin:0 !important; }
+    .status-badge{ font-size:.6rem !important; padding:2px 5px !important; }
+    .status-badge.playing{ animation:pulse 2s infinite; }
+    .section-icon{ font-size:.875rem !important; color:#3498db !important; }
+    .section-title{ font-size:.8rem !important; font-weight:600 !important; color:#2c3e50 !important; margin:0 !important; }
+    .playlist-indicator{ font-size:.7rem !important; color:#6c757d !important; font-weight:400 !important; }
+    .playlist-card,.media-card{ padding:.75rem !important; background:white !important; border:1px solid #e1e4e8 !important; height:100%; min-height:320px; }
+    .playlist-container{ max-height:260px; overflow-y:auto; padding-right:.25rem; }
+    .playlist-item{ padding:.5rem; margin-bottom:.375rem; border-radius:4px; background:#fafbfc; border:1px solid #e1e4e8; cursor:pointer; transition:all .15s ease; }
+    .playlist-item:hover{ background:#f5f6f8; border-color:#3498db; transform:translateX(2px); }
+    .playlist-item.selected{ background:#e8f4fd; border-color:#3498db; }
+    .playlist-icon{ font-size:.875rem !important; color:#34495e !important; }
+    .playlist-name{ font-size:.75rem !important; font-weight:500 !important; color:#2c3e50 !important; margin:0 !important; }
+    .playlist-desc{ font-size:.65rem !important; color:#6c757d !important; margin:0 !important; }
+    .count-badge{ font-size:.6rem !important; padding:2px 6px !important; }
+    .media-container{ max-height:260px; overflow:hidden; }
+    .compact-checkbox{ transform: scale(0.8); }
+    .select-all-text{ font-size:.7rem !important; color:#6c757d !important; margin:0 !important; }
+    .media-icon{ font-size:.75rem !important; color:#6c757d !important; }
+    .media-name{ font-size:.7rem !important; color:#2c3e50 !important; margin:0 !important; }
+    .media-date{ font-size:.65rem !important; color:#6c757d !important; margin:0 !important; }
+    .compact-grid{ font-size:.7rem !important; }
+    .compact-grid .rz-datatable-data td{ padding:.3rem .4rem !important; font-size:.7rem !important; }
+    .compact-grid .rz-datatable-thead th{ padding:.35rem .4rem !important; font-size:.7rem !important; font-weight:600 !important; background:#fafbfc !important; }
+    .compact-grid .rz-paginator{ font-size:.65rem !important; padding:.3rem !important; }
+    .compact-grid .rz-paginator .rz-button{ height:24px !important; min-width:24px !important; }
+    .loading-container,.empty-state{ text-align:center; padding:1.5rem 0; }
+    .slim-progress{ width:80px !important; height:3px !important; margin:0 auto !important; }
+    .loading-text{ margin-top:.5rem !important; font-size:.65rem !important; color:#6c757d !important; }
+    .empty-icon{ font-size:1.5rem !important; color:#d0d7de !important; margin-bottom:.375rem; }
+    .empty-text{ font-size:.7rem !important; color:#6c757d !important; margin:0 !important; }
+    .playlist-container::-webkit-scrollbar{ width:4px; }
+    .playlist-container::-webkit-scrollbar-track{ background:#f0f0f0; border-radius:2px; }
+    .playlist-container::-webkit-scrollbar-thumb{ background:#c0c0c0; border-radius:2px; }
+    .playlist-container::-webkit-scrollbar-thumb:hover{ background:#a0a0a0; }
+    @@keyframes slideDown{ from{opacity:0; transform:translateY(-5px);} to{ opacity:1; transform:translateY(0);} }
+    @@keyframes pulse{ 0%{opacity:1;} 50%{opacity:.6;} 100%{opacity:1;} }
+    :root[data-theme='dark'] .professional-panel{ background:#0d1117 !important; border-color:#30363d !important; }
+    :root[data-theme='dark'] .panel-header{ background:#161b22; border-bottom-color:#30363d; }
+    :root[data-theme='dark'] .panel-header:hover{ background:#1f2937; }
+    :root[data-theme='dark'] .playlist-card, :root[data-theme='dark'] .media-card{ background:#0d1117 !important; border-color:#30363d !important; }
+    :root[data-theme='dark'] .playlist-item{ background:#161b22; border-color:#30363d; }
+    :root[data-theme='dark'] .playlist-item:hover{ background:#1f2937; }
+    :root[data-theme='dark'] .playlist-item.selected{ background:#1f2937; border-color:#3498db; }
+    :root[data-theme='dark'] .broadcast-alert{ background-color:#1f2937 !important; border-color:#374151 !important; }
+    :root[data-theme='dark'] .divider{ background-color:#30363d; }
+    :root[data-theme='dark'] .compact-grid .rz-datatable-thead th{ background:#161b22 !important; }
+
+    /* 미니 플레이어 */
+    .mini-player { display:flex; align-items:center; gap:6px; margin-left:8px; }
+    .mini-icon { font-size:0.9rem; color:#3498db; }
+    .mini-btn { padding:0 4px !important; height:22px !important; }
+    .now-playing { font-size:0.72rem; color:#2c3e50; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .time-text { font-size:0.7rem; color:#6c757d; margin-left:4px; }
 </style>

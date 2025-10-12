@@ -13,6 +13,7 @@ public partial class ManageSchedule
     [Inject] protected DialogService DialogService { get; set; }
     [Inject] protected ILogger<ManageSchedule> Logger { get; set; }
     [Inject] protected BroadcastWebSocketService WebSocketService { get; set; }
+    [Inject] protected NavigationManager NavigationManager { get; set; }
 
     // 스케줄 관련 필드
     private IEnumerable<Schedule> schedules = new List<Schedule>();
@@ -103,6 +104,18 @@ public partial class ManageSchedule
         await LoadAvailableContent();
         await LoadSpeakerData();
     }
+
+    // UTC로 저장된 TimeOnly를 로컬 시간대로 변환
+    private static TimeOnly UtcTimeOnlyToLocal(TimeOnly utcTime)
+    {
+        var utcDateTime = DateTime.SpecifyKind(DateTime.UtcNow.Date.Add(utcTime.ToTimeSpan()), DateTimeKind.Utc);
+        var local = utcDateTime.ToLocalTime();
+        return TimeOnly.FromTimeSpan(local.TimeOfDay);
+    }
+
+    // 목록/UI 표시용 포맷터
+    private string FormatLocalTime(TimeOnly utcTime)
+        => UtcTimeOnlyToLocal(utcTime).ToString("HH:mm");
 
     private async Task LoadSchedules()
     {
@@ -447,8 +460,9 @@ public partial class ManageSchedule
             };
         }
 
-        // TimeOnly를 DateTime으로 변환
-        tempStartDateTime = DateTime.Today.Add(editingSchedule.StartTime.ToTimeSpan());
+        // TimeOnly(UTC 저장)를 로컬 시간대로 변환하여 DateTime으로 설정
+        var localTimeOnly = UtcTimeOnlyToLocal(editingSchedule.StartTime);
+        tempStartDateTime = DateTime.Today.Add(localTimeOnly.ToTimeSpan());
         tempRepeatCount = editingSchedule.RepeatCount;
 
         // 선택된 스케줄의 콘텐츠 로드
@@ -1261,8 +1275,26 @@ public partial class ManageSchedule
 
             Logger.LogInformation($"Stopping scheduled broadcast: {channel.Name} (Broadcast ID: {ongoingBroadcast.Id})");
 
-            // 2. 방송 중지 - WebSocket을 통한 모든 정리 작업 수행
-            await WebSocketService.StopBroadcastAsync(ongoingBroadcast.Id);
+            // 2. 방송 종료 API 호출 - 모든 정리 작업 수행
+            var httpClient = new HttpClient { BaseAddress = new Uri(NavigationManager.BaseUri) };
+            var response = await httpClient.PostAsync($"api/broadcasts/{ongoingBroadcast.Id}/finalize", null);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Logger.LogError($"Failed to finalize broadcast: {errorContent}");
+                
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "방송 중지 실패",
+                    Detail = "방송 중지 요청이 실패했습니다.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            Logger.LogInformation($"Successfully stopped scheduled broadcast: {channel.Name}");
 
             // 3. 캐시 갱신
             await LoadSchedules();
@@ -1533,7 +1565,7 @@ public partial class ManageSchedule
     }
 
     private List<Speaker> GetOnlineSpeakersSelected() => allSpeakers.Where(s => editingSelectedSpeakerIds.Contains(s.Id) && s.State == 1).ToList();
-    private List<Speaker> GetOfflineSpeakersSelected() => allSpeakers.Where(s => editingSelectedSpeakerIds.Contains(s.Id) && s.State != 1).ToList();
+    private List<Speaker> GetOfflineSpeakersSelected() => allSpeakers.Where(s => editingSelectedTtsIds.Contains(s.Id) && s.State != 1).ToList();
 
     private BadgeStyle GetSpeakerStatusBadgeStyle(byte state) => state switch
     {

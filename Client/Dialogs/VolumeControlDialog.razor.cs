@@ -161,6 +161,11 @@ namespace WicsPlatform.Client.Dialogs
                     Channel.UpdatedAt = DateTime.Now;
                 }
 
+                // 저장 후 현재 값을 기준으로 변경사항 체크 기준 갱신
+                _originalMicVolume = micVolume;
+                _originalTtsVolume = ttsVolume;
+                _originalMediaVolume = mediaVolume;
+                _originalGlobalVolume = globalVolume;
                 _hasUnsavedChanges = false;
 
                 NotificationService.Notify(new NotificationMessage
@@ -168,13 +173,12 @@ namespace WicsPlatform.Client.Dialogs
                     Severity = NotificationSeverity.Success,
                     Summary = "저장 완료",
                     Detail = IsBroadcasting && CurrentBroadcastId != null
-                        ? "볼륨 설정이 저장되고 실시간으로 적용되었습니다."
-                        : "볼륨 설정이 저장되었습니다. 다음 방송부터 적용됩니다.",
+                        ? "볼륨 설정이 저장되고 실시간으로 적용되었습니다. (창은 계속 열려 있습니다)"
+                        : "볼륨 설정이 저장되었습니다. 다음 방송부터 적용됩니다. (창은 계속 열려 있습니다)",
                     Duration = 3000
                 });
 
-                // 다이얼로그 닫기
-                DialogService.Close(true);
+                // 저장 후에도 다이얼로그 유지 (닫지 않음)
             }
             catch (Exception ex)
             {

@@ -15,13 +15,35 @@ public partial class WebSocketMiddleware
         {
             if (_broadcastSessions.TryGetValue(broadcastId, out var session))
             {
-                // WebSocket 연결이 이미 끊어진 상태인지 확인
+                // 현재 재생 상태 조회
+                var mediaStatus = await mediaBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
+                var ttsStatus = await ttsBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
+
+                // 클라이언트에 브로드캐스트: 재생 완료 알림 (UI 자동 갱신용)
+                if (session.WebSocket != null)
+                {
+                    try
+                    {
+                        var payload = new
+                        {
+                            type = "playbackCompleted",
+                            broadcastId = broadcastId,
+                            mediaPlaying = mediaStatus?.IsPlaying == true,
+                            ttsPlaying = ttsStatus?.IsPlaying == true
+                        };
+                        var json = JsonSerializer.Serialize(payload);
+                        await SendMessageAsync(session.WebSocket, json);
+                        logger.LogInformation($"Sent playbackCompleted to client (broadcast {broadcastId})");
+                    }
+                    catch (Exception sendEx)
+                    {
+                        logger.LogError(sendEx, $"Failed to send playbackCompleted for broadcast {broadcastId}");
+                    }
+                }
+
+                // WebSocket 연결이 이미 끊어진 상태인지 확인 → 끊어졌다면 자원 정리 시도
                 if (session.WebSocket == null)
                 {
-                    // 미디어와 TTS 둘 다 재생 중인지 확인
-                    var mediaStatus = await mediaBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
-                    var ttsStatus = await ttsBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
-
                     // 둘 다 재생이 끝났을 때만 정리
                     if (mediaStatus?.IsPlaying != true && ttsStatus?.IsPlaying != true)
                     {

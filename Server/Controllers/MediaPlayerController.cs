@@ -12,15 +12,18 @@ namespace WicsPlatform.Server.Controllers
     public class MediaPlayerController : Controller
     {
         private readonly IMediaBroadcastService _mediaBroadcastService;
+        private readonly IAudioMixingService _mixer;
         private readonly ILogger<MediaPlayerController> _logger;
         private readonly wicsContext context;
 
         public MediaPlayerController(
             IMediaBroadcastService mediaBroadcastService,
+            IAudioMixingService mixer,
             ILogger<MediaPlayerController> logger,
             WicsPlatform.Server.Data.wicsContext context)
         {
             _mediaBroadcastService = mediaBroadcastService;
+            _mixer = mixer;
             _logger = logger;
             this.context = context;
         }
@@ -47,7 +50,8 @@ namespace WicsPlatform.Server.Controllers
 
                 _logger.LogInformation(
                     $"Media play request - BroadcastId: {request.BroadcastId}, " +
-                    $"MediaIds: [{string.Join(", ", request.MediaIds ?? new List<ulong>())}]"
+                    $"MediaIds: [{string.Join(", ", request.MediaIds ?? new List<ulong>())}], " +
+                    $"Shuffle: {request.Shuffle}"
                 );
 
                 // DB에서 실제 미디어 정보 조회
@@ -74,7 +78,8 @@ namespace WicsPlatform.Server.Controllers
                 var jsonData = JsonSerializer.SerializeToElement(new
                 {
                     broadcastId = request.BroadcastId,
-                    mediaIds = request.MediaIds ?? new List<ulong>()
+                    mediaIds = request.MediaIds ?? new List<ulong>(),
+                    shuffle = request.Shuffle
                 });
 
                 // 실제 미디어 정보를 전달
@@ -173,6 +178,42 @@ namespace WicsPlatform.Server.Controllers
         }
 
         /// <summary>
+        /// 현재 재생 상태 조회 (간단 now-playing)
+        /// </summary>
+        [HttpGet("now-playing/{broadcastId}")]
+        public IActionResult GetNowPlaying(ulong broadcastId)
+        {
+            try
+            {
+                if (broadcastId == 0)
+                {
+                    return BadRequest(new { success = false, message = "BroadcastId is required" });
+                }
+
+                var status = _mediaBroadcastService.GetStatusByBroadcastIdAsync(broadcastId).Result;
+                var current = _mediaBroadcastService.GetCurrentMedia(broadcastId);
+                var (cur, tot) = _mixer.GetMediaTimes(broadcastId);
+
+                return Ok(new MediaStatusResponse
+                {
+                    Success = true,
+                    BroadcastId = broadcastId,
+                    IsPlaying = status?.IsPlaying == true,
+                    CurrentTrackIndex = status?.CurrentTrackIndex ?? -1,
+                    CurrentPosition = cur.ToString(@"mm\:ss"),
+                    TotalDuration = tot.ToString(@"mm\:ss"),
+                    CurrentMediaId = current?.mediaId,
+                    CurrentMediaFileName = current?.fileName
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting now-playing status");
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// 현재 재생 상태 조회 (선택적 기능)
         /// </summary>
         /// <param name="broadcastId">방송 ID</param>
@@ -205,5 +246,62 @@ namespace WicsPlatform.Server.Controllers
                 return StatusCode(500, new { success = false, message = ex.Message });
             }
         }
+
+        // 간단 탐색(앞으로/뒤로)
+        [HttpPost("seek")]
+        public async Task<IActionResult> Seek([FromBody] SeekRequest req)
+        {
+            try
+            {
+                if (req == null || req.BroadcastId == 0)
+                    return BadRequest(new { success = false, message = "BroadcastId is required" });
+
+                var ok = await _mixer.SeekMediaAsync(req.BroadcastId, req.Seconds);
+                var (cur, tot) = _mixer.GetMediaTimes(req.BroadcastId);
+
+                return Ok(new
+                {
+                    success = ok,
+                    current = cur.ToString(@"mm\:ss"),
+                    total = tot.ToString(@"mm\:ss")
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Seek error");
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
+        // 다음 곡으로 건너뛰기
+        [HttpPost("next")]
+        public async Task<IActionResult> Next([FromBody] NextRequest req)
+        {
+            try
+            {
+                if (req == null || req.BroadcastId == 0)
+                    return BadRequest(new { success = false, message = "BroadcastId is required" });
+
+                var ok = await _mediaBroadcastService.SkipToNextAsync(req.BroadcastId);
+                return Ok(new { success = ok });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Next error");
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+    }
+
+    public class SeekRequest
+    {
+        public ulong BroadcastId { get; set; }
+        // +10이면 10초 앞으로, -10이면 10초 뒤로
+        public double Seconds { get; set; }
+    }
+
+    public class NextRequest
+    {
+        public ulong BroadcastId { get; set; }
     }
 }

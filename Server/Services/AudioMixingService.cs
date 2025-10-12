@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace WicsPlatform.Server.Services;
 
@@ -41,6 +42,8 @@ sealed class AutoDetachSampleProvider : ISampleProvider
 
 public class AudioMixingService : IAudioMixingService, IDisposable
 {
+    public event Action<ulong> OnMediaEnded; // ← 미디어 종료 이벤트
+
     private readonly ILogger<AudioMixingService> logger;
     private readonly IUdpBroadcastService udpService;
     private readonly IServiceScopeFactory scopeFactory;
@@ -78,6 +81,7 @@ public class AudioMixingService : IAudioMixingService, IDisposable
         public VolumeSampleProvider? MicVolumeNode { get; set; }
         public bool MicAttachedToMixer { get; set; } = false;
         public float MicVolume { get; set; } = 1.0f;
+        public DateTime LastMicReceivedUtc { get; set; } = DateTime.MinValue;
 
         // 미디어 (파일 1개)
         public AudioFileReader? MediaReader { get; set; }
@@ -85,7 +89,7 @@ public class AudioMixingService : IAudioMixingService, IDisposable
         public FadeInOutSampleProvider? MediaFadeNode { get; set; }
         public VolumeSampleProvider? MediaVolumeNode { get; set; }
         public float MediaVolume { get; set; } = 0.7f;
-        public int MediaEndNearTicks { get; set; } = 0; // 추가: 종료 근접 감지 누적
+        public int MediaEndNearTicks { get; set; } = 0;
 
         // TTS (여러 개)
         public Dictionary<int, TtsEntry> TtsEntries { get; } = new();
@@ -144,6 +148,7 @@ public class AudioMixingService : IAudioMixingService, IDisposable
     public async Task AddMicrophoneData(ulong broadcastId, byte[] micBytes)
     {
         if (!_sessions.TryGetValue(broadcastId, out var s) || !s.IsActive) return;
+        s.LastMicReceivedUtc = DateTime.UtcNow;
         if (s.MicBuffer == null)
         {
             var micFmt = new WaveFormat(s.MicInputSampleRate, s.MicInputChannels);
@@ -169,46 +174,37 @@ public class AudioMixingService : IAudioMixingService, IDisposable
         if (!_sessions.TryGetValue(broadcastId, out var s) || !s.IsActive) return;
         try
         {
-            // 기존 미디어 정리(믹서 입력 제거 + Dispose + 상태 클리어)
             RemoveMediaStreamInternal(s);
 
             var full = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", mediaPath.TrimStart('/'));
             if (!File.Exists(full)) { logger.LogError($"Media not found: {full}"); return; }
 
-            var reader = new AudioFileReader(full); // float32, 원본 SR/채널
+            var reader = new AudioFileReader(full);
             ISampleProvider sp = reader;
 
-            // 믹서 포맷으로 정규화 (리샘플 → 채널 매칭)
             sp = EnsureSampleRate(sp, s.MixerConfig.SampleRate);
             sp = EnsureChannelMatch(sp, s.MixerConfig.Channels);
 
-            // 클릭 방지용 짧은 페이드인
             var fade = new FadeInOutSampleProvider(sp, initiallySilent: true); fade.BeginFadeIn(20);
-
-            // 볼륨
             var vol = new VolumeSampleProvider(fade) { Volume = s.MediaVolume };
-
-            // ★ 컷가드: 최종 출력 체인에서 정확히 끝나도록 TotalTime 만큼만 내보내기
             var cut = new OffsetSampleProvider(vol) { Take = reader.TotalTime };
 
-            // ★ 마지막 노드에 초얇은 래퍼 1개: 처음 0을 받는 순간 상태만 정리(믹서 제거는 자동)
-            var final = new AutoDetachSampleProvider(
+            AutoDetachSampleProvider? final = null;
+            final = new AutoDetachSampleProvider(
                 cut,
                 onEndedOnce: () =>
                 {
-                    try { reader.Dispose(); } catch { /* swallow */ }
-
+                    try { lock (s.MixerLock) if (final != null) s.Mixer.RemoveMixerInput(final); } catch { } 
+                    try { reader.Dispose(); } catch { } 
                     s.MediaReader = null;
                     s.MediaFadeNode = null;
                     s.MediaVolumeNode = null;
                     s.MediaToMixer = null;
                     s.MediaEndNearTicks = 0;
-
-                    System.Diagnostics.Debug.WriteLine($"[AMX][{DateTime.Now:HH:mm:ss.fff}][Media] ended → detached (auto)");
                     logger.LogInformation("[NAudio] Media ended → detached (auto)");
+                    try { OnMediaEnded?.Invoke(broadcastId); } catch { }
                 });
 
-            // 세션 상태 저장 + 믹서 연결
             s.MediaReader = reader;
             s.MediaFadeNode = fade;
             s.MediaVolumeNode = vol;
@@ -239,7 +235,7 @@ public class AudioMixingService : IAudioMixingService, IDisposable
         s.MediaToMixer = null;
         s.MediaFadeNode = null;
         s.MediaVolumeNode = null;
-        s.MediaEndNearTicks = 0; // 카운터 리셋
+        s.MediaEndNearTicks = 0;
     }
 
     // ===== TTS: EOF 자동 제거(미디어와 동일 패턴) =====
@@ -258,23 +254,19 @@ public class AudioMixingService : IAudioMixingService, IDisposable
             sp = EnsureChannelMatch(sp, s.MixerConfig.Channels);
 
             var fade = new FadeInOutSampleProvider(sp, initiallySilent: true); fade.BeginFadeIn(10);
-
             var vol = new VolumeSampleProvider(fade) { Volume = s.TtsVolume };
-
-            // 컷가드
             var cut = new OffsetSampleProvider(vol) { Take = reader.TotalTime };
 
             var id = s.NextTtsId++;
 
-            var final = new AutoDetachSampleProvider(
+            AutoDetachSampleProvider? final = null;
+            final = new AutoDetachSampleProvider(
                 cut,
                 onEndedOnce: () =>
                 {
-                    try { reader.Dispose(); } catch { /* swallow */ }
-                    // 믹서 입력 제거는 자동(0 반환) → 여기서는 사전에서만 제거
+                    try { lock (s.MixerLock) if (final != null) s.Mixer.RemoveMixerInput(final); } catch { }
+                    try { reader.Dispose(); } catch { }
                     s.TtsEntries.Remove(id);
-
-                    System.Diagnostics.Debug.WriteLine($"[AMX][{DateTime.Now:HH:mm:ss.fff}][TTS] id={id} ended → detached");
                     logger.LogInformation($"[NAudio] TTS ended → detached (id={id})");
                 });
 
@@ -287,7 +279,6 @@ public class AudioMixingService : IAudioMixingService, IDisposable
             };
 
             lock (s.MixerLock) s.Mixer.AddMixerInput(entry.InputToMixer);
-
             s.TtsEntries[id] = entry;
 
             logger.LogInformation($"[NAudio] TTS added: {Path.GetFileName(ttsPath)} (id={id})");
@@ -332,6 +323,35 @@ public class AudioMixingService : IAudioMixingService, IDisposable
         }
     }
 
+    // ====== 간단 플레이어 컨트롤 구현 ======
+    public async Task<bool> SeekMediaAsync(ulong broadcastId, double seconds)
+    {
+        if (!_sessions.TryGetValue(broadcastId, out var s) || s.MediaReader == null) return false;
+        try
+        {
+            var r = s.MediaReader;
+            var target = r.CurrentTime + TimeSpan.FromSeconds(seconds);
+            if (target < TimeSpan.Zero) target = TimeSpan.Zero;
+            if (target > r.TotalTime) target = r.TotalTime - TimeSpan.FromMilliseconds(10);
+            r.CurrentTime = target;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, $"SeekMediaAsync failed for {broadcastId}");
+            return false;
+        }
+    }
+
+    public (TimeSpan current, TimeSpan total) GetMediaTimes(ulong broadcastId)
+    {
+        if (_sessions.TryGetValue(broadcastId, out var s) && s.MediaReader != null)
+        {
+            return (s.MediaReader.CurrentTime, s.MediaReader.TotalTime);
+        }
+        return (TimeSpan.Zero, TimeSpan.Zero);
+    }
+
     private async Task ProcessMixedOutput(ulong broadcastId)
     {
         if (!_sessions.TryGetValue(broadcastId, out var s) || !s.IsActive) return;
@@ -347,12 +367,13 @@ public class AudioMixingService : IAudioMixingService, IDisposable
                     {
                         logger.LogInformation($"[NAudio][Heuristic] Force end media (remain {remainingMs:F1}ms) broadcast={broadcastId}");
                         RemoveMediaStreamInternal(s);
+                        try { OnMediaEnded?.Invoke(broadcastId); } catch { }
                     }
                 }
                 else s.MediaEndNearTicks = 0;
             }
 
-            // TTS 종료 휴리스틱 (각 스트림)
+            // TTS 종료 휴리스틱
             if (s.TtsEntries.Count > 0)
             {
                 List<int>? forceRemove = null;
@@ -386,7 +407,24 @@ public class AudioMixingService : IAudioMixingService, IDisposable
                 }
             }
 
-            bool hasMic = s.MicToMixer != null;
+            // 마이크 활성 상태 확인 및 필요 시 분리
+            var now = DateTime.UtcNow;
+            var micRecentMs = (now - s.LastMicReceivedUtc).TotalMilliseconds;
+            var micHasRecent = s.MicToMixer != null && micRecentMs <= 1000;
+            if (s.MicToMixer != null && !micHasRecent && (s.MicBuffer == null || s.MicBuffer.BufferedDuration.TotalMilliseconds <= 0))
+            {
+                lock (s.MixerLock)
+                {
+                    s.Mixer.RemoveMixerInput(s.MicToMixer);
+                }
+                s.MicToMixer = null;
+                s.MicBuffer = null;
+                s.MicVolumeNode = null;
+                s.MicAttachedToMixer = false;
+                logger.LogInformation($"[NAudio] Mic auto-detached (inactive) for {broadcastId}");
+            }
+
+            bool hasMic = s.MicToMixer != null && micHasRecent;
             bool hasMedia = s.MediaToMixer != null;
             bool hasTts = s.TtsEntries.Count > 0;
             if (!(hasMic || hasMedia || hasTts)) return;
@@ -396,6 +434,16 @@ public class AudioMixingService : IAudioMixingService, IDisposable
             var floatBuf = new float[samplesNeeded];
             int read = s.Mixer.Read(floatBuf, 0, samplesNeeded);
             if (read <= 0) return;
+
+            // 무음 프레임 전송 스킵
+            double energy = 0;
+            for (int i = 0; i < read; i += Math.Max(1, read / 256))
+            {
+                var v = floatBuf[i];
+                energy += v * v;
+            }
+            if (energy < 1e-6) return;
+
             var pcm16 = new byte[read * 2];
             for (int i = 0; i < read; i++)
             {
@@ -435,7 +483,11 @@ public class AudioMixingService : IAudioMixingService, IDisposable
         if (s.MicToMixer != null)
         {
             lock (s.MixerLock) s.Mixer.RemoveMixerInput(s.MicToMixer);
-            s.MicToMixer = null; s.MicBuffer = null; s.MicVolumeNode = null; s.MicAttachedToMixer = false;
+            s.MicToMixer = null;
+            s.MicBuffer = null;
+            s.MicVolumeNode = null;
+            s.MicAttachedToMixer = false;
+            s.LastMicReceivedUtc = DateTime.MinValue;
             logger.LogInformation($"Mic removed for {broadcastId}");
         }
     }

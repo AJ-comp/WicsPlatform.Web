@@ -9,6 +9,7 @@ public partial class ManageBroadCast
     {
         WebSocketService.OnBroadcastStatusReceived += OnBroadcastStatusReceived;
         WebSocketService.OnConnectionStatusChanged += OnWebSocketConnectionStatusChanged;
+        WebSocketService.OnPlaybackCompleted += OnServerPlaybackCompleted; // 재생 완료 수신 등록
     }
 
     private void UnsubscribeFromWebSocketEvents()
@@ -17,6 +18,7 @@ public partial class ManageBroadCast
         {
             WebSocketService.OnBroadcastStatusReceived -= OnBroadcastStatusReceived;
             WebSocketService.OnConnectionStatusChanged -= OnWebSocketConnectionStatusChanged;
+            WebSocketService.OnPlaybackCompleted -= OnServerPlaybackCompleted;
         }
     }
 
@@ -51,6 +53,19 @@ public partial class ManageBroadCast
         {
             isBroadcasting = false;
             currentBroadcastId = null;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // 서버에서 모든 재생 완료(playbackCompleted) 수신 시: 방송은 유지하고, 재생 전 상태로만 복귀
+    private void OnServerPlaybackCompleted(ulong broadcastId)
+    {
+        if (currentBroadcastId.HasValue && broadcastId == currentBroadcastId.Value)
+        {
+            _logger.LogInformation($"Playback completed for broadcast {broadcastId} - resetting playlist/TTS state only");
+            // 방송 상태(isBroadcasting)나 상위 UI는 변경하지 않음
+            playlistSection?.ResetMediaPlaybackState();
+            ttsSection?.ResetTtsPlaybackState();
             InvokeAsync(StateHasChanged);
         }
     }

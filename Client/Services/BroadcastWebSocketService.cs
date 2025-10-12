@@ -17,6 +17,7 @@ public class BroadcastWebSocketService : IAsyncDisposable
 
     public event Action<ulong, BroadcastStatus> OnBroadcastStatusReceived;
     public event Action<ulong, string> OnConnectionStatusChanged;
+    public event Action<ulong> OnPlaybackCompleted; // ← 추가: 서버에서 재생 완료 브로드캐스트를 받으면 알림
 
     public BroadcastWebSocketService(NavigationManager navigationManager, ILogger<BroadcastWebSocketService> logger)
     {
@@ -184,17 +185,26 @@ public class BroadcastWebSocketService : IAsyncDisposable
             {
                 var messageType = typeElement.GetString();
 
-                if (messageType == "status" && _channelWebSockets.TryGetValue(broadcastId, out var channelWs))
+                switch (messageType)
                 {
-                    var status = new BroadcastStatus
-                    {
-                        BroadcastId = broadcastId,
-                        PacketCount = root.GetProperty("packetCount").GetInt64(),
-                        TotalBytes = root.GetProperty("totalBytes").GetInt64(),
-                        Duration = TimeSpan.FromSeconds(root.GetProperty("durationSeconds").GetDouble())
-                    };
+                    case "status":
+                        if (_channelWebSockets.TryGetValue(broadcastId, out var channelWs))
+                        {
+                            var status = new BroadcastStatus
+                            {
+                                BroadcastId = broadcastId,
+                                PacketCount = root.GetProperty("packetCount").GetInt64(),
+                                TotalBytes = root.GetProperty("totalBytes").GetInt64(),
+                                Duration = TimeSpan.FromSeconds(root.GetProperty("durationSeconds").GetDouble())
+                            };
 
-                    OnBroadcastStatusReceived?.Invoke(broadcastId, status);
+                            OnBroadcastStatusReceived?.Invoke(broadcastId, status);
+                        }
+                        break;
+
+                    case "playbackCompleted":
+                        OnPlaybackCompleted?.Invoke(broadcastId);
+                        break;
                 }
             }
         }

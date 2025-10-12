@@ -10,7 +10,7 @@ using WicsPlatform.Shared;
 
 namespace WicsPlatform.Client.Pages.SubPages
 {
-    public partial class BroadcastPlaylistSection
+    public partial class BroadcastPlaylistSection : IDisposable
     {
         /* ────────────────────── [Parameters] ────────────────────── */
         [Parameter] public WicsPlatform.Server.Models.wics.Channel Channel { get; set; }
@@ -49,10 +49,19 @@ namespace WicsPlatform.Client.Pages.SubPages
         private bool isMediaActionInProgress = false;
         private string currentMediaSessionId = null;
 
+        // Mini-player state
+        private string _nowPlayingText = string.Empty;
+        private string _nowPlayingTime = string.Empty;
+        private System.Timers.Timer _npTimer;
+
+        // alias for Razor handler
+        private Task OnSeek(int seconds) => Seek(seconds);
+
         /* ────────────────────── [Life-Cycle] ────────────────────── */
         protected override async Task OnInitializedAsync()
         {
             await LoadPlaylists();
+            SetupNowPlayingTimer();
         }
 
         protected override async Task OnParametersSetAsync()
@@ -62,6 +71,89 @@ namespace WicsPlatform.Client.Pages.SubPages
             {
                 isMediaPlaying = false;
                 currentMediaSessionId = null;
+                StateHasChanged();
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _npTimer?.Stop();
+                _npTimer?.Dispose();
+                _npTimer = null;
+            }
+            catch { }
+        }
+
+        private void SetupNowPlayingTimer()
+        {
+            _npTimer?.Stop();
+            _npTimer?.Dispose();
+            _npTimer = new System.Timers.Timer(2000);
+            _npTimer.Elapsed += async (_, __) => await QueryNowPlaying();
+            _npTimer.AutoReset = true;
+            _npTimer.Enabled = true;
+        }
+
+        private async Task QueryNowPlaying()
+        {
+            try
+            {
+                if (!IsBroadcasting || string.IsNullOrEmpty(BroadcastId)) return;
+                if (!ulong.TryParse(BroadcastId, out var bid)) return;
+
+                var res = await Http.GetFromJsonAsync<WicsPlatform.Shared.MediaStatusResponse>($"api/mediaplayer/now-playing/{bid}");
+                if (res?.Success == true)
+                {
+                    _nowPlayingText = string.IsNullOrEmpty(res.CurrentMediaFileName) ? string.Empty : res.CurrentMediaFileName;
+                    _nowPlayingTime = string.IsNullOrEmpty(res.CurrentPosition) ? string.Empty : $"{res.CurrentPosition} / {res.TotalDuration}";
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch { }
+        }
+
+        private async Task Seek(int seconds)
+        {
+            try
+            {
+                if (!IsBroadcasting || string.IsNullOrEmpty(BroadcastId)) return;
+                if (!ulong.TryParse(BroadcastId, out var bid)) return;
+                var req = new { BroadcastId = bid, Seconds = seconds };
+                await Http.PostAsJsonAsync("api/mediaplayer/seek", req);
+            }
+            catch { }
+        }
+
+        private async Task SkipNext()
+        {
+            try
+            {
+                if (!IsBroadcasting || string.IsNullOrEmpty(BroadcastId)) return;
+                if (!ulong.TryParse(BroadcastId, out var bid)) return;
+                isMediaActionInProgress = true;
+                StateHasChanged();
+                var req = new { BroadcastId = bid };
+                var resp = await Http.PostAsJsonAsync("api/mediaplayer/next", req);
+                if (resp.IsSuccessStatusCode)
+                {
+                    NotifyInfo("다음 미디어로 이동합니다.");
+                    _ = QueryNowPlaying();
+                }
+                else
+                {
+                    var msg = await resp.Content.ReadAsStringAsync();
+                    NotifyError("다음 미디어 이동 실패", new Exception(msg));
+                }
+            }
+            catch (Exception ex)
+            {
+                NotifyError("다음 미디어 이동 중 오류", ex);
+            }
+            finally
+            {
+                isMediaActionInProgress = false;
                 StateHasChanged();
             }
         }
@@ -119,6 +211,16 @@ namespace WicsPlatform.Client.Pages.SubPages
         /* ────────────────────── [미디어 재생/중지] ────────────────────── */
         private async Task PlayMedia()
         {
+            await PlayMediaInternal(shuffle: false);
+        }
+
+        private async Task PlayMediaRandom()
+        {
+            await PlayMediaInternal(shuffle: true);
+        }
+
+        private async Task PlayMediaInternal(bool shuffle)
+        {
             if (!IsBroadcasting || string.IsNullOrEmpty(BroadcastId) || !HasSelectedMedia())
             {
                 NotifyWarning("미디어를 재생하려면 방송 중이어야 하고 미디어가 선택되어 있어야 합니다.");
@@ -139,10 +241,11 @@ namespace WicsPlatform.Client.Pages.SubPages
                 }
 
                 // MediaPlayerController의 play 엔드포인트 호출
-                var request = new
+                var request = new MediaPlayRequest
                 {
-                    broadcastId = BroadcastId,
-                    mediaIds = mediaIds
+                    BroadcastId = ulong.TryParse(BroadcastId, out var bid) ? bid : 0UL,
+                    MediaIds = mediaIds,
+                    Shuffle = shuffle
                 };
 
                 var response = await Http.PostAsJsonAsync("api/mediaplayer/play", request);
@@ -154,7 +257,14 @@ namespace WicsPlatform.Client.Pages.SubPages
                     {
                         isMediaPlaying = true;
                         currentMediaSessionId = result.SessionId;
-                        NotifySuccess($"미디어 재생을 시작했습니다. ({mediaIds.Count}개 파일)");
+                        if (shuffle)
+                        {
+                            NotifySuccess($"랜덤재생을 시작했습니다. ({mediaIds.Count}개 파일)");
+                        }
+                        else
+                        {
+                            NotifySuccess($"미디어 재생을 시작했습니다. ({mediaIds.Count}개 파일)");
+                        }
                     }
                     else
                     {
@@ -272,7 +382,16 @@ namespace WicsPlatform.Client.Pages.SubPages
         private async Task OnPlaylistCardClicked(WicsPlatform.Server.Models.wics.Group playlist)
         {
             selectedPlaylist = playlist;
-            await LoadPlaylistMedia(playlist.Id);
+
+            // 체크박스로 선택된 플레이리스트가 있으면 전체 집계, 아니면 단일 플레이리스트 로드
+            if (GetSelectedPlaylists().Any())
+            {
+                await LoadSelectedPlaylistsMedia();
+            }
+            else
+            {
+                await LoadPlaylistMedia(playlist.Id);
+            }
         }
 
         // 플레이리스트 선택 상태 확인
@@ -288,13 +407,23 @@ namespace WicsPlatform.Client.Pages.SubPages
         }
 
         // 플레이리스트 체크박스 변경 시
-        private void OnPlaylistCheckChanged(ulong playlistId, bool isChecked)
+        private async Task OnPlaylistCheckChanged(ulong playlistId, bool isChecked)
         {
             selectedPlaylists[playlistId] = isChecked;
+
+            // 선택된 플레이리스트 기준으로 미디어 집계
+            await LoadSelectedPlaylistsMedia();
+
+            // 선택이 모두 해제되면 단일 선택도 해제
+            if (!GetSelectedPlaylists().Any())
+            {
+                selectedPlaylist = null;
+            }
+
             StateHasChanged();
         }
 
-        // 플레이리스트의 미디어 파일 로드
+        // 하나의 플레이리스트에 속한 미디어 파일 로드 (단일)
         private async Task LoadPlaylistMedia(ulong playlistId)
         {
             try
@@ -364,6 +493,87 @@ namespace WicsPlatform.Client.Pages.SubPages
 
                 NotifyError("미디어 파일 목록을 불러오는 중 오류가 발생했습니다", ex);
 
+                playlistMedia = new List<WicsPlatform.Server.Models.wics.Medium>();
+                selectAllMedia = false;
+            }
+            finally
+            {
+                isLoadingMedia = false;
+                StateHasChanged();
+            }
+        }
+
+        // 여러 플레이리스트에 속한 미디어 파일 집계 로드 (멀티)
+        private async Task LoadSelectedPlaylistsMedia()
+        {
+            try
+            {
+                isLoadingMedia = true;
+                playlistMedia = new List<WicsPlatform.Server.Models.wics.Medium>();
+                selectedMedia.Clear();
+                selectAllMedia = true;
+
+                var selectedIds = selectedPlaylists.Where(kvp => kvp.Value).Select(kvp => kvp.Key).Distinct().ToList();
+                if (!selectedIds.Any())
+                {
+                    selectAllMedia = false;
+                    StateHasChanged();
+                    return;
+                }
+
+                // MapMediaGroups에서 선택된 모든 그룹에 대한 매핑 조회
+                var mapFilter = string.Join(" or ", selectedIds.Select(id => $"GroupId eq {id}"));
+                var mapQuery = new Radzen.Query
+                {
+                    Filter = mapFilter,
+                    OrderBy = "CreatedAt desc"
+                };
+                var mapResult = await WicsService.GetMapMediaGroups(mapQuery);
+
+                if (mapResult.Value != null && mapResult.Value.Any())
+                {
+                    var mediaIds = mapResult.Value
+                        .Select(m => m.MediaId)
+                        .Where(id => id > 0)
+                        .Distinct()
+                        .ToList();
+
+                    if (mediaIds.Any())
+                    {
+                        var mediaFilter = string.Join(" or ", mediaIds.Select(id => $"Id eq {id}"));
+                        var mediaQuery = new Radzen.Query
+                        {
+                            Filter = $"({mediaFilter}) and (DeleteYn eq 'N' or DeleteYn eq null)",
+                            OrderBy = "CreatedAt desc"
+                        };
+
+                        var mediaResult = await WicsService.GetMedia(mediaQuery);
+                        if (mediaResult.Value != null && mediaResult.Value.Any())
+                        {
+                            playlistMedia = mediaResult.Value.AsODataEnumerable();
+
+                            // 기본적으로 모두 선택
+                            foreach (var media in playlistMedia)
+                            {
+                                selectedMedia[media.Id] = true;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    playlistMedia = new List<WicsPlatform.Server.Models.wics.Medium>();
+                    selectAllMedia = false;
+                }
+
+                // 전체 선택 상태 계산
+                selectAllMedia = playlistMedia.Any() && playlistMedia.All(m => selectedMedia.ContainsKey(m.Id) && selectedMedia[m.Id]);
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                NotifyError("선택된 플레이리스트의 미디어를 불러오는 중 오류가 발생했습니다", ex);
                 playlistMedia = new List<WicsPlatform.Server.Models.wics.Medium>();
                 selectAllMedia = false;
             }
@@ -467,6 +677,53 @@ namespace WicsPlatform.Client.Pages.SubPages
             isMediaPlaying = false;
             currentMediaSessionId = null;
             StateHasChanged();
+        }
+
+        // 미디어 재생 시 현재 위치로 이동
+        private async Task SeekToCurrentMediaPosition()
+        {
+            if (!IsBroadcasting || string.IsNullOrEmpty(BroadcastId) || string.IsNullOrEmpty(currentMediaSessionId))
+            {
+                return;
+            }
+
+            try
+            {
+                // 현재 미디어의 시작 시간을 가져오기 위해 일단 정지
+                await StopMedia();
+
+                // 잠시 대기
+                await Task.Delay(500);
+
+                // 다시 재생 요청
+                await Seek(0);
+                await PlayMediaInternal(shuffle: false);
+            }
+            catch (Exception ex)
+            {
+                NotifyError("미디어 위치 변경 중 오류가 발생했습니다", ex);
+            }
+        }
+
+        private string GetPlaylistItemClass(ulong id)
+        {
+            var isSel = selectedPlaylist?.Id == id;
+            return $"playlist-item {(isSel ? "selected" : string.Empty)}";
+        }
+
+        // 헤더 표시 텍스트
+        private string GetMediaHeaderIndicator()
+        {
+            var sel = GetSelectedPlaylists().ToList();
+            if (sel.Count == 1) return $"({sel[0].Name})";
+            if (sel.Count > 1) return $"(선택된 플레이리스트 {sel.Count}개)";
+            if (selectedPlaylist != null) return $"({selectedPlaylist.Name})";
+            return null;
+        }
+
+        private bool HasAnyPlaylistSelected()
+        {
+            return selectedPlaylist != null || GetSelectedPlaylists().Any();
         }
 
         /* ────────────────────── [Helpers] ────────────────────── */
