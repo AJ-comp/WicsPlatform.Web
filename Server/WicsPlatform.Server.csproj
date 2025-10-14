@@ -14,17 +14,7 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     -->
 	</PropertyGroup>
-
-	<!-- 네이티브 DLL: 빌드/퍼블리시 모두 복사 -->
-	<ItemGroup>
-		<None Include="bass.dll" CopyToOutputDirectory="PreserveNewest">
-			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
-		</None>
-		<None Include="bassmix.dll" CopyToOutputDirectory="PreserveNewest">
-			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
-		</None>
-	</ItemGroup>
-
+	
 	<ItemGroup>
 		<PackageReference Include="Concentus" Version="2.2.2" />
 		<PackageReference Include="ManagedBass" Version="3.1.4" />

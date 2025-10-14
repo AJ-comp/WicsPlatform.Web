@@ -172,6 +172,7 @@ public class AudioMixingService : IAudioMixingService, IDisposable
     public async Task AddMediaStream(ulong broadcastId, string mediaPath)
     {
         if (!_sessions.TryGetValue(broadcastId, out var s) || !s.IsActive) return;
+
         try
         {
             RemoveMediaStreamInternal(s);

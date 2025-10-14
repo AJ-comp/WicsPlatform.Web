@@ -1,0 +1,164 @@
+@page "/__theme-debug"
+@using Radzen
+@using Radzen.Blazor
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Web
+@inject ThemeService ThemeService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="rz-card" style="max-width: 960px; margin: 24px auto; padding: 16px;">
+    <h3>Theme Debug</h3>
+
+    <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+        <RadzenAppearanceToggle />
+        <RadzenButton Size="ButtonSize.Small" Click="RunProbe">Run Probe now</RadzenButton>
+        <span style="opacity:0.6;">토글을 눌러 다크/라이트 전환 → <b>Run Probe now</b>로 상태를 갱신해서 보세요.</span>
+    </div>
+
+    <RadzenAlert Severity="AlertSeverity.Info" Style="margin-bottom:12px;">
+        아래 결과는 화면에도 보이고, 동시에 <b>Debug.WriteLine/Console.WriteLine</b>으로도 출력됩니다.
+        (클라이언트는 브라우저 DevTools Console, 서버는 VS 출력 창에서 확인)
+    </RadzenAlert>
+
+    <RadzenPanel Expanded="true" Style="white-space:pre-wrap;">
+        <HeaderTemplate>최근 Probe 결과</HeaderTemplate>
+        <ChildContent>
+            @_dump
+        </ChildContent>
+    </RadzenPanel>
+</div>
+
+<script>
+    window.themeProbe = {
+        cookies: function () { return document.cookie || ''; },
+        bodyBg: function () {
+            try { return getComputedStyle(document.body).backgroundColor; } catch (e) { return 'ERR:' + e; }
+        },
+        rootVar: function (name) {
+            try { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); } catch (e) { return 'ERR:' + e; }
+        },
+        radzenThemeHref: function () {
+            var hrefs = [];
+            try {
+                var sheets = Array.from(document.styleSheets || []);
+                for (var i = 0; i < sheets.length; i++) {
+                    var s = sheets[i];
+                    if (s && s.href && s.href.indexOf('/_content/Radzen.Blazor/css/') !== -1) {
+                        hrefs.push(s.href);
+                    }
+                }
+                var links = Array.from(document.querySelectorAll('link[rel="stylesheet"]') || []);
+                for (var j = 0; j < links.length; j++) {
+                    var l = links[j];
+                    if (l.href && l.href.indexOf('/_content/Radzen.Blazor/css/') !== -1) { hrefs.push(l.href); }
+                }
+            } catch (e) { hrefs.push('ERR:' + e); }
+            return hrefs.join(' | ');
+        },
+        inlineWhiteBgCount: function () {
+            var nodes = document.querySelectorAll('[style*="background"],[style*="background-color"]');
+            var cnt = 0;
+            nodes.forEach(function (el) {
+                try {
+                    var bg = getComputedStyle(el).backgroundColor;
+                    if (bg === 'rgb(255, 255, 255)') cnt++;
+                } catch (e) { }
+            });
+            return cnt;
+        }
+    };
+</script>
+
+@code {
+    string _dump = "";
+    bool _subscribed;
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            Console.WriteLine($"[THEME] ThemeDebug.OnInitialized: ThemeService.Theme = '{ThemeService?.Theme ?? "(null)"}'");
+            System.Diagnostics.Debug.WriteLine($"[THEME] ThemeDebug.OnInitialized: ThemeService.Theme = '{ThemeService?.Theme ?? "(null)"}'");
+
+            if (ThemeService != null && !_subscribed)
+            {
+                ThemeService.ThemeChanged += OnThemeChanged;
+                _subscribed = true;
+                Console.WriteLine("[THEME] Subscribed to ThemeService.ThemeChanged");
+                System.Diagnostics.Debug.WriteLine("[THEME] Subscribed to ThemeService.ThemeChanged");
+            }
+            else if (ThemeService == null)
+            {
+                Console.WriteLine("[THEME] ThemeService is NULL — AddRadzenComponents() 미등록 가능성");
+                System.Diagnostics.Debug.WriteLine("[THEME] ThemeService is NULL — AddRadzenComponents() 미등록 가능성");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[THEME] OnInitialized error: " + ex);
+            System.Diagnostics.Debug.WriteLine("[THEME] OnInitialized error: " + ex);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ProbeCssAsync("FirstRender");
+        }
+    }
+
+    private async void OnThemeChanged()
+    {
+        await ProbeCssAsync("ThemeChanged");
+        StateHasChanged();
+    }
+
+    private async Task ProbeCssAsync(string source)
+    {
+        try
+        {
+            var theme = ThemeService?.Theme ?? "(null)";
+            var cookies = await JS.InvokeAsync<string>("themeProbe.cookies");
+            var href = await JS.InvokeAsync<string>("themeProbe.radzenThemeHref");
+            var bodyBg = await JS.InvokeAsync<string>("themeProbe.bodyBg");
+            var baseBg = await JS.InvokeAsync<string>("themeProbe.rootVar", "--rz-base-background-color");
+            var bodyBase = await JS.InvokeAsync<string>("themeProbe.rootVar", "--rz-body-background-color");
+            var text = await JS.InvokeAsync<string>("themeProbe.rootVar", "--rz-text-color");
+            var inlineWhite = await JS.InvokeAsync<int>("themeProbe.inlineWhiteBgCount");
+
+            var now = DateTime.Now.ToString("HH:mm:ss.fff");
+            var log =
+$@"[{now}] [{source}]
+  ThemeService.Theme: {theme}
+  Radzen CSS href   : {href}
+  CSS Vars          : --rz-base-background-color={baseBg}, --rz-body-background-color={bodyBase}, --rz-text-color={text}
+  Body background   : {bodyBg}
+  InlineWhiteBgCount: {inlineWhite}
+  document.cookie   : {cookies}";
+
+            _dump = log + "\n\n" + _dump;
+            Console.WriteLine("[THEME-DEBUG]\n" + log);
+            System.Diagnostics.Debug.WriteLine("[THEME-DEBUG]\n" + log);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[PROBE] JS interop failed: " + ex);
+            System.Diagnostics.Debug.WriteLine("[PROBE] JS interop failed: " + ex);
+        }
+    }
+
+    private async Task RunProbe(MouseEventArgs _)
+    {
+        await ProbeCssAsync("Manual");
+    }
+
+    public void Dispose()
+    {
+        if (_subscribed && ThemeService != null)
+        {
+            ThemeService.ThemeChanged -= OnThemeChanged;
+        }
+    }
+}

@@ -1,0 +1,82 @@
+﻿@* Injects/updates Radzen theme CSS link in <head> without touching Server/App.razor *@
+@using Radzen
+@using Microsoft.JSInterop
+@inject ThemeService ThemeService
+@inject IJSRuntime JS
+@implements IDisposable
+
+@code {
+    private bool _subscribed;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var theme = ThemeService?.Theme;
+            await JS.InvokeVoidAsync("rzThemeLink.ensure", theme);
+            if (ThemeService != null && !_subscribed)
+            {
+                ThemeService.ThemeChanged += OnThemeChanged;
+                _subscribed = true;
+            }
+        }
+    }
+
+    private async void OnThemeChanged()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("rzThemeLink.update", ThemeService?.Theme);
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        if (_subscribed && ThemeService != null)
+        {
+            ThemeService.ThemeChanged -= OnThemeChanged;
+        }
+    }
+}
+
+<script>
+    window.rzThemeLink = {
+        _pickTheme: function (t) {
+            if (!t || typeof t !== 'string' || !t.trim()) {
+                // fallback to cookie if ThemeService.Theme is null at startup
+                var m = (document.cookie || '').match(/(?:^|;\s*)WicsPlatformTheme=([^;]+)/);
+                if (m && m[1]) t = decodeURIComponent(m[1]);
+            }
+            if (!t) t = 'material'; // final fallback
+            return t;
+        },
+        _ensureEl: function () {
+            var el = document.getElementById('rz-theme-dyn');
+            if (!el) {
+                el = document.createElement('link');
+                el.id = 'rz-theme-dyn';
+                el.rel = 'stylesheet';
+                // append as the LAST stylesheet in <head> so it overrides earlier static links
+                document.head.appendChild(el);
+            } else if (el.parentNode !== document.head) {
+                document.head.appendChild(el);
+            }
+            return el;
+        },
+        ensure: function (theme) {
+            try {
+                var t = this._pickTheme(theme);
+                var href = '/_content/Radzen.Blazor/css/' + t + '.css';
+                var el = this._ensureEl();
+                if (el.href !== href) el.href = href;
+                return href;
+            } catch (e) {
+                console.error('[rzThemeLink.ensure] failed', e);
+            }
+        },
+        update: function (theme) {
+            return this.ensure(theme);
+        }
+    };
+</script>
