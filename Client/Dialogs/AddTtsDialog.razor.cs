@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -44,7 +44,6 @@ public partial class AddTtsDialog
     {
         // 기본값 설정
         model.VoiceType = "female";
-        model.Speed = 1.0m;
     }
 
     protected async Task FormSubmit()
@@ -166,7 +165,6 @@ public class TtsFormModel
     public string Content { get; set; }
 
     public string VoiceType { get; set; }
-    public decimal Speed { get; set; }
 }
 
 // 음성 옵션 모델

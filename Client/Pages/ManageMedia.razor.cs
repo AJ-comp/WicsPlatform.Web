@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,6 +17,9 @@ namespace WicsPlatform.Client.Pages
 {
     public partial class ManageMedia : IAsyncDisposable
     {
+        [SupplyParameterFromQuery(Name = "tab")]
+        public string TabQuery { get; set; }
+
         [Inject]
         protected IJSRuntime JSRuntime { get; set; }
 
@@ -88,11 +91,28 @@ namespace WicsPlatform.Client.Pages
         // 중복 방지를 위한 처리 중 플래그
         private bool isAddingToPlaylist = false;
 
+        // 탭 상태 (0: 음원, 1: TTS)
+        protected int selectedTabIndex = 0;
+
         protected override async Task OnInitializedAsync()
         {
+            // 쿼리로 TTS 탭 오픈 요청 처리
+            if (!string.IsNullOrEmpty(TabQuery) && string.Equals(TabQuery, "tts", StringComparison.OrdinalIgnoreCase))
+            {
+                selectedTabIndex = 1;
+            }
+
             await LoadPlaylists();
             await LoadMedia();
             await LoadMediaPlaylistMappings();
+        }
+
+        protected override void OnParametersSet()
+        {
+            if (!string.IsNullOrEmpty(TabQuery) && string.Equals(TabQuery, "tts", StringComparison.OrdinalIgnoreCase))
+            {
+                selectedTabIndex = 1;
+            }
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)

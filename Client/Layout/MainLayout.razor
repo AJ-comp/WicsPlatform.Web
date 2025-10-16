@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @inject CookieThemeService CookieThemeService
 <RadzenComponents />
 
@@ -56,25 +56,11 @@
                         <span class="menu-text">홈</span>
                     }
                 </NavLink>
-                <NavLink href="manage-speaker" class="icon-menu-item" data-tooltip="스피커 관리">
-                    <RadzenIcon Icon="speaker" />
-                    @if (sidebarExpanded)
-                    {
-                        <span class="menu-text">스피커 관리</span>
-                    }
-                </NavLink>
-                <NavLink href="manage-media" class="icon-menu-item" data-tooltip="미디어 파일 관리">
+                <NavLink href="manage-media" class="icon-menu-item" data-tooltip="미디어 관리">
                     <RadzenIcon Icon="perm_media" />
                     @if (sidebarExpanded)
                     {
-                        <span class="menu-text">미디어 파일 관리</span>
-                    }
-                </NavLink>
-                <NavLink href="manage-tts" class="icon-menu-item" data-tooltip="TTS 관리">
-                    <RadzenIcon Icon="record_voice_over" />
-                    @if (sidebarExpanded)
-                    {
-                        <span class="menu-text">TTS 관리</span>
+                        <span class="menu-text">미디어 관리</span>
                     }
                 </NavLink>
                 <NavLink href="manage-broad-cast" class="icon-menu-item" data-tooltip="방송 관리">

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -163,27 +163,25 @@ namespace WicsPlatform.Client.Pages
 
         private string GetActivityIcon(string type)
         {
-            return type switch
+            return type?.ToLower() switch
             {
-                "broadcast" => "play_circle",
+                "broadcast" => "settings_input_antenna",
                 "speaker" => "speaker",
                 "media" => "audio_file",
                 "tts" => "record_voice_over",
-                "system" => "settings",
-                _ => "info"
+                _ => "event"
             };
         }
 
-        private string GetActivityColor(string type)
+        private BadgeStyle GetActivityBadgeStyle(string type)
         {
-            return type switch
+            return type?.ToLower() switch
             {
-                "broadcast" => "var(--rz-primary)",
-                "speaker" => "var(--rz-info)",
-                "media" => "var(--rz-warning)",
-                "tts" => "var(--rz-success)",
-                "system" => "var(--rz-secondary)",
-                _ => "var(--rz-text-color)"
+                "broadcast" => BadgeStyle.Primary,
+                "speaker" => BadgeStyle.Secondary,
+                "media" => BadgeStyle.Warning,
+                "tts" => BadgeStyle.Success,
+                _ => BadgeStyle.Light
             };
         }
 

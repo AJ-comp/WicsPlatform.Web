@@ -89,7 +89,7 @@ namespace WicsPlatform.Client.Dialogs
 
                 // OData를 사용하여 스피커 데이터 가져오기
                 var response = await Http.GetFromJsonAsync<WicsPlatform.Server.Models.wics.Speaker>(
-                                    $"/odata/wics/Speakers(Id={SpeakerId})");
+                                    $"/odata/wics/Speakers({SpeakerId})");
 
                 if (response != null)
                 {
@@ -197,7 +197,7 @@ namespace WicsPlatform.Client.Dialogs
                 };
 
                 // API 호출하여 스피커 업데이트 (PATCH 메서드 사용)
-                var response = await Http.PatchAsJsonAsync($"odata/wics/Speakers(Id={SpeakerId})", updateData, options);
+                var response = await Http.PatchAsJsonAsync($"odata/wics/Speakers({SpeakerId})", updateData, options);
 
                 // 응답 확인
                 if (response.IsSuccessStatusCode)

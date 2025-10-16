@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -23,6 +23,7 @@ namespace WicsPlatform.Client.Pages.SubPages
 
         /* ────────────────────── [DI] ────────────────────── */
         [Inject] protected NotificationService NotificationService { get; set; }
+        [Inject] protected DialogService DialogService { get; set; }
         [Inject] protected wicsService WicsService { get; set; }
         [Inject] protected HttpClient Http { get; set; }
 
@@ -44,6 +45,12 @@ namespace WicsPlatform.Client.Pages.SubPages
         private Dictionary<ulong, bool> selectedMedia = new Dictionary<ulong, bool>();
         private bool selectAllMedia = false;
 
+        // UI 관련 필드 추가
+        private HashSet<ulong> expandedPlaylists = new HashSet<ulong>();
+        private WicsPlatform.Server.Models.wics.Group viewingPlaylist = null;
+        private IEnumerable<WicsPlatform.Server.Models.wics.Medium> allMedia = new List<WicsPlatform.Server.Models.wics.Medium>();
+        private IEnumerable<WicsPlatform.Server.Models.wics.MapMediaGroup> mediaGroupMappings = new List<WicsPlatform.Server.Models.wics.MapMediaGroup>();
+
         /* ────────────────────── [State - 미디어 재생 관련 추가] ────────────────────── */
         private bool isMediaPlaying = false;
         private bool isMediaActionInProgress = false;
@@ -60,7 +67,11 @@ namespace WicsPlatform.Client.Pages.SubPages
         /* ────────────────────── [Life-Cycle] ────────────────────── */
         protected override async Task OnInitializedAsync()
         {
-            await LoadPlaylists();
+            await Task.WhenAll(
+                LoadPlaylists(),
+                LoadAllMedia(),
+                LoadMediaGroupMappings()
+            );
             SetupNowPlayingTimer();
         }
 
@@ -721,9 +732,166 @@ namespace WicsPlatform.Client.Pages.SubPages
             return null;
         }
 
-        private bool HasAnyPlaylistSelected()
+        /* ────────────────────── [UI 관련 메서드 추가] ────────────────────── */
+        // 전체 미디어 로드
+        private async Task LoadAllMedia()
         {
-            return selectedPlaylist != null || GetSelectedPlaylists().Any();
+            try
+            {
+                isLoadingMedia = true;
+                var query = new Radzen.Query
+                {
+                    Filter = "(DeleteYn eq 'N' or DeleteYn eq null)",
+                    OrderBy = "CreatedAt desc"
+                };
+
+                var result = await WicsService.GetMedia(query);
+                allMedia = result.Value.AsODataEnumerable();
+
+                foreach (var media in allMedia)
+                {
+                    if (!selectedMedia.ContainsKey(media.Id))
+                    {
+                        selectedMedia[media.Id] = false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                NotifyError("미디어 목록을 불러오는 중 오류가 발생했습니다", ex);
+            }
+            finally
+            {
+                isLoadingMedia = false;
+            }
+        }
+
+        // 미디어-그룹 매핑 로드
+        private async Task LoadMediaGroupMappings()
+        {
+            try
+            {
+                var query = new Radzen.Query
+                {
+                    Expand = "Group,Medium"
+                };
+
+                var result = await WicsService.GetMapMediaGroups(query);
+                mediaGroupMappings = result.Value.AsODataEnumerable();
+            }
+            catch (Exception ex)
+            {
+                NotifyError("미디어 그룹 매핑을 불러오는 중 오류가 발생했습니다", ex);
+            }
+        }
+
+        // 플레이리스트 확장/축소 토글
+        private void TogglePlaylistExpansion(ulong playlistId)
+        {
+            if (expandedPlaylists.Contains(playlistId))
+            {
+                expandedPlaylists.Remove(playlistId);
+            }
+            else
+            {
+                expandedPlaylists.Add(playlistId);
+            }
+            StateHasChanged();
+        }
+
+        // 플레이리스트 상세 보기
+        private void ViewPlaylistDetails(WicsPlatform.Server.Models.wics.Group playlist)
+        {
+            viewingPlaylist = playlist;
+            bool isCurrentlySelected = selectedPlaylists.ContainsKey(playlist.Id) && selectedPlaylists[playlist.Id];
+            OnPlaylistSelectionChanged(playlist.Id, !isCurrentlySelected);
+        }
+
+        // 플레이리스트 선택 변경
+        private void OnPlaylistSelectionChanged(ulong playlistId, bool isSelected)
+        {
+            selectedPlaylists[playlistId] = isSelected;
+
+            if (isSelected)
+            {
+                var mediaInPlaylist = GetMediaInPlaylistSync(playlistId).Select(m => m.Id);
+                foreach (var mediaId in mediaInPlaylist)
+                {
+                    selectedMedia[mediaId] = true;
+                }
+            }
+            else
+            {
+                var mediaInPlaylist = GetMediaInPlaylistSync(playlistId).Select(m => m.Id);
+                foreach (var mediaId in mediaInPlaylist)
+                {
+                    selectedMedia[mediaId] = false;
+                }
+            }
+
+            StateHasChanged();
+        }
+
+        // 개별 미디어 선택 변경
+        private void OnMediaSelectionChanged(ulong mediaId, bool isSelected)
+        {
+            selectedMedia[mediaId] = isSelected;
+            StateHasChanged();
+        }
+
+        // 플레이리스트의 미디어 개수 가져오기 (int)
+        private int GetPlaylistMediaCountInt(ulong playlistId)
+        {
+            if (playlistMediaCounts.ContainsKey(playlistId))
+            {
+                return playlistMediaCounts[playlistId];
+            }
+            return 0;
+        }
+
+        // 플레이리스트 내 미디어 목록 가져오기
+        private IEnumerable<WicsPlatform.Server.Models.wics.Medium> GetMediaInPlaylistSync(ulong playlistId)
+        {
+            var mediaIds = mediaGroupMappings
+                .Where(m => m.GroupId == playlistId)
+                .Select(m => m.MediaId)
+                .Distinct();
+
+            return allMedia.Where(m => mediaIds.Contains(m.Id));
+        }
+
+        // 선택 초기화
+        public void ClearSelection()
+        {
+            foreach (var key in selectedPlaylists.Keys.ToList())
+            {
+                selectedPlaylists[key] = false;
+            }
+            foreach (var key in selectedMedia.Keys.ToList())
+            {
+                selectedMedia[key] = false;
+            }
+            viewingPlaylist = null;
+            StateHasChanged();
+        }
+
+        // 플레이리스트 추가 다이얼로그 열기
+        protected async Task OpenAddPlaylistDialog()
+        {
+            var result = await DialogService.OpenAsync<WicsPlatform.Client.Dialogs.AddPlaylistDialog>("플레이리스트 추가",
+                null,
+                new DialogOptions
+                {
+                    Width = "600px",
+                    Height = "auto",
+                    Resizable = false,
+                    Draggable = true
+                });
+
+            if (result == true)
+            {
+                await LoadPlaylists();
+            }
         }
 
         /* ────────────────────── [Helpers] ────────────────────── */

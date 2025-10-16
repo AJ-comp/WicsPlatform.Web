@@ -193,9 +193,9 @@ public partial class ManageBroadCast : IDisposable, IAsyncDisposable
             null,
             new DialogOptions
             {
-                Width = "500px",
+                Width = "750px",
                 Height = "auto",
-                Resizable = false,
+                Resizable = true,
                 Draggable = true
             });
 

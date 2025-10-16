@@ -6,6 +6,7 @@ using Radzen;
 using System.ComponentModel.DataAnnotations;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Linq;
 
 namespace WicsPlatform.Client.Dialogs
 {
@@ -22,6 +23,9 @@ namespace WicsPlatform.Client.Dialogs
 
         [Inject]
         protected HttpClient Http { get; set; }
+
+        [Inject]
+        protected wicsService WicsService { get; set; }
 
         [Parameter]
         public ulong GroupId { get; set; }
@@ -42,8 +46,14 @@ namespace WicsPlatform.Client.Dialogs
             {
                 isProcessing = true;
 
-                // 그룹 데이터 가져오기
-                var group = await Http.GetFromJsonAsync<GroupData>($"odata/wics/Groups(Id={GroupId})");
+                // wicsService를 사용하여 그룹 데이터 가져오기
+                var query = new Radzen.Query
+                {
+                    Filter = $"Id eq {GroupId}"
+                };
+
+                var result = await WicsService.GetGroups(query);
+                var group = result.Value.AsODataEnumerable().FirstOrDefault();
 
                 if (group != null)
                 {
@@ -92,7 +102,7 @@ namespace WicsPlatform.Client.Dialogs
                 };
 
                 // API 호출하여 그룹 업데이트 (PATCH 메서드 사용)
-                var response = await Http.PatchAsJsonAsync($"odata/wics/Groups(Id={GroupId})", group);
+                var response = await Http.PatchAsJsonAsync($"odata/wics/Groups({GroupId})", group);
 
                 // 응답 확인
                 if (response.IsSuccessStatusCode)
@@ -138,18 +148,6 @@ namespace WicsPlatform.Client.Dialogs
         {
             public string Name { get; set; }
             public string Description { get; set; }
-            public DateTime UpdatedAt { get; set; }
-        }
-
-        // 그룹 데이터 응답 모델
-        public class GroupData
-        {
-            public ulong Id { get; set; }
-            public byte Type { get; set; }
-            public string Name { get; set; }
-            public string Description { get; set; }
-            public string DeleteYn { get; set; }
-            public DateTime CreatedAt { get; set; }
             public DateTime UpdatedAt { get; set; }
         }
 

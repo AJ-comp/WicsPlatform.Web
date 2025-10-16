@@ -1,885 +1,383 @@
 ﻿@attribute [Authorize]
 
-<div class="channel-dialog">
-    <!-- 헤더 섹션 -->
-    <div class="dialog-header-section">
-        <div class="header-icon-wrapper">
-            <div class="icon-background">
-                <RadzenIcon Icon="settings_input_antenna" class="header-icon" />
-            </div>
-        </div>
-        <div class="header-content">
-            <h2 class="header-title">새 채널 만들기</h2>
-            <p class="header-subtitle">방송을 위한 새로운 채널을 생성하고 설정합니다</p>
-        </div>
-    </div>
-
+<RadzenStack Gap="1rem" Style="width: 100%;">
     <!-- 폼 섹션 -->
     <RadzenTemplateForm TItem="ChannelFormModel" Data="@model" Submit="@FormSubmit">
         <!-- 에러 알림 -->
-        <RadzenAlert Shade="Shade.Lighter" Variant="Variant.Flat" Size="AlertSize.Small"
-                     AlertStyle="AlertStyle.Danger" Visible="@errorVisible" class="custom-alert">
-            <div class="alert-content">
-                <RadzenIcon Icon="error_outline" class="alert-icon" />
-                <span class="alert-text">@error</span>
-            </div>
-        </RadzenAlert>
-
-        <!-- 메인 폼 컨테이너 -->
-        <div class="form-container">
-            <!-- 기본 정보 섹션 -->
-            <div class="section-group">
-                <div class="section-header">
-                    <div class="section-title-wrapper">
-                        <RadzenIcon Icon="info" class="section-icon" />
-                        <h3 class="section-title">기본 정보</h3>
-                    </div>
-                    <div class="section-line"></div>
-                </div>
-
-                <!-- 채널명 필드 -->
-                <div class="form-field">
-                    <label class="field-label">
-                        <span class="label-text">채널명</span>
-                        <span class="required-mark">*</span>
-                    </label>
-                    <div class="input-wrapper">
-                        <div class="input-icon-container">
-                            <RadzenIcon Icon="label" class="input-icon" />
-                        </div>
-                        <RadzenTextBox class="custom-input"
-                                       Placeholder="예: 1층 로비 방송"
-                                       @bind-Value="@(model.Name)"
-                                       Name="Name" />
-                        <RadzenRequiredValidator Component="Name"
-                                                 Text="채널명은 필수 입력 항목입니다"
-                                                 class="custom-validator" />
-                    </div>
-                    <span class="field-hint">채널을 쉽게 식별할 수 있는 이름을 입력하세요</span>
-                </div>
-
-                <!-- 설명 필드 -->
-                <div class="form-field">
-                    <label class="field-label">
-                        <span class="label-text">설명</span>
-                        <span class="optional-mark">선택</span>
-                    </label>
-                    <div class="input-wrapper">
-                        <div class="input-icon-container textarea-icon">
-                            <RadzenIcon Icon="description" class="input-icon" />
-                        </div>
-                        <RadzenTextArea Rows="4"
-                                        class="custom-textarea"
-                                        Placeholder="채널의 용도나 특징을 간단히 설명해주세요"
-                                        @bind-Value="@(model.Description)"
-                                        Name="Description" />
-                    </div>
-                    <span class="field-hint">채널의 목적이나 사용 위치 등을 입력할 수 있습니다</span>
-                </div>
-            </div>
-
-            <!-- 채널 설정 섹션 -->
-            <div class="section-group">
-                <div class="section-header">
-                    <div class="section-title-wrapper">
-                        <RadzenIcon Icon="settings" class="section-icon" />
-                        <h3 class="section-title">채널 설정</h3>
-                    </div>
-                    <div class="section-line"></div>
-                </div>
-
-                <div class="settings-grid">
-                    <!-- 채널 타입 필드 -->
-                    <div class="form-field">
-                        <label class="field-label">
-                            <span class="label-text">채널 타입</span>
-                            <span class="required-mark">*</span>
-                        </label>
-                        <div class="input-wrapper">
-                            <div class="input-icon-container">
-                                <RadzenIcon Icon="category" class="input-icon" />
-                            </div>
-                            <RadzenDropDown class="custom-dropdown"
-                                            @bind-Value="@(model.Type)"
-                                            Data="@channelTypes"
-                                            TextProperty="Text"
-                                            ValueProperty="Value"
-                                            Change="@OnChannelTypeChanged"
-                                            Name="Type" />
-                        </div>
-                    </div>
-
-                    <!-- 우선순위 필드 -->
-                    <div class="form-field">
-                        <label class="field-label">
-                            <span class="label-text">우선순위</span>
-                            <span class="required-mark">*</span>
-                        </label>
-                        <div class="input-wrapper">
-                            <div class="input-icon-container">
-                                <RadzenIcon Icon="priority_high" class="input-icon" />
-                            </div>
-                            <RadzenNumeric class="custom-numeric"
-                                           @bind-Value="@(model.Priority)"
-                                           Min="0"
-                                           Max="255"
-                                           ShowUpDown="true"
-                                           Format="0"
-                                           Name="Priority" />
-                            <RadzenRequiredValidator Component="Priority"
-                                                     Text="우선순위는 필수 입력 항목입니다"
-                                                     class="custom-validator" />
-                            <RadzenNumericRangeValidator Component="Priority"
-                                                         Min="0"
-                                                         Max="255"
-                                                         Text="우선순위는 0~255 사이의 값이어야 합니다"
-                                                         class="custom-validator" />
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 우선순위 슬라이더 -->
-                <div class="priority-slider-container">
-                    <div class="slider-labels">
-                        <span class="slider-label high">높음</span>
-                        <span class="slider-label current">우선순위: @model.Priority @GetPriorityLevel(model.Priority)</span>
-                        <span class="slider-label low">낮음</span>
-                    </div>
-                    <RadzenSlider @bind-Value="@model.Priority"
-                                  Min="0"
-                                  Max="255"
-                                  Step="1"
-                                  class="custom-slider" />
-                    <div class="priority-hint">
-                        <RadzenIcon Icon="info" class="hint-icon" />
-                        <span class="hint-text">숫자가 작을수록 높은 우선순위를 가집니다 (0: 최고, 255: 최저)</span>
-                    </div>
-                </div>
-
-                <!-- 우선순위 가이드 -->
-                <div class="priority-guide">
-                    <div class="guide-title">
-                        <RadzenIcon Icon="help_outline" class="guide-icon" />
-                        <span>채널 타입별 권장 우선순위</span>
-                    </div>
-                    <div class="priority-levels">
-                        <div class="priority-level emergency">
-                            <span class="level-badge">0~50</span>
-                            <span class="level-name">긴급 방송</span>
-                            <span class="level-desc">재난, 비상상황</span>
-                        </div>
-                        <div class="priority-level notice">
-                            <span class="level-badge">51~100</span>
-                            <span class="level-name">공지 방송</span>
-                            <span class="level-desc">중요 안내사항</span>
-                        </div>
-                        <div class="priority-level normal">
-                            <span class="level-badge">101~150</span>
-                            <span class="level-name">일반 방송</span>
-                            <span class="level-desc">일상 안내방송</span>
-                        </div>
-                        <div class="priority-level music">
-                            <span class="level-badge">151~255</span>
-                            <span class="level-name">음악 방송</span>
-                            <span class="level-desc">배경음악, BGM</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 오디오 설정 섹션 -->
-            <div class="section-group">
-                <div class="section-header">
-                    <div class="section-title-wrapper">
-                        <RadzenIcon Icon="tune" class="section-icon" />
-                        <h3 class="section-title">오디오 설정</h3>
-                    </div>
-                    <div class="section-line"></div>
-                </div>
-
-                <div class="settings-grid">
-                    <!-- 샘플레이트 필드 -->
-                    <div class="form-field">
-                        <label class="field-label">
-                            <span class="label-text">샘플레이트</span>
-                        </label>
-                        <div class="input-wrapper">
-                            <div class="input-icon-container">
-                                <RadzenIcon Icon="graphic_eq" class="input-icon" />
-                            </div>
-                            <RadzenDropDown class="custom-dropdown"
-                                            @bind-Value="@(model.SamplingRate)"
-                                            Data="@sampleRates"
-                                            TextProperty="Text"
-                                            ValueProperty="Value"
-                                            Name="SamplingRate" />
-                        </div>
-                    </div>
-
-                    <!-- 채널 수 필드 -->
-                    <div class="form-field">
-                        <label class="field-label">
-                            <span class="label-text">오디오 채널</span>
-                        </label>
-                        <div class="input-wrapper">
-                            <div class="input-icon-container">
-                                <RadzenIcon Icon="surround_sound" class="input-icon" />
-                            </div>
-                            <RadzenDropDown class="custom-dropdown"
-                                            @bind-Value="@(model.ChannelCount)"
-                                            Data="@audioChannels"
-                                            TextProperty="Text"
-                                            ValueProperty="Value"
-                                            Name="ChannelCount" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 정보 카드 -->
-            <div class="info-section">
-                <div class="info-card">
-                    <RadzenIcon Icon="lightbulb" class="info-icon" />
-                    <div class="info-content">
-                        <h4 class="info-title">채널 생성 안내</h4>
-                        <ul class="info-list">
-                            <li>생성 후 스피커와 미디어를 연결할 수 있습니다</li>
-                            <li>우선순위가 높은(숫자가 작은) 채널이 방송 충돌 시 우선권을 가집니다</li>
-                            <li>긴급 방송 > 공지 방송 > 일반 방송 > 음악 방송 순으로 우선권이 있습니다</li>
-                            <li>오디오 설정은 방송 품질에 영향을 줍니다</li>
-                            <li>생성된 채널은 언제든지 수정 가능합니다</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 액션 버튼 섹션 -->
-        <div class="dialog-actions">
-            <div class="action-info">
-                <RadzenIcon Icon="info_outline" class="action-info-icon" />
-                <span class="action-info-text">모든 필수 항목을 입력했는지 확인하세요</span>
-            </div>
-            <div class="action-buttons">
-                <RadzenButton ButtonStyle="ButtonStyle.Light"
-                              Text="취소"
-                              Icon="close"
-                              Click="@CancelClick"
-                              Variant="Variant.Flat"
-                              class="btn-cancel"
-                              Disabled="@isProcessing" />
-                @if (isProcessing)
-                {
-                    <RadzenButton ButtonType="ButtonType.Submit"
-                                  Text="생성 중..."
-                                  Icon="sync"
-                                  IconSpin="true"
-                                  Disabled="true"
-                                  Variant="Variant.Flat"
-                                  class="btn-primary processing" />
-                }
-                else
-                {
-                    <RadzenButton ButtonType="ButtonType.Submit"
-                                  Icon="add_circle"
-                                  Text="채널 생성"
-                                  Variant="Variant.Flat"
-                                  class="btn-primary" />
-                }
-            </div>
-        </div>
-    </RadzenTemplateForm>
-</div>
-
-<style>
-    /* 메인 컨테이너 */
-    .channel-dialog {
-        padding: 0;
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    /* 헤더 섹션 */
-    .dialog-header-section {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 1.5rem;
-        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-        border-radius: 12px 12px 0 0;
-        margin: -24px -24px 0 -24px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    .header-icon-wrapper {
-        flex-shrink: 0;
-    }
-
-    .icon-background {
-        width: 3rem;
-        height: 3rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 12px;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    .header-icon {
-        font-size: 1.5rem !important;
-        color: white !important;
-    }
-
-    .header-content {
-        flex: 1;
-    }
-
-    .header-title {
-        margin: 0;
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: white;
-        letter-spacing: -0.02em;
-    }
-
-    .header-subtitle {
-        margin: 0.25rem 0 0 0;
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.9);
-        font-weight: 400;
-    }
-
-    /* 커스텀 알림 */
-    .custom-alert {
-        margin: 1.5rem 0 1rem 0;
-        border-radius: 8px;
-        border: 1px solid rgba(239, 68, 68, 0.2);
-        background: rgba(254, 226, 226, 0.5);
-        backdrop-filter: blur(5px);
-    }
-
-    .alert-content {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .alert-icon {
-        font-size: 1rem !important;
-        color: #dc2626;
-    }
-
-    .alert-text {
-        font-size: 0.75rem;
-        color: #991b1b;
-        font-weight: 500;
-    }
-
-    /* 폼 컨테이너 */
-    .form-container {
-        padding: 1.5rem 0;
-    }
-
-    /* 섹션 그룹 */
-    .section-group {
-        margin-bottom: 2rem;
-        padding: 1.25rem;
-        background: linear-gradient(to bottom, #fafbfc, #ffffff);
-        border-radius: 10px;
-        border: 1px solid #e5e7eb;
-        transition: all 0.3s ease;
-    }
-
-        .section-group:hover {
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        @if (errorVisible)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger"
+                         Variant="Variant.Flat"
+                         Size="AlertSize.Small"
+                         class="error-alert">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="error_outline" />
+                    <RadzenText TextStyle="TextStyle.Caption">@error</RadzenText>
+                </RadzenStack>
+            </RadzenAlert>
         }
 
-    .section-header {
-        margin-bottom: 1.25rem;
+        <!-- 기본 정보 섹션 -->
+        <RadzenCard class="section-card">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="section-header">
+                    <RadzenIcon Icon="info" class="section-icon primary" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="section-title">기본 정보</RadzenText>
+                </RadzenStack>
+
+                <!-- 채널명 필드 -->
+                <RadzenRow Gap="0.5rem">
+                    <RadzenColumn Size="12" SizeMD="12">
+                        <RadzenFormField Text="채널명" Variant="Variant.Outlined" class="form-field">
+                            <ChildContent>
+                                <RadzenTextBox @bind-Value="@model.Name"
+                                               Placeholder="예: 1층 로비 방송"
+                                               Name="Name"
+                                               class="input-field" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint">
+                                    <RadzenIcon Icon="label" class="hint-icon" />
+                                    채널을 쉽게 식별할 수 있는 이름을 입력하세요
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                        <RadzenRequiredValidator Component="Name"
+                                                 Text="채널명은 필수 입력 항목입니다" />
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <!-- 설명 필드 -->
+                <RadzenRow Gap="0.5rem">
+                    <RadzenColumn Size="12" SizeMD="12">
+                        <RadzenFormField Text="설명 (선택)" Variant="Variant.Outlined" class="form-field">
+                            <ChildContent>
+                                <RadzenTextArea @bind-Value="@model.Description"
+                                                Rows="2"
+                                                Placeholder="채널의 용도나 특징을 간단히 설명해주세요"
+                                                Name="Description"
+                                                class="input-field" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint">
+                                    <RadzenIcon Icon="description" class="hint-icon" />
+                                    채널의 목적이나 사용 위치 등을 입력할 수 있습니다
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- 채널 설정 및 오디오 설정 섹션 -->
+        <RadzenCard class="section-card">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="section-header">
+                    <RadzenIcon Icon="settings" class="section-icon primary" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="section-title">채널 설정 및 오디오 설정</RadzenText>
+                </RadzenStack>
+
+                <!-- 4개 필드를 한 줄에 배치 -->
+                <RadzenRow Gap="0.5rem">
+                    <!-- 채널 타입 -->
+                    <RadzenColumn Size="4" SizeMD="3">
+                        <RadzenFormField Text="채널 타입" Variant="Variant.Outlined" class="form-field compact-field">
+                            <ChildContent>
+                                <RadzenDropDown @bind-Value="@model.Type"
+                                                Data="@channelTypes"
+                                                TextProperty="Text"
+                                                ValueProperty="Value"
+                                                Change="@OnChannelTypeChanged"
+                                                Name="Type"
+                                                class="input-field compact-input small-combo" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint compact-hint">
+                                    <RadzenIcon Icon="category" class="hint-icon" />
+                                    방송 유형
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+
+                    <!-- 우선순위 -->
+                    <RadzenColumn Size="3" SizeMD="2">
+                        <RadzenFormField Text="우선순위" Variant="Variant.Outlined" class="form-field compact-field">
+                            <ChildContent>
+                                <RadzenNumeric @bind-Value="@model.Priority"
+                                               Min="0"
+                                               Max="255"
+                                               ShowUpDown="true"
+                                               Name="Priority"
+                                               class="input-field compact-input small-combo priority-input" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint compact-hint">
+                                    <RadzenIcon Icon="priority_high" class="hint-icon" />
+                                    0~255
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                        <RadzenRequiredValidator Component="Priority"
+                                                 Text="우선순위는 필수 입력 항목입니다" />
+                        <RadzenNumericRangeValidator Component="Priority"
+                                                     Min="0"
+                                                     Max="255"
+                                                     Text="우선순위는 0~255 사이의 값이어야 합니다" />
+                    </RadzenColumn>
+
+                    <!-- 샘플레이트 -->
+                    <RadzenColumn Size="4" SizeMD="4">
+                        <RadzenFormField Text="샘플레이트" Variant="Variant.Outlined" class="form-field compact-field">
+                            <ChildContent>
+                                <RadzenDropDown @bind-Value="@model.SamplingRate"
+                                                Data="@sampleRates"
+                                                TextProperty="Text"
+                                                ValueProperty="Value"
+                                                Name="SamplingRate"
+                                                class="input-field compact-input small-combo" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint compact-hint">
+                                    <RadzenIcon Icon="graphic_eq" class="hint-icon" />
+                                    오디오 품질
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+
+                    <!-- 오디오 채널 -->
+                    <RadzenColumn Size="5" SizeMD="3">
+                        <RadzenFormField Text="오디오 채널" Variant="Variant.Outlined" class="form-field compact-field">
+                            <ChildContent>
+                                <RadzenDropDown @bind-Value="@model.ChannelCount"
+                                                Data="@audioChannels"
+                                                TextProperty="Text"
+                                                ValueProperty="Value"
+                                                Name="ChannelCount"
+                                                class="input-field compact-input small-combo" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint compact-hint">
+                                    <RadzenIcon Icon="surround_sound" class="hint-icon" />
+                                    모노/스테레오
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- 정보 카드 -->
+        <RadzenCard class="info-card">
+            <RadzenStack Gap="0.75rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="lightbulb" class="info-icon" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="info-title">채널 생성 안내</RadzenText>
+                </RadzenStack>
+                <RadzenStack Gap="0.5rem" class="info-list">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">생성 후 스피커와 미디어를 연결할 수 있습니다</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">우선순위가 높은(숫자가 작은) 채널이 방송 충돌 시 우선권을 가집니다</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">긴급 방송 > 공지 방송 > 일반 방송 > 음악 방송 순으로 우선권이 있습니다</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">오디오 설정은 방송 품질에 영향을 줍니다</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">생성된 채널은 언제든지 수정 가능합니다</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- 액션 버튼 섹션 -->
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" AlignItems="AlignItems.Center" Gap="0.75rem" class="dialog-actions">
+            <RadzenButton ButtonStyle="ButtonStyle.Light"
+                          Text="취소"
+                          Icon="close"
+                          Click="@CancelClick"
+                          Size="ButtonSize.Medium"
+                          Disabled="@isProcessing" />
+            @if (isProcessing)
+            {
+                <RadzenButton ButtonType="ButtonType.Submit"
+                              Text="생성 중..."
+                              Icon="sync"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Medium"
+                              IsBusy="true"
+                              Disabled="true" />
+            }
+            else
+            {
+                <RadzenButton ButtonType="ButtonType.Submit"
+                              Icon="add_circle"
+                              Text="채널 생성"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Medium" />
+            }
+        </RadzenStack>
+    </RadzenTemplateForm>
+</RadzenStack>
+
+<style>
+    /* 에러 알림 */
+    .error-alert {
+        padding: 0.75rem !important;
+        border-radius: var(--rz-border-radius) !important;
     }
 
-    .section-title-wrapper {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
+    /* 섹션 카드 */
+    .section-card {
+        padding: 1.25rem !important;
+        background: rgba(var(--rz-primary-rgb), 0.03) !important;
+        border: 1px solid var(--rz-border-color) !important;
+        border-radius: var(--rz-border-radius) !important;
+        transition: all 0.2s ease;
+    }
+
+        .section-card:hover {
+            background: rgba(var(--rz-primary-rgb), 0.05) !important;
+            box-shadow: var(--rz-shadow-2) !important;
+        }
+
+    /* 섹션 헤더 */
+    .section-header {
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid rgba(var(--rz-primary-rgb), 0.2);
     }
 
     .section-icon {
-        font-size: 0.9rem !important;
-        color: #3b82f6;
+        font-size: 1.125rem !important;
     }
+
+        .section-icon.primary {
+            color: var(--rz-primary) !important;
+        }
 
     .section-title {
-        margin: 0;
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #1e293b;
-        letter-spacing: -0.01em;
+        margin: 0 !important;
+        font-weight: 600 !important;
+        color: var(--rz-text-color) !important;
     }
 
-    .section-line {
-        height: 2px;
-        background: linear-gradient(90deg, #3b82f6 0%, transparent 100%);
-        border-radius: 1px;
+    /* 서브섹션 헤더 */
+    .subsection-header {
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(var(--rz-primary-rgb), 0.15);
+    }
+
+    .subsection-icon {
+        font-size: 1rem !important;
+        color: var(--rz-primary) !important;
+    }
+
+    .subsection-title-large {
+        margin: 0 !important;
+        font-weight: 600 !important;
+        color: var(--rz-text-color) !important;
+        font-size: 1rem !important;
     }
 
     /* 폼 필드 */
     .form-field {
-        margin-bottom: 1.25rem;
+        width: 100%;
     }
 
-        .form-field:last-child {
-            margin-bottom: 0;
-        }
-
-    .field-label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
-
-    .label-text {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #374151;
-        letter-spacing: 0.025em;
-    }
-
-    .required-mark {
-        color: #ef4444;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-
-    .optional-mark {
-        color: #9ca3af;
-        font-size: 0.65rem;
-        font-weight: 400;
-        background: #f3f4f6;
-        padding: 0.125rem 0.375rem;
-        border-radius: 4px;
-    }
-
-    /* 입력 필드 래퍼 */
-    .input-wrapper {
-        position: relative;
-    }
-
-    .input-icon-container {
-        position: absolute;
-        left: 0.875rem;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.25rem;
-        height: 1.25rem;
-    }
-
-        .input-icon-container.textarea-icon {
-            top: 1rem;
-            transform: none;
-        }
-
-    .input-icon {
-        font-size: 1rem !important;
-        color: #9ca3af;
-        transition: color 0.2s;
-    }
-
-    /* 커스텀 입력 필드 */
-    .custom-input,
-    .custom-textarea,
-    .custom-dropdown,
-    .custom-numeric {
+    .input-field {
         width: 100% !important;
-        padding-left: 2.75rem !important;
-        font-size: 0.8rem !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        background: var(--rz-base-background-color)!important;
-        transition: all 0.2s !important;
+        font-size: 0.875rem !important;
     }
 
-    .custom-input,
-    .custom-dropdown,
-    .custom-numeric {
-        height: 2.5rem !important;
+    /* Compact 필드 스타일 */
+    .compact-field {
+        margin-bottom: 0 !important;
     }
 
-    .custom-textarea {
-        min-height: 5rem !important;
-        padding-top: 0.75rem !important;
-        resize: vertical !important;
+    .compact-input {
+        width: 100% !important;
     }
 
-        .custom-input:hover,
-        .custom-textarea:hover,
-        .custom-dropdown:hover,
-        .custom-numeric:hover {
-            border-color: #9ca3af !important;
-        }
+    /* 작은 콤보박스 */
+    .small-combo {
+        width: 100% !important;
+        display: block !important;
+    }
 
-        .custom-input:focus,
-        .custom-textarea:focus,
-        .custom-dropdown:focus,
-        .custom-numeric:focus {
-            border-color: #3b82f6 !important;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
-            outline: none !important;
-        }
+    /* 우선순위 입력 필드 */
+    .priority-input {
+        width: 100% !important;
+        display: block !important;
+    }
 
-            .custom-input:focus ~ .input-icon-container .input-icon,
-            .custom-textarea:focus ~ .input-icon-container .input-icon,
-            .custom-dropdown:focus ~ .input-icon-container .input-icon,
-            .custom-numeric:focus ~ .input-icon-container .input-icon {
-                color: #3b82f6;
-            }
-
-    /* 필드 힌트 */
     .field-hint {
-        display: block;
-        margin-top: 0.375rem;
-        font-size: 0.7rem;
-        color: #6b7280;
-        padding-left: 2.75rem;
-    }
-
-    /* 커스텀 유효성 검사 */
-    .custom-validator {
-        font-size: 0.7rem !important;
-        color: #ef4444 !important;
-        margin-top: 0.25rem !important;
-        padding-left: 2.75rem !important;
-    }
-
-    /* 설정 그리드 */
-    .settings-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-    }
-
-    /* 우선순위 슬라이더 */
-    .priority-slider-container {
-        margin-top: 1rem;
-        padding: 0 0.5rem;
-    }
-
-    .slider-labels {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 0.5rem;
-    }
-
-    .slider-label {
-        font-size: 0.65rem;
-        color: #9ca3af;
-    }
-
-        .slider-label.high {
-            color: #ef4444;
-            font-weight: 600;
-        }
-
-        .slider-label.low {
-            color: #6b7280;
-            font-weight: 600;
-        }
-
-        .slider-label.current {
-            color: #3b82f6;
-            font-weight: 600;
-        }
-
-    .custom-slider {
-        width: 100% !important;
-    }
-
-        .custom-slider .rz-slider-horizontal .rz-slider-track {
-            height: 6px !important;
-            background: linear-gradient(90deg, #ef4444 0%, #fbbf24 50%, #3b82f6 100%) !important;
-            border-radius: 3px !important;
-        }
-
-        .custom-slider .rz-slider-horizontal .rz-slider-range {
-            background: transparent !important;
-        }
-
-        .custom-slider .rz-slider-handle {
-            width: 16px !important;
-            height: 16px !important;
-            background: var(--rz-base-background-color)!important;
-            border: 2px solid #3b82f6 !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-        }
-
-    .priority-hint {
         display: flex;
         align-items: center;
-        gap: 0.25rem;
-        margin-top: 0.5rem;
-        padding: 0.5rem;
-        background: #eff6ff;
-        border-radius: 6px;
-        border: 1px solid #bfdbfe;
+        gap: 0.375rem;
+        margin-top: 0.25rem;
+        color: var(--rz-text-secondary-color) !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* Compact 힌트 */
+    .compact-hint {
+        font-size: 0.7rem !important;
     }
 
     .hint-icon {
         font-size: 0.75rem !important;
-        color: #3b82f6;
+        color: var(--rz-text-tertiary-color) !important;
     }
 
-    .hint-text {
-        font-size: 0.65rem;
-        color: #1e40af;
-    }
-
-    /* 우선순위 가이드 */
-    .priority-guide {
-        margin-top: 1.25rem;
-        padding: 0.75rem;
-        background: #f9fafb;
-        border-radius: 8px;
-        border: 1px solid #e5e7eb;
-    }
-
-    .guide-title {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-        margin-bottom: 0.625rem;
-        font-size: 0.7rem;
-        font-weight: 600;
-        color: #374151;
-    }
-
-    .guide-icon {
-        font-size: 0.875rem !important;
-        color: #6b7280;
-    }
-
-    .priority-levels {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 0.5rem;
-    }
-
-    .priority-level {
-        display: flex;
-        flex-direction: column;
-        padding: 0.5rem;
-        border-radius: 6px;
-        border: 1px solid;
-        transition: all 0.2s;
-    }
-
-        .priority-level:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-
-    .level-badge {
-        font-size: 0.65rem;
-        font-weight: 700;
-        margin-bottom: 0.25rem;
-    }
-
-    .level-name {
-        font-size: 0.7rem;
-        font-weight: 600;
-        margin-bottom: 0.125rem;
-    }
-
-    .level-desc {
-        font-size: 0.6rem;
-        opacity: 0.8;
-    }
-
-    .priority-level.emergency {
-        background: #fee2e2;
-        border-color: #fca5a5;
-        color: #991b1b;
-    }
-
-    .priority-level.notice {
-        background: #fef3c7;
-        border-color: #fcd34d;
-        color: #92400e;
-    }
-
-    .priority-level.normal {
-        background: #dbeafe;
-        border-color: #93c5fd;
-        color: #1e3a8a;
-    }
-
-    .priority-level.music {
-        background: #e0e7ff;
-        border-color: #a5b4fc;
-        color: #3730a3;
-    }
-
-    /* 정보 섹션 */
-    .info-section {
-        margin-top: 1.5rem;
-    }
-
+    /* 정보 카드 */
     .info-card {
-        display: flex;
-        gap: 0.875rem;
-        padding: 1rem;
-        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-        border-radius: 10px;
-        border: 1px solid #bfdbfe;
+        padding: 1.25rem !important;
+        background: rgba(var(--rz-info-rgb), 0.05) !important;
+        border: 1px solid rgba(var(--rz-info-rgb), 0.2) !important;
+        border-radius: var(--rz-border-radius) !important;
     }
 
     .info-icon {
-        font-size: 1rem !important;
-        color: #3b82f6;
-        flex-shrink: 0;
-        margin-top: 0.125rem;
-    }
-
-    .info-content {
-        flex: 1;
+        font-size: 1.25rem !important;
+        color: var(--rz-info) !important;
     }
 
     .info-title {
-        margin: 0 0 0.5rem 0;
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #1e40af;
+        margin: 0 !important;
+        font-weight: 600 !important;
+        color: var(--rz-text-color) !important;
     }
 
     .info-list {
-        margin: 0;
-        padding-left: 1.25rem;
-        list-style: none;
+        margin: 0 !important;
     }
 
-        .info-list li {
-            position: relative;
-            font-size: 0.7rem;
-            color: #3730a3;
-            line-height: 1.5;
-            margin-bottom: 0.375rem;
-            padding-left: 1rem;
-        }
-
-            .info-list li:last-child {
-                margin-bottom: 0;
-            }
-
-            .info-list li::before {
-                content: "✓";
-                position: absolute;
-                left: 0;
-                color: #3b82f6;
-                font-weight: bold;
-                font-size: 0.75rem;
-            }
+    .check-icon {
+        font-size: 0.875rem !important;
+        color: var(--rz-success) !important;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
 
     /* 액션 버튼 섹션 */
     .dialog-actions {
-        padding: 1.25rem 0 0 0;
-        margin-top: 1.5rem;
-        border-top: 1px solid #e5e7eb;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        padding-top: 1rem;
+        border-top: 1px solid var(--rz-border-color);
+        margin-right: 0.5rem;
     }
-
-    .action-info {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-    }
-
-    .action-info-icon {
-        font-size: 0.875rem !important;
-        color: #3b82f6;
-    }
-
-    .action-info-text {
-        font-size: 0.7rem;
-        color: #6b7280;
-    }
-
-    .action-buttons {
-        display: flex;
-        gap: 0.75rem;
-    }
-
-    /* 버튼 스타일 */
-    .btn-cancel,
-    .btn-primary {
-        font-size: 0.75rem !important;
-        font-weight: 500 !important;
-        padding: 0.5rem 1.25rem !important;
-        border-radius: 8px !important;
-        transition: all 0.2s !important;
-        letter-spacing: 0.025em !important;
-    }
-
-    .btn-cancel {
-        background: var(--rz-base-background-color)!important;
-        color: #6b7280 !important;
-        border: 1px solid #e5e7eb !important;
-    }
-
-        .btn-cancel:hover:not(:disabled) {
-            background: #f9fafb !important;
-            border-color: #d1d5db !important;
-            color: #374151 !important;
-        }
-
-    .btn-primary {
-        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%) !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2) !important;
-    }
-
-        .btn-primary:hover:not(:disabled) {
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3) !important;
-            transform: translateY(-1px);
-        }
-
-        .btn-primary.processing {
-            background: #9ca3af !important;
-            cursor: not-allowed !important;
-        }
-
-    /* 드롭다운 커스터마이징 */
-    .custom-dropdown .rz-dropdown-item {
-        font-size: 0.75rem !important;
-        padding: 0.375rem 0.5rem !important;
-    }
-
-    /* 스크롤바 스타일 */
-    .custom-textarea::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .custom-textarea::-webkit-scrollbar-track {
-        background: #f3f4f6;
-        border-radius: 3px;
-    }
-
-    .custom-textarea::-webkit-scrollbar-thumb {
-        background: #d1d5db;
-        border-radius: 3px;
-    }
-
-        .custom-textarea::-webkit-scrollbar-thumb:hover {
-            background: #9ca3af;
-        }
 
     /* 애니메이션 */
     @@keyframes fadeIn {
@@ -894,46 +392,7 @@
         }
     }
 
-    @@keyframes slideIn {
-        from {
-            opacity: 0;
-            transform: translateX(-10px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-
-    @@keyframes pulse {
-        0%, 100% {
-            opacity: 1;
-        }
-
-        50% {
-            opacity: 0.5;
-        }
-    }
-
-    .channel-dialog {
+    .section-card {
         animation: fadeIn 0.3s ease-out;
-    }
-
-    .section-group {
-        animation: slideIn 0.4s ease-out;
-        animation-fill-mode: both;
-    }
-
-        .section-group:nth-child(2) {
-            animation-delay: 0.1s;
-        }
-
-        .section-group:nth-child(3) {
-            animation-delay: 0.2s;
-        }
-
-    .btn-primary.processing {
-        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 </style>

@@ -1,30 +1,33 @@
 ﻿@using WicsPlatform.Server.Models.wics
 
-<RadzenCard class="mt-2 professional-panel">
-    <!-- 패널 헤더 -->
-    <div @onclick="TogglePanel" class="panel-header">
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
-                <RadzenIcon Icon="monitoring" class="panel-icon success" />
-                <RadzenText TextStyle="TextStyle.Body1" class="panel-title">
-                    @(Channel?.Name ?? "채널") - 방송 모니터링
-                </RadzenText>
-                <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="방송 중" class="status-badge" />
-            </RadzenStack>
-            <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")" class="expand-icon" />
+<RadzenCard class="mt-3 collapsible-panel-container">
+<!-- 패널 헤더 -->
+<div @onclick="TogglePanel"
+     style="background-color: var(--rz-sidebar-background-color); padding: 0.75rem 1rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+            <RadzenIcon Icon="monitoring" Style="font-size: 1.25rem; color: var(--rz-success);" />
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="mb-0" Style="font-size: 0.95rem;">
+                @(Channel?.Name ?? "채널") - 방송 모니터링
+            </RadzenText>
+            <RadzenBadge BadgeStyle="BadgeStyle.Success" IsPill="true" Text="방송 중" Style="font-size: 0.65rem; padding: 2px 8px;" />
         </RadzenStack>
-    </div>
+        <RadzenIcon Icon="@(IsCollapsed ? "expand_more" : "expand_less")"
+                    Style="font-size: 1.25rem; transition: transform 0.3s ease;"
+                    class="@(IsCollapsed ? "rotate-icon" : "")" />
+    </RadzenStack>
+</div>
 
-    <!-- 패널 내용 -->
-    @if (!IsCollapsed)
-    {
-        <div class="panel-content">
+<!-- 패널 내용 -->
+@if (!IsCollapsed)
+{
+    <div class="panel-content" Style="padding: 1rem;">
             <RadzenStack Gap="0.75rem">
                 <!-- 방송 상태 정보 -->
                 <RadzenRow Gap="0.5rem">
                     <!-- 활성 소스 표시 -->
                     <RadzenColumn Size="12" SizeMD="4">
-                        <RadzenCard class="info-card">
+                        <RadzenCard class="info-card" Style="padding: 0.75rem; height: 100%;">
                             <RadzenStack Gap="0.25rem">
                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
                                     <RadzenIcon Icon="source" class="info-icon" />
@@ -52,7 +55,7 @@
                     @if (IsMicEnabled)
                     {
                         <RadzenColumn Size="12" SizeMD="4">
-                            <RadzenCard class="info-card">
+                            <RadzenCard class="info-card" Style="padding: 0.75rem; height: 100%;">
                                 <RadzenStack Gap="0.25rem">
                                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
                                         <RadzenIcon Icon="volume_up" class="info-icon" />
@@ -69,7 +72,7 @@
 
                     <!-- 방송 시간 -->
                     <RadzenColumn Size="12" SizeMD="4">
-                        <RadzenCard class="info-card">
+                        <RadzenCard class="info-card" Style="padding: 0.75rem; height: 100%;">
                             <RadzenStack Gap="0.25rem">
                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
                                     <RadzenIcon Icon="timer" class="info-icon" />
@@ -87,11 +90,11 @@
                 </RadzenRow>
 
                 <!-- 데이터 통계 -->
-                <RadzenCard class="stats-card">
+                <RadzenCard Style="padding: 0.75rem;">
                     <RadzenStack Gap="0.5rem">
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                            <RadzenIcon Icon="analytics" class="section-icon" />
-                            <RadzenText TextStyle="TextStyle.Body2" class="section-title">방송 데이터 통계</RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="analytics" Style="font-size: 0.875rem; color: var(--rz-primary);" />
+                            <RadzenText TextStyle="TextStyle.Subtitle2"><strong>방송 데이터 통계</strong></RadzenText>
                         </RadzenStack>
                         <RadzenRow Gap="0.5rem">
                             <RadzenColumn Size="6" SizeMD="3">
@@ -143,11 +146,11 @@
                 </RadzenRow>
 
                 <!-- 실시간 로그 -->
-                <RadzenCard class="log-card">
+                <RadzenCard Style="padding: 0.75rem;">
                     <RadzenStack Gap="0.5rem">
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                            <RadzenIcon Icon="receipt_long" class="section-icon" />
-                            <RadzenText TextStyle="TextStyle.Body2" class="section-title">실시간 로그</RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="receipt_long" Style="font-size: 0.875rem; color: var(--rz-primary);" />
+                            <RadzenText TextStyle="TextStyle.Subtitle2"><strong>실시간 로그</strong></RadzenText>
                         </RadzenStack>
                         <div class="log-container">
                             @foreach (var log in broadcastLogs.TakeLast(50).Reverse())
@@ -165,13 +168,13 @@
                 <!-- 마이크 디버깅 패널 (옵션) -->
                 @if (IsMicEnabled && showDebugPanel)
                 {
-                    <RadzenCard class="debug-card">
+                    <RadzenCard Style="padding: 0.75rem; background-color: rgba(var(--rz-warning-rgb), 0.1); border: 1px solid var(--rz-warning);">
                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                                <RadzenIcon Icon="bug_report" class="section-icon warning" />
-                                <RadzenText TextStyle="TextStyle.Body2" class="section-title">마이크 데이터 디버깅</RadzenText>
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="bug_report" Style="font-size: 0.875rem; color: var(--rz-warning);" />
+                                <RadzenText TextStyle="TextStyle.Subtitle2"><strong>마이크 데이터 디버깅</strong></RadzenText>
                             </RadzenStack>
-                            <RadzenSwitch @bind-Value="@showDebugPanel" class="compact-switch" />
+                            <RadzenSwitch @bind-Value="@showDebugPanel" />
                         </RadzenStack>
                     </RadzenCard>
                 }
@@ -181,95 +184,55 @@
 </RadzenCard>
 
 <style>
-    /* 전문적인 패널 디자인 */
-    .professional-panel {
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-        border: 1px solid #dde2e6 !important;
-        border-radius: 6px !important;
-        background: var(--rz-base-background-color)!important;
+    .collapsible-panel-container {
         overflow: hidden;
-    }
-
-    .panel-header {
-        background: #fafbfc;
-        padding: 0.625rem 0.875rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        border-bottom: 1px solid #e1e4e8;
-        user-select: none;
-    }
-
-        .panel-header:hover {
-            background: #f5f6f8;
-        }
-
-    .panel-icon {
-        font-size: 1rem !important;
-    }
-
-        .panel-icon.success {
-            color: #27ae60 !important;
-        }
-
-    .panel-title {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        color: #2c3e50 !important;
-        margin: 0 !important;
-    }
-
-    .status-badge {
-        font-size: 0.65rem !important;
-        padding: 2px 6px !important;
-    }
-
-    .expand-icon {
-        font-size: 1rem !important;
-        color: #6c757d !important;
-        transition: transform 0.2s ease;
+        transition: all 0.3s ease;
     }
 
     .panel-content {
-        padding: 0.875rem;
-        animation: slideDown 0.2s ease-out;
+        animation: slideDown 0.3s ease-out;
+        background-color: var(--rz-base-background-color);
+        border-radius: 0 0 var(--rz-border-radius) var(--rz-border-radius);
+        border: 1px solid var(--rz-border-color);
+        border-top: none;
+    }
+
+    .rotate-icon {
+        transform: rotate(-90deg);
     }
 
     /* 정보 카드 */
     .info-card {
-        padding: 0.625rem !important;
-        background: #fafbfc !important;
-        border: 1px solid #e1e4e8 !important;
-        height: 100%;
+        background: rgba(var(--rz-primary-rgb), 0.05) !important;
+        border: 1px solid var(--rz-border-color) !important;
     }
 
     .info-icon {
         font-size: 0.875rem !important;
-        color: #3498db !important;
+        color: var(--rz-primary) !important;
     }
 
     .info-title {
         font-size: 0.7rem !important;
         font-weight: 500 !important;
-        color: #6c757d !important;
+        color: var(--rz-text-secondary-color) !important;
         margin: 0 !important;
     }
 
     .info-main-value {
-        font-size: 1rem !important;
+        font-size: 1.1rem !important;
         font-weight: 600 !important;
-        color: #2c3e50 !important;
         margin: 0 !important;
     }
 
     .info-value {
         font-size: 0.75rem !important;
-        color: #34495e !important;
         margin: 0 !important;
     }
 
     .info-sub-value {
         font-size: 0.65rem !important;
-        color: #6c757d !important;
+        color: var(--rz-text-secondary-color) !important;
         margin: 0 !important;
     }
 
@@ -282,190 +245,123 @@
         height: 14px !important;
     }
 
-    /* 통계 카드 */
-    .stats-card {
-        padding: 0.75rem !important;
-        background: var(--rz-base-background-color)!important;
-        border: 1px solid #e1e4e8 !important;
-    }
-
-    .section-icon {
-        font-size: 0.875rem !important;
-        color: #3498db !important;
-    }
-
-        .section-icon.warning {
-            color: #f39c12 !important;
-        }
-
-    .section-title {
-        font-size: 0.8rem !important;
-        font-weight: 600 !important;
-        color: #2c3e50 !important;
-        margin: 0 !important;
-    }
-
+    /* 통계 아이템 */
     .stat-item {
         text-align: center;
-        padding: 0.5rem;
-        background: #fafbfc;
-        border-radius: 4px;
-        border: 1px solid #e1e4e8;
+        padding: 0.625rem;
+        background: rgba(var(--rz-primary-rgb), 0.05);
+        border-radius: var(--rz-border-radius);
+        border: 1px solid var(--rz-border-color);
+        transition: all 0.2s ease;
     }
 
+        .stat-item:hover {
+            background: rgba(var(--rz-primary-rgb), 0.1);
+            transform: translateY(-2px);
+            box-shadow: var(--rz-shadow-2);
+        }
+
     .stat-value {
-        font-size: 0.875rem !important;
+        font-size: 0.95rem !important;
         font-weight: 600 !important;
-        color: #2c3e50 !important;
         margin: 0 !important;
     }
 
     .stat-label {
         font-size: 0.65rem !important;
-        color: #6c757d !important;
+        color: var(--rz-text-secondary-color) !important;
         margin: 0 !important;
     }
 
     /* 제어 버튼 */
     .control-button {
         width: 100% !important;
-        height: 30px !important;
+        height: 32px !important;
         font-size: 0.75rem !important;
-        padding: 0 0.5rem !important;
     }
 
     /* 로그 컨테이너 */
-    .log-card {
-        padding: 0.75rem !important;
-        background: var(--rz-base-background-color)!important;
-        border: 1px solid #e1e4e8 !important;
-    }
-
     .log-container {
-        height: 150px;
+        height: 180px;
         overflow-y: auto;
-        background: #0d1117;
-        border-radius: 4px;
-        padding: 0.5rem;
-        font-family: 'Consolas', 'Monaco', monospace;
+        background: var(--rz-base-900, #0d1117);
+        border-radius: var(--rz-border-radius);
+        padding: 0.625rem;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         font-size: 0.7rem;
-        line-height: 1.4;
+        line-height: 1.5;
+        border: 1px solid var(--rz-border-color);
     }
 
     .log-entry {
-        margin-bottom: 0.15rem;
+        margin-bottom: 0.25rem;
         white-space: pre-wrap;
         word-break: break-all;
     }
 
     .log-time {
-        color: #8b949e;
+        color: var(--rz-text-disabled-color, #8b949e);
+        font-weight: 500;
     }
 
     .log-level {
-        font-weight: 600;
-        margin: 0 0.25rem;
+        font-weight: 700;
+        margin: 0 0.375rem;
     }
 
     .log-message {
-        color: #c9d1d9;
+        color: var(--rz-text-color, #c9d1d9);
     }
 
     .log-entry.ERROR .log-level {
-        color: #f85149;
+        color: var(--rz-danger, #f85149);
     }
 
     .log-entry.WARN .log-level {
-        color: #f39c12;
+        color: var(--rz-warning, #f39c12);
     }
 
     .log-entry.INFO .log-level {
-        color: #58a6ff;
+        color: var(--rz-info, #58a6ff);
     }
 
     .log-entry.SUCCESS .log-level {
-        color: #56d364;
+        color: var(--rz-success, #56d364);
     }
 
     .log-entry.DEBUG .log-level {
-        color: #8b949e;
-    }
-
-    /* 디버그 카드 */
-    .debug-card {
-        padding: 0.625rem !important;
-        background: #fff8dc !important;
-        border: 1px solid #f39c12 !important;
-    }
-
-    .compact-switch {
-        transform: scale(0.8);
+        color: var(--rz-text-disabled-color, #8b949e);
     }
 
     /* 스크롤바 */
     .log-container::-webkit-scrollbar {
-        width: 5px;
+        width: 6px;
     }
 
     .log-container::-webkit-scrollbar-track {
-        background: #161b22;
+        background: var(--rz-base-200);
         border-radius: 3px;
     }
 
     .log-container::-webkit-scrollbar-thumb {
-        background: #30363d;
+        background: var(--rz-base-400);
         border-radius: 3px;
     }
 
         .log-container::-webkit-scrollbar-thumb:hover {
-            background: #484f58;
+            background: var(--rz-base-500);
         }
 
     /* 애니메이션 */
     @@keyframes slideDown {
-        from
-
-    {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-
-    }
-
-    /* 다크 테마 */
-    :root[data-theme='dark'] .professional-panel {
-        background: #0d1117 !important;
-        border-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .panel-header {
-        background: #161b22;
-        border-bottom-color: #30363d;
-    }
-
-        :root[data-theme='dark'] .panel-header:hover {
-            background: #1f2937;
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
         }
 
-    :root[data-theme='dark'] .info-card,
-    :root[data-theme='dark'] .stats-card,
-    :root[data-theme='dark'] .log-card {
-        background: #161b22 !important;
-        border-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .stat-item {
-        background: #0d1117;
-        border-color: #30363d;
-    }
-
-    :root[data-theme='dark'] .debug-card {
-        background: #1f2937 !important;
-        border-color: #374151 !important;
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 </style>

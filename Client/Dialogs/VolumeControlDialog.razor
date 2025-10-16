@@ -193,21 +193,24 @@
 <style>
     /* 볼륨 카드 */
     .volume-card {
-        padding: 0.625rem !important;
-        background: #fafbfc !important;
-        border: 1px solid #e1e4e8 !important;
+        padding: 0.75rem !important;
+        background: rgba(var(--rz-primary-rgb), 0.03) !important;
+        border: 1px solid var(--rz-border-color) !important;
+        border-radius: var(--rz-border-radius) !important;
         height: 100%;
         transition: all 0.2s ease;
     }
 
         .volume-card:hover {
-            background: var(--rz-base-background-color)!important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+            background: rgba(var(--rz-primary-rgb), 0.06) !important;
+            box-shadow: var(--rz-shadow-2) !important;
+            transform: translateY(-2px);
         }
 
         .volume-card.master {
-            background: var(--rz-base-background-color)!important;
-            border-color: #3498db !important;
+            background: rgba(var(--rz-primary-rgb), 0.08) !important;
+            border: 2px solid var(--rz-primary) !important;
+            box-shadow: 0 0 0 1px rgba(var(--rz-primary-rgb), 0.2) !important;
         }
 
     .volume-icon {
@@ -215,25 +218,24 @@
     }
 
         .volume-icon.info {
-            color: #3498db !important;
+            color: var(--rz-info) !important;
         }
 
         .volume-icon.success {
-            color: #27ae60 !important;
+            color: var(--rz-success) !important;
         }
 
         .volume-icon.warning {
-            color: #f39c12 !important;
+            color: var(--rz-warning) !important;
         }
 
         .volume-icon.primary {
-            color: #3498db !important;
+            color: var(--rz-primary) !important;
         }
 
     .volume-title {
-        font-size: 0.7rem !important;
+        font-size: 0.75rem !important;
         font-weight: 600 !important;
-        color: #2c3e50 !important;
         margin: 0 !important;
     }
 
@@ -245,133 +247,125 @@
 
     /* 볼륨 슬라이더 */
     .volume-slider {
-        margin: 0.375rem 0 !important;
+        margin: 0.5rem 0 !important;
     }
 
         .volume-slider .rz-slider-horizontal .rz-slider-track {
-            height: 5px !important;
-            background-color: #e1e4e8 !important;
+            height: 6px !important;
+            background-color: var(--rz-base-300, rgba(0,0,0,0.1)) !important;
+            border-radius: 3px !important;
         }
 
         .volume-slider .rz-slider-horizontal .rz-slider-range {
-            height: 5px !important;
-            background-color: #3498db !important;
+            height: 6px !important;
+            background: linear-gradient(90deg, var(--rz-primary), var(--rz-primary-light)) !important;
+            border-radius: 3px !important;
         }
 
         .volume-slider.master .rz-slider-horizontal .rz-slider-range {
-            background-color: #2c3e50 !important;
+            background: linear-gradient(90deg, var(--rz-primary), var(--rz-primary-dark)) !important;
         }
 
         .volume-slider .rz-slider-handle {
-            width: 14px !important;
-            height: 14px !important;
+            width: 16px !important;
+            height: 16px !important;
             top: -5px !important;
-            background-color: var(--rz-base-background-color)!important;
-            border: 2px solid #3498db !important;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+            background-color: white !important;
+            border: 3px solid var(--rz-primary) !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.2s ease !important;
         }
 
+            .volume-slider .rz-slider-handle:hover {
+                transform: scale(1.1);
+                box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+            }
+
         .volume-slider.master .rz-slider-handle {
-            border-color: #2c3e50 !important;
+            border-width: 4px !important;
+            box-shadow: 0 0 0 2px rgba(var(--rz-primary-rgb), 0.2), 0 2px 6px rgba(0, 0, 0, 0.2) !important;
         }
 
     .volume-label {
-        font-size: 0.6rem !important;
-        color: #6c757d !important;
+        font-size: 0.65rem !important;
+        color: var(--rz-text-secondary-color) !important;
         margin: 0 !important;
+        font-weight: 500;
     }
 
     /* 프리셋 카드 */
     .preset-card {
-        padding: 0.625rem !important;
-        background: #f8f9fa !important;
-        border: 1px solid #e1e4e8 !important;
+        padding: 0.75rem !important;
+        background: rgba(var(--rz-secondary-rgb, 108, 117, 125), 0.05) !important;
+        border: 1px solid var(--rz-border-color) !important;
+        border-radius: var(--rz-border-radius) !important;
     }
 
     .preset-title {
-        font-size: 0.7rem !important;
+        font-size: 0.75rem !important;
         font-weight: 600 !important;
-        color: #2c3e50 !important;
-        margin: 0 !important;
+        margin: 0 0 0.5rem 0 !important;
     }
 
     .preset-button {
-        font-size: 0.65rem !important;
-        padding: 0.25rem 0.5rem !important;
-        height: 26px !important;
+        font-size: 0.7rem !important;
+        padding: 0.375rem 0.625rem !important;
+        height: 30px !important;
+        border-radius: var(--rz-border-radius) !important;
+        transition: all 0.2s ease !important;
     }
 
+        .preset-button:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--rz-shadow-2) !important;
+        }
+
         .preset-button .rz-button-icon {
-            font-size: 0.75rem !important;
+            font-size: 0.875rem !important;
         }
 
     /* 액션 버튼 */
     .action-button {
-        font-size: 0.7rem !important;
-        padding: 0.25rem 0.75rem !important;
-        height: 28px !important;
+        font-size: 0.75rem !important;
+        padding: 0.375rem 0.875rem !important;
+        height: 32px !important;
+        border-radius: var(--rz-border-radius) !important;
+        transition: all 0.2s ease !important;
     }
 
+        .action-button:hover {
+            transform: translateY(-1px);
+        }
+
         .action-button.primary {
-            background: #3498db !important;
-            border-color: #3498db !important;
+            background: var(--rz-primary) !important;
+            border-color: var(--rz-primary) !important;
             color: white !important;
             font-weight: 500 !important;
+            box-shadow: var(--rz-shadow-1) !important;
         }
 
             .action-button.primary:hover {
-                background: #2980b9 !important;
-                border-color: #2980b9 !important;
+                opacity: 0.9;
+                box-shadow: var(--rz-shadow-3) !important;
             }
 
     /* 경고 알림 */
     .unsaved-alert {
-        padding: 0.5rem 0.75rem !important;
-        background-color: #fff3cd !important;
-        border: 1px solid #ffc107 !important;
+        padding: 0.625rem 0.875rem !important;
+        background-color: rgba(var(--rz-warning-rgb), 0.1) !important;
+        border: 1px solid rgba(var(--rz-warning-rgb), 0.3) !important;
+        border-radius: var(--rz-border-radius) !important;
     }
 
     .alert-icon {
-        font-size: 0.875rem !important;
-        color: #f39c12 !important;
+        font-size: 1rem !important;
+        color: var(--rz-warning) !important;
     }
 
     .alert-text {
-        font-size: 0.7rem !important;
-        color: #856404 !important;
+        font-size: 0.75rem !important;
         margin: 0 !important;
-    }
-
-    /* 다크 테마 */
-    :root[data-theme='dark'] .volume-card {
-        background: #161b22 !important;
-        border-color: #30363d !important;
-    }
-
-        :root[data-theme='dark'] .volume-card:hover {
-            background: #1f2937 !important;
-        }
-
-        :root[data-theme='dark'] .volume-card.master {
-            background: #1f2937 !important;
-            border-color: #3498db !important;
-        }
-
-    :root[data-theme='dark'] .preset-card {
-        background: #161b22 !important;
-        border-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .volume-slider .rz-slider-horizontal .rz-slider-track {
-        background-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .unsaved-alert {
-        background-color: #1f2937 !important;
-        border-color: #374151 !important;
-    }
-
-    :root[data-theme='dark'] .alert-text {
-        color: #fbbf24 !important;
+        line-height: 1.4;
     }
 </style>

@@ -8,16 +8,16 @@
 @if (_isRecoveringBroadcast)
 {
     <div class="recovery-overlay">
-        <RadzenCard class="recovery-card">
+        <RadzenCard class="rz-shadow-3 rz-border-radius-3" Style="padding: 1.5rem; min-width: 320px;">
             <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem">
                 <RadzenProgressBarCircular Value="100"
                                            ShowValue="false"
                                            Mode="ProgressBarMode.Indeterminate"
                                            Size="ProgressBarCircularSize.Medium" />
-                <RadzenText TextStyle="TextStyle.Body1" class="recovery-title">
-                    @(selectedChannel?.Name ?? "채널") 방송 복구 중...
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-text-align-center">
+                    <strong>@(selectedChannel?.Name ?? "채널") 방송 복구 중...</strong>
                 </RadzenText>
-                <RadzenText TextStyle="TextStyle.Caption" class="recovery-subtitle">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-text-align-center rz-color-secondary">
                     잠시만 기다려주세요. 이전 방송 상태를 복구하고 있습니다.
                 </RadzenText>
             </RadzenStack>
@@ -25,37 +25,33 @@
     </div>
 }
 
-<RadzenStack>
+<RadzenStack Gap="1rem">
     <!-- 페이지 헤더 -->
-    <RadzenRow AlignItems="AlignItems.Center" Class="page-header mb-3">
-        <RadzenColumn Size="12">
-            <RadzenText Text="방송 관리" TextStyle="TextStyle.H5" TagName="TagName.H1" class="page-title" />
-            <RadzenText Text="채널을 선택하고 실시간 방송을 관리합니다" TextStyle="TextStyle.Caption" class="page-subtitle" />
-        </RadzenColumn>
-    </RadzenRow>
+    <RadzenStack Gap="0.5rem" Style="padding-bottom: 1rem; border-bottom: 1px solid var(--rz-border-color);">
+        <RadzenText Text="방송 관리" TextStyle="TextStyle.H5" TagName="TagName.H1" />
+        <RadzenText Text="채널을 선택하고 실시간 방송을 관리합니다" TextStyle="TextStyle.Caption" class="rz-color-secondary" />
+    </RadzenStack>
 
     <!-- 채널 리스트 영역 - 가로 스크롤 -->
-    <RadzenCard class="channels-panel mb-3">
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="section-header">
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
-                <RadzenIcon Icon="settings_input_antenna" class="section-icon" />
-                <RadzenText TextStyle="TextStyle.Body1" class="section-title">채널 목록</RadzenText>
+    <RadzenCard class="rz-shadow-1 rz-border-radius-2" Style="padding: 1rem;">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" 
+                     Style="padding-bottom: 0.75rem; border-bottom: 1px solid var(--rz-border-color); margin-bottom: 0.75rem;">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="settings_input_antenna" Style="color: var(--rz-primary);" />
+                <RadzenText TextStyle="TextStyle.Subtitle1"><strong>채널 목록</strong></RadzenText>
                 @if (channels != null && channels.Any())
                 {
-                    <RadzenText TextStyle="TextStyle.Caption" class="channel-count">
-                        총 @channels.Count()개 채널
-                    </RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@($"{channels.Count()}개")" IsPill="true" />
                 }
             </RadzenStack>
 
             @* 우측 버튼 그룹 *@
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
                 @* 채널 생성 버튼 *@
                 <RadzenButton Text="채널 생성"
                               Icon="add_circle"
                               ButtonStyle="ButtonStyle.Primary"
                               Size="ButtonSize.Small"
-                              class="header-action-button"
                               Click="@OpenCreateChannelDialog" />
 
                 @* 방송 시작 버튼 *@
@@ -64,7 +60,6 @@
                               ButtonStyle="@(!isBroadcasting ? ButtonStyle.Success : ButtonStyle.Warning)"
                               Size="ButtonSize.Small"
                               Disabled="@(isBroadcasting || selectedChannel == null)"
-                              class="header-action-button"
                               Click="@(() => StartBroadcast())"
                               Title="@(selectedChannel == null ? "먼저 채널을 선택하세요" : "")" />
 
@@ -72,7 +67,7 @@
                 <RadzenButton Icon="settings"
                               ButtonStyle="ButtonStyle.Info"
                               Size="ButtonSize.Small"
-                              class="header-icon-button"
+                              Variant="Variant.Flat"
                               Click="@OpenAudioSettingsDialog"
                               Title="오디오 설정"
                               Disabled="@(selectedChannel == null)" />
@@ -81,7 +76,7 @@
                 <RadzenButton Icon="tune"
                               ButtonStyle="ButtonStyle.Secondary"
                               Size="ButtonSize.Small"
-                              class="header-icon-button"
+                              Variant="Variant.Flat"
                               Click="@OpenVolumeControlDialog"
                               Title="볼륨 제어"
                               Disabled="@(selectedChannel == null)" />
@@ -94,7 +89,7 @@
                         <RadzenButton Icon="fiber_manual_record"
                                       ButtonStyle="ButtonStyle.Danger"
                                       Size="ButtonSize.Small"
-                                      class="header-icon-button"
+                                      Variant="Variant.Flat"
                                       Click="@StartRecording"
                                       Title="녹음 시작" />
                     }
@@ -103,7 +98,7 @@
                         <RadzenButton Icon="stop"
                                       ButtonStyle="ButtonStyle.Warning"
                                       Size="ButtonSize.Small"
-                                      class="header-icon-button"
+                                      Variant="Variant.Flat"
                                       Click="@StopRecording"
                                       Title="녹음 중지" />
                     }
@@ -112,7 +107,7 @@
                     <RadzenButton Icon="@(_currentLoopbackSetting ? "hearing" : "hearing_disabled")"
                                   ButtonStyle="@(_currentLoopbackSetting ? ButtonStyle.Success : ButtonStyle.Secondary)"
                                   Size="ButtonSize.Small"
-                                  class="header-icon-button"
+                                  Variant="Variant.Flat"
                                   Click="@ToggleLoopback"
                                   Title="@(_currentLoopbackSetting ? "루프백 끄기" : "루프백 켜기")" />
                 }
@@ -122,45 +117,49 @@
         @* 방송 상태 표시 영역 *@
         @if (isBroadcasting)
         {
-            <RadzenCard class="broadcast-status-bar mt-2 mb-2">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
-                        <RadzenIcon Icon="broadcast_on_home" class="status-icon broadcasting" />
-                        <RadzenText TextStyle="TextStyle.Caption" class="status-label">방송 중</RadzenText>
+            <RadzenAlert AlertStyle="AlertStyle.Success" 
+                         Variant="Variant.Flat" 
+                         Shade="Shade.Lighter"
+                         AllowClose="false"
+                         Style="margin-top: 0.75rem; margin-bottom: 0.75rem;">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Wrap="FlexWrap.Wrap">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="broadcast_on_home" class="broadcast-icon-pulse" />
+                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="방송 중" IsPill="true" />
                     </RadzenStack>
 
                     @if (selectedChannel != null)
                     {
-                        <RadzenText TextStyle="TextStyle.Caption" class="status-info">
+                        <RadzenText TextStyle="TextStyle.Caption">
                             채널: <strong>@selectedChannel.Name</strong>
                         </RadzenText>
                     }
 
                     @if (isRecording)
                     {
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                            <RadzenIcon Icon="fiber_manual_record" class="recording-icon" />
-                            <RadzenText TextStyle="TextStyle.Caption" class="status-info">
-                                녹음: @recordingDuration
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="fiber_manual_record" class="recording-icon-blink" />
+                            <RadzenText TextStyle="TextStyle.Caption">
+                                녹음: <strong>@recordingDuration</strong>
                             </RadzenText>
                         </RadzenStack>
                     }
 
                     @if (_currentLoopbackSetting)
                     {
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                            <RadzenIcon Icon="hearing" class="loopback-icon" />
-                            <RadzenText TextStyle="TextStyle.Caption" class="status-info">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="hearing" Style="color: var(--rz-success);" />
+                            <RadzenText TextStyle="TextStyle.Caption">
                                 루프백 활성
                             </RadzenText>
                         </RadzenStack>
                     }
 
-                    <RadzenText TextStyle="TextStyle.Caption" class="status-info ms-auto">
-                        @recordingDataSize.ToString("F2") MB
+                    <RadzenText TextStyle="TextStyle.Caption" Style="margin-left: auto;">
+                        <strong>@recordingDataSize.ToString("F2") MB</strong>
                     </RadzenText>
                 </RadzenStack>
-            </RadzenCard>
+            </RadzenAlert>
         }
 
         <div class="channel-list-container">
@@ -170,40 +169,41 @@
                     @foreach (var channel in channels)
                     {
                         <div class="channel-card-wrapper">
-                            <RadzenCard class="@($"channel-card compact {(selectedChannel?.Id == channel.Id ? "selected" : "")}")"
-                                        @onclick="@(() => SelectChannel(channel))">
-                                <RadzenStack Gap="0.25rem">
+                            <RadzenCard class="@($"channel-card {(selectedChannel?.Id == channel.Id ? "channel-selected" : "")}")"
+                                        @onclick="@(() => SelectChannel(channel))"
+                                        Style="cursor: pointer; transition: all 0.2s ease;">
+                                <RadzenStack Gap="0.5rem">
                                     <!-- 채널 헤더 -->
                                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                                            <RadzenIcon Icon="@GetChannelIcon(channel.Type)" class="channel-icon" />
-                                            <RadzenText TextStyle="TextStyle.Body2" class="channel-name">
-                                                @channel.Name
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenIcon Icon="@GetChannelIcon(channel.Type)" Style="color: var(--rz-primary);" />
+                                            <RadzenText TextStyle="TextStyle.Subtitle2">
+                                                <strong>@channel.Name</strong>
                                             </RadzenText>
                                         </RadzenStack>
                                         <RadzenBadge BadgeStyle="@GetChannelBadgeStyle(channel.State)"
                                                      IsPill="true"
-                                                     Text="@GetChannelStateText(channel.State)"
-                                                     class="status-badge" />
+                                                     Text="@GetChannelStateText(channel.State)" />
                                     </RadzenStack>
 
                                     <!-- 채널 설명 -->
                                     @if (!string.IsNullOrEmpty(channel.Description))
                                     {
-                                        <RadzenText TextStyle="TextStyle.Caption" class="channel-description">
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" 
+                                                    Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                             @channel.Description
                                         </RadzenText>
                                     }
 
                                     <!-- 채널 메타 정보 -->
                                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                        <RadzenText TextStyle="TextStyle.Caption" class="channel-meta">
-                                            <RadzenIcon Icon="access_time" class="meta-icon" />
-                                            @channel.CreatedAt.ToString("yyyy.MM.dd")
-                                        </RadzenText>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="channel-meta">
-                                            @channel.SamplingRate Hz
-                                        </RadzenText>
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                            <RadzenIcon Icon="access_time" Style="font-size: 0.8rem; color: var(--rz-text-secondary-color);" />
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                @channel.CreatedAt.ToString("yyyy.MM.dd")
+                                            </RadzenText>
+                                        </RadzenStack>
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@($"{channel.SamplingRate} Hz")" />
                                     </RadzenStack>
 
                                     <!-- 개별 채널 방송 버튼 -->
@@ -212,7 +212,7 @@
                                                   ButtonStyle="@(isChannelBroadcasting.ContainsKey(channel.Id) && isChannelBroadcasting[channel.Id] ? ButtonStyle.Danger : ButtonStyle.Light)"
                                                   Size="ButtonSize.Small"
                                                   Variant="Variant.Flat"
-                                                  class="channel-quick-button"
+                                                  Style="width: 100%;"
                                                   @onclick:stopPropagation="true"
                                                   Click="@(() => ToggleBroadcast(channel.Id))" />
                                 </RadzenStack>
@@ -223,22 +223,20 @@
             }
             else if (isLoading)
             {
-                <div class="loading-container">
-                    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="slim-progress" />
-                    <RadzenText Text="채널 목록을 불러오는 중..." TextStyle="TextStyle.Caption" class="loading-text" />
-                </div>
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" Style="padding: 2rem;">
+                    <RadzenProgressBarCircular Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">채널 목록을 불러오는 중...</RadzenText>
+                </RadzenStack>
             }
             else
             {
-                <div class="empty-state">
-                    <RadzenIcon Icon="tv_off" class="empty-icon" />
-                    <RadzenText TextStyle="TextStyle.Body2" class="empty-text">
-                        생성된 채널이 없습니다
-                    </RadzenText>
-                    <RadzenText TextStyle="TextStyle.Caption" class="empty-subtext">
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" Style="padding: 2rem; text-align: center;">
+                    <RadzenIcon Icon="tv_off" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
+                    <RadzenText TextStyle="TextStyle.Body2">생성된 채널이 없습니다</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                         상단의 '채널 생성' 버튼을 클릭하여 첫 번째 채널을 생성해보세요
                     </RadzenText>
-                </div>
+                </RadzenStack>
             }
         </div>
     </RadzenCard>
@@ -246,14 +244,14 @@
     <!-- 선택된 채널이 없을 때 가이드 표시 -->
     @if (selectedChannel == null && channels != null && channels.Any())
     {
-        <RadzenCard class="guide-card">
-            <RadzenStack Gap="0.75rem">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem" class="mb-2">
-                    <RadzenIcon Icon="help_outline" class="guide-icon" />
-                    <RadzenText TextStyle="TextStyle.Body1" class="guide-title">방송 관리 가이드</RadzenText>
+        <RadzenCard class="rz-shadow-1 rz-border-radius-2" Style="padding: 1rem; background: var(--rz-base-background-color);">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="help_outline" Style="color: var(--rz-info);" />
+                    <RadzenText TextStyle="TextStyle.Subtitle1"><strong>방송 관리 가이드</strong></RadzenText>
                 </RadzenStack>
 
-                <RadzenRow Gap="0.5rem">
+                <RadzenRow Gap="0.75rem">
                     @foreach (var step in new[] {
                                 new { Number = "1", Title = "채널 선택", Description = "위의 채널 목록에서 방송할 채널을 선택하세요" },
                                 new { Number = "2", Title = "스피커 설정", Description = "방송할 스피커 그룹을 선택하고 체크하세요" },
@@ -262,13 +260,15 @@
                                 })
                     {
                         <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-                            <RadzenCard class="guide-step-card">
-                                <RadzenStack Gap="0.25rem">
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                                        <div class="step-number">@step.Number</div>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="step-title">@step.Title</RadzenText>
+                            <RadzenCard class="rz-shadow-1" Style="padding: 0.75rem; height: 100%; transition: transform 0.2s ease;"
+                                        onmouseover="this.style.transform='translateY(-2px)'"
+                                        onmouseout="this.style.transform='translateY(0)'">
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@step.Number" Style="width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;" />
+                                        <RadzenText TextStyle="TextStyle.Subtitle2"><strong>@step.Title</strong></RadzenText>
                                     </RadzenStack>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="step-description">
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" Style="line-height: 1.4;">
                                         @step.Description
                                     </RadzenText>
                                 </RadzenStack>
@@ -318,319 +318,6 @@
 </RadzenStack>
 
 <style>
-    /* 전문적이고 고급스러운 디자인 시스템 */
-    :root {
-        --professional-primary: #2c3e50;
-        --professional-secondary: #34495e;
-        --professional-accent: #3498db;
-        --professional-success: #27ae60;
-        --professional-danger: #e74c3c;
-        --professional-warning: #f39c12;
-        --professional-border: #dde2e6;
-        --professional-hover: #ecf0f1;
-        --professional-selected: #e8f4fd;
-        --professional-background: #fafbfc;
-    }
-
-    /* 페이지 헤더 */
-    .page-header {
-        border-bottom: 1px solid var(--professional-border);
-        padding-bottom: 0.75rem;
-        margin-bottom: 1rem;
-    }
-
-    .page-title {
-        font-size: 1.25rem !important;
-        font-weight: 600 !important;
-        color: var(--professional-primary) !important;
-        margin: 0 !important;
-        letter-spacing: -0.5px;
-    }
-
-    .page-subtitle {
-        font-size: 0.75rem !important;
-        color: #6c757d !important;
-        margin-top: 0.25rem !important;
-        font-weight: 400;
-    }
-
-    /* 카드 스타일 */
-    .channels-panel, .guide-card {
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-        border: 1px solid var(--professional-border) !important;
-        border-radius: 6px !important;
-        background: var(--rz-base-background-color)!important;
-    }
-
-    .channels-panel {
-        padding: 1rem !important;
-    }
-
-    .guide-card {
-        background: var(--professional-background) !important;
-        padding: 1rem !important;
-    }
-
-    /* 방송 상태 바 */
-    .broadcast-status-bar {
-        background: linear-gradient(90deg, #e8f5e9 0%, #f3f4f6 100%) !important;
-        border: 1px solid #c8e6c9 !important;
-        padding: 0.375rem 0.75rem !important;
-        border-radius: 4px !important;
-    }
-
-    .status-icon {
-        font-size: 0.875rem !important;
-    }
-
-        .status-icon.broadcasting {
-            color: var(--professional-success) !important;
-            animation: pulse 2s infinite;
-        }
-
-    .status-label {
-        font-size: 0.7rem !important;
-        font-weight: 600 !important;
-        color: var(--professional-success) !important;
-    }
-
-    .status-info {
-        font-size: 0.7rem !important;
-        color: var(--professional-secondary) !important;
-    }
-
-    /* 섹션 헤더 */
-    .section-header {
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid #f0f0f0;
-        margin-bottom: 0.75rem;
-    }
-
-    .section-icon {
-        font-size: 1rem !important;
-        color: var(--professional-accent) !important;
-    }
-
-    .section-title {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        color: var(--professional-primary) !important;
-        margin: 0 !important;
-    }
-
-    .channel-count {
-        font-size: 0.7rem !important;
-        color: #6c757d !important;
-        padding-left: 0.5rem;
-    }
-
-    /* 헤더 버튼 스타일 */
-    .header-action-button {
-        font-size: 0.75rem !important;
-        padding: 0.25rem 0.75rem !important;
-        height: 30px !important;
-        font-weight: 500 !important;
-    }
-
-    .header-icon-button {
-        width: 30px !important;
-        height: 30px !important;
-        padding: 0 !important;
-        min-width: 30px !important;
-    }
-
-        .header-icon-button .rz-button-icon {
-            font-size: 0.875rem !important;
-        }
-
-    /* 채널 카드 */
-    .channel-list-container {
-        position: relative;
-        width: 100%;
-        overflow: hidden;
-    }
-
-    .channel-list-scroll {
-        display: flex;
-        gap: 0.5rem;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding: 0.5rem 0;
-        scroll-behavior: smooth;
-    }
-
-    .channel-card-wrapper {
-        flex: 0 0 auto;
-        width: 200px;
-        min-width: 200px;
-    }
-
-    .channel-card.compact {
-        height: 100%;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        border: 1px solid #e1e4e8 !important;
-        padding: 0.625rem !important;
-    }
-
-        .channel-card.compact:hover {
-            border-color: var(--professional-accent) !important;
-            background: var(--professional-hover) !important;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
-        }
-
-        .channel-card.compact.selected {
-            border-color: var(--professional-accent) !important;
-            background: var(--professional-selected) !important;
-        }
-
-    .channel-icon {
-        font-size: 0.875rem !important;
-        color: var(--professional-accent) !important;
-    }
-
-    .channel-name {
-        font-size: 0.8rem !important;
-        font-weight: 500 !important;
-        color: var(--professional-primary) !important;
-        margin: 0 !important;
-    }
-
-    .channel-description {
-        font-size: 0.7rem !important;
-        color: #6c757d !important;
-        margin: 0 !important;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .channel-meta {
-        font-size: 0.65rem !important;
-        color: #6c757d !important;
-        display: flex;
-        align-items: center;
-        gap: 0.15rem;
-    }
-
-    .meta-icon {
-        font-size: 0.7rem !important;
-    }
-
-    .status-badge {
-        font-size: 0.65rem !important;
-        padding: 2px 6px !important;
-    }
-
-    .channel-quick-button {
-        width: 100% !important;
-        height: 24px !important;
-        font-size: 0.65rem !important;
-        padding: 0 0.375rem !important;
-    }
-
-    /* 상태 표시 */
-    .recording-icon {
-        font-size: 0.75rem !important;
-        color: var(--professional-danger) !important;
-        animation: blink 1s infinite;
-    }
-
-    .loopback-icon {
-        font-size: 0.75rem !important;
-        color: var(--professional-success) !important;
-    }
-
-    /* 가이드 카드 */
-    .guide-icon {
-        font-size: 1rem !important;
-        color: var(--professional-accent) !important;
-    }
-
-    .guide-title {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        color: var(--professional-primary) !important;
-        margin: 0 !important;
-    }
-
-    .guide-step-card {
-        padding: 0.625rem !important;
-        background: var(--rz-base-background-color)!important;
-        border: 1px solid #e1e4e8 !important;
-        height: 100%;
-        transition: all 0.2s ease;
-    }
-
-        .guide-step-card:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
-        }
-
-    .step-number {
-        width: 20px;
-        height: 20px;
-        background-color: var(--professional-accent);
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        font-size: 0.7rem;
-    }
-
-    .step-title {
-        font-size: 0.75rem !important;
-        font-weight: 600 !important;
-        color: var(--professional-primary) !important;
-        margin: 0 !important;
-    }
-
-    .step-description {
-        font-size: 0.7rem !important;
-        color: #6c757d !important;
-        margin: 0 !important;
-        line-height: 1.3;
-    }
-
-    /* 로딩 및 빈 상태 */
-    .loading-container, .empty-state {
-        text-align: center;
-        padding: 2rem 0;
-    }
-
-    .slim-progress {
-        width: 100px !important;
-        height: 3px !important;
-        margin: 0 auto !important;
-    }
-
-    .loading-text {
-        margin-top: 0.5rem !important;
-        font-size: 0.7rem !important;
-        color: #6c757d !important;
-    }
-
-    .empty-icon {
-        font-size: 2rem !important;
-        color: #d0d7de !important;
-        margin-bottom: 0.5rem;
-    }
-
-    .empty-text {
-        font-size: 0.8rem !important;
-        color: var(--professional-secondary) !important;
-        margin: 0.25rem 0 !important;
-    }
-
-    .empty-subtext {
-        font-size: 0.7rem !important;
-        color: #6c757d !important;
-        margin: 0 !important;
-    }
-
     /* 복구 오버레이 */
     .recovery-overlay {
         position: fixed;
@@ -643,46 +330,77 @@
         align-items: center;
         justify-content: center;
         z-index: 9999;
-    }
-
-    .recovery-card {
-        min-width: 320px;
-        padding: 1.5rem !important;
         animation: fadeIn 0.3s ease-in;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
     }
 
-    .recovery-title {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        color: var(--professional-primary) !important;
-        margin: 0 !important;
+    /* 채널 리스트 스크롤 컨테이너 */
+    .channel-list-container {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
     }
 
-    .recovery-subtitle {
-        font-size: 0.7rem !important;
-        color: #6c757d !important;
-        margin: 0 !important;
+    .channel-list-scroll {
+        display: flex;
+        gap: 0.75rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 0.5rem 0;
+        scroll-behavior: smooth;
     }
 
-    /* 스크롤바 스타일링 */
-    .channel-list-scroll::-webkit-scrollbar {
-        height: 6px;
-    }
-
-    .channel-list-scroll::-webkit-scrollbar-track {
-        background: #f0f0f0;
-        border-radius: 3px;
-    }
-
-    .channel-list-scroll::-webkit-scrollbar-thumb {
-        background: #c0c0c0;
-        border-radius: 3px;
-    }
-
-        .channel-list-scroll::-webkit-scrollbar-thumb:hover {
-            background: #a0a0a0;
+        .channel-list-scroll::-webkit-scrollbar {
+            height: 6px;
         }
+
+        .channel-list-scroll::-webkit-scrollbar-track {
+            background: var(--rz-base-200);
+            border-radius: 3px;
+        }
+
+        .channel-list-scroll::-webkit-scrollbar-thumb {
+            background: var(--rz-base-400);
+            border-radius: 3px;
+        }
+
+            .channel-list-scroll::-webkit-scrollbar-thumb:hover {
+                background: var(--rz-base-500);
+            }
+
+    .channel-card-wrapper {
+        flex: 0 0 auto;
+        width: 220px;
+        min-width: 220px;
+    }
+
+    .channel-card {
+        height: 100%;
+        border: 2px solid var(--rz-border-color) !important;
+        transition: all 0.2s ease;
+    }
+
+        .channel-card:hover {
+            border-color: var(--rz-primary) !important;
+            transform: translateY(-2px);
+            box-shadow: var(--rz-shadow-3) !important;
+        }
+
+        .channel-card.channel-selected {
+            border-color: var(--rz-primary) !important;
+            background-color: var(--rz-primary-lighter) !important;
+            box-shadow: var(--rz-shadow-2) !important;
+        }
+
+    /* 방송 아이콘 애니메이션 */
+    .broadcast-icon-pulse {
+        animation: pulse 2s infinite;
+        color: var(--rz-success) !important;
+    }
+
+    .recording-icon-blink {
+        animation: blink 1s infinite;
+        color: var(--rz-danger) !important;
+    }
 
     /* 애니메이션 */
     @@keyframes fadeIn {
@@ -697,67 +415,23 @@
         }
     }
 
+    @@keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+
     @@keyframes blink {
         0%, 50%, 100% {
             opacity: 1;
         }
 
         25%, 75% {
-            opacity: 0.5;
+            opacity: 0.3;
         }
-    }
-
-    @@keyframes pulse {
-        0% {
-            opacity: 1;
-        }
-
-        50% {
-            opacity: 0.6;
-        }
-
-        100% {
-            opacity: 1;
-        }
-    }
-
-    /* 다크 테마 지원 */
-    :root[data-theme='dark'] .page-title {
-        color: #e1e4e8 !important;
-    }
-
-    :root[data-theme='dark'] .channels-panel {
-        background: #0d1117 !important;
-        border-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .guide-card {
-        background: #161b22 !important;
-        border-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .channel-card.compact {
-        background: #0d1117 !important;
-        border-color: #21262d !important;
-    }
-
-        :root[data-theme='dark'] .channel-card.compact:hover {
-            background: #161b22 !important;
-            border-color: var(--professional-accent) !important;
-        }
-
-        :root[data-theme='dark'] .channel-card.compact.selected {
-            background: #1f2937 !important;
-            border-color: var(--professional-accent) !important;
-        }
-
-    :root[data-theme='dark'] .guide-step-card {
-        background: #0d1117 !important;
-        border-color: #30363d !important;
-    }
-
-    :root[data-theme='dark'] .broadcast-status-bar {
-        background: linear-gradient(90deg, #1a2332 0%, #0d1117 100%) !important;
-        border-color: #30363d !important;
     }
 </style>
