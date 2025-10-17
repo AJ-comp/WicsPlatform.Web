@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.StaticFiles;
@@ -92,6 +92,13 @@ builder.Services.AddHeaderPropagation(o => o.Headers.Add("Cookie"));
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<WicsPlatform.Client.SecurityService>();
+
+// Client 서비스 등록 (Server-Side Rendering을 위해 필요)
+builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastWebSocketService>();
+builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastRecordingService>();
+builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastLoggingService>();
+builder.Services.AddSingleton<OpusCodec>(provider => new OpusCodec(48000, 1, 32000));
+builder.Services.AddScoped<WicsPlatform.Client.Services.Interfaces.IBroadcastDataService, WicsPlatform.Client.Services.BroadcastDataService>();
 builder.Services.AddControllers().AddOData(o =>
 {
     var oDataBuilder = new ODataConventionModelBuilder();

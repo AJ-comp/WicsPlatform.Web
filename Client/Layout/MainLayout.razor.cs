@@ -25,16 +25,10 @@ namespace WicsPlatform.Client.Layout
         [Inject]
         protected NotificationService NotificationService { get; set; }
 
-        private bool sidebarExpanded = true;
         private bool _isInitialized = false;
 
         [Inject]
         protected SecurityService Security { get; set; }
-
-        void SidebarToggleClick()
-        {
-            sidebarExpanded = !sidebarExpanded;
-        }
 
         protected void ProfileMenuClick(RadzenProfileMenuItem args)
         {

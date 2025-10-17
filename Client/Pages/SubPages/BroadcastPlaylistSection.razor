@@ -3,7 +3,7 @@
 <RadzenCard class="mt-3 collapsible-panel-container">
 <!-- 패널 헤더 -->
 <div @onclick="TogglePanel" 
-     style="background-color: var(--rz-sidebar-background-color); padding: 0.75rem 1rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
+     style="background-color: var(--rz-sidebar-background-color); padding: 0.5rem 0.75rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
                 <RadzenIcon Icon="playlist_play" Style="font-size: 1.25rem; color: var(--rz-primary);" />
@@ -78,7 +78,7 @@
     <!-- 패널 내용 -->
     @if (!IsCollapsed)
     {
-        <div class="panel-content" Style="padding: 1rem;">
+        <div class="panel-content" Style="padding: 0.5rem;">
             @* 방송 중 상태 표시 *@
             @if (IsBroadcasting)
             {
@@ -86,7 +86,7 @@
                              Variant="Variant.Flat"
                              Shade="Shade.Lighter"
                              AllowClose="false"
-                             Style="margin-bottom: 1rem;">
+                             Style="margin-bottom: 0.5rem;">
                     <RadzenStack Orientation="Orientation.Horizontal"
                                  AlignItems="AlignItems.Center"
                                  Gap="0.5rem"
@@ -125,17 +125,28 @@
                 </RadzenAlert>
             }
 
-            <RadzenRow Gap="0.75rem">
+            <RadzenRow Gap="0.5rem">
                 <!-- 좌측: 플레이리스트 목록 -->
                 <RadzenColumn Size="12" SizeMD="5">
-                    <RadzenCard class="group-section" Style="padding: 0.75rem; position: relative;">
+                    <RadzenCard class="group-section" Style="padding: 0.5rem; position: relative;">
+                        @if (isAddingToPlaylist)
+                        {
+                            <div class="processing-overlay">
+                                <RadzenStack Gap="1rem" Style="align-items: center;">
+                                    <RadzenText TextStyle="TextStyle.Body2" Style="color: white; font-weight: 600;">미디어를 플레이리스트에 추가하는 중...</RadzenText>
+                                    <RadzenProgressBar Value="@AddProgressPercent" ShowValue="true" Max="100" Style="width: 200px; height: 8px;" />
+                                    <RadzenText TextStyle="TextStyle.Caption" Style="color: rgba(255,255,255,0.9);">@addProgress / @addTotal</RadzenText>
+                                </RadzenStack>
+                            </div>
+                        }
+
                         <RadzenStack Orientation="Orientation.Horizontal" 
                                      JustifyContent="JustifyContent.SpaceBetween" 
                                      AlignItems="AlignItems.Center" 
-                                     class="mb-2">
+                                     Style="margin-bottom: 0.35rem;">
                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                                <RadzenIcon Icon="queue_music" Style="font-size: 0.875rem; color: var(--rz-primary);" />
-                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.8rem;">
+                                <RadzenIcon Icon="queue_music" Style="font-size: 0.8rem; color: var(--rz-primary);" />
+                                <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.75rem;">
                                     플레이리스트 목록
                                 </RadzenText>
                             </RadzenStack>
@@ -144,7 +155,7 @@
                                           Click="@OpenAddPlaylistDialog" 
                                           ButtonStyle="ButtonStyle.Light" 
                                           Size="ButtonSize.Small"
-                                          Style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" />
+                                          Style="font-size: 0.65rem; padding: 0.2rem 0.4rem; height: auto;" />
                         </RadzenStack>
 
                         @if (isLoadingPlaylists)
@@ -157,27 +168,29 @@
                         }
                         else if (playlists.Any())
                         {
-                            <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--rz-border); border-radius: var(--rz-border-radius); background-color: var(--rz-base-background-color);">
+                            <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--rz-border); border-radius: var(--rz-border-radius); background-color: var(--rz-base-background-color);">
                                 @foreach (var playlist in playlists)
                                 {
                                     var isExpanded = expandedPlaylists.Contains(playlist.Id);
                                     var playlistMediaCount = GetPlaylistMediaCountInt(playlist.Id);
 
-                                    <div>
-                                        <RadzenCard class="@($"group-item {(viewingPlaylist?.Id == playlist.Id ? "viewing" : "")} {(IsPlaylistSelected(playlist.Id) ? "selected" : "")}")"
-                                                    Style="margin: 3px; cursor: pointer; padding: 0.5rem; background-color: var(--rz-base-background-color);"
+                                    <div class="group-drop-zone" data-group-id="@playlist.Id"
+                                         @ondragenter="@(() => HandleDragEnter(playlist))"
+                                         @ondragleave="@(() => HandleDragLeave(playlist))">
+                                        <RadzenCard class="@($"group-item {(viewingPlaylist?.Id == playlist.Id ? "viewing" : "")} {(IsPlaylistSelected(playlist.Id) ? "selected" : "")} {(isDraggingOverPlaylist == playlist.Id ? "drag-over" : "")}")"
+                                                    Style="margin: 1px; cursor: pointer; padding: 0.25rem; background-color: var(--rz-base-background-color);"
                                                     @onclick="@(() => ViewPlaylistDetails(playlist))">
-                                        <RadzenStack Gap="0.25rem">
+                                        <RadzenStack Gap="0.15rem">
                                             <RadzenRow AlignItems="AlignItems.Center">
                                                 <RadzenColumn Size="8">
-                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
+                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.2rem">
                                                         <RadzenCheckBox Value="@IsPlaylistSelected(playlist.Id)"
                                                                         Change="@((bool value) => OnPlaylistSelectionChanged(playlist.Id, value))"
-                                                                        Style="width: 14px; height: 14px;"
+                                                                        Style="width: 12px; height: 12px;"
                                                                         @onclick:stopPropagation="true" />
                                                         <RadzenIcon Icon="@(isExpanded ? "folder_open" : "folder")"
-                                                                    Style="color: var(--rz-secondary); font-size: 0.875rem;" />
-                                                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.8rem;">
+                                                                    Style="color: var(--rz-secondary); font-size: 0.8rem;" />
+                                                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0" Style="font-weight: 600; font-size: 0.75rem;">
                                                             @playlist.Name
                                                         </RadzenText>
                                                     </RadzenStack>
@@ -202,7 +215,7 @@
                                             @if (!string.IsNullOrEmpty(playlist.Description))
                                             {
                                                 <RadzenText TextStyle="TextStyle.Caption" class="text-muted mb-0"
-                                                            Style="margin-left: 1.5rem; font-size: 0.7rem;">
+                                                            Style="margin-left: 1.2rem; font-size: 0.65rem;">
                                                     @playlist.Description
                                                 </RadzenText>
                                             }
@@ -210,20 +223,25 @@
                                             @* 확장된 상태에서 미디어 전체 목록 표시 *@
                                             @if (isExpanded && playlistMediaCount > 0)
                                             {
-                                                <RadzenCard Variant="Variant.Outlined" Style="padding: 0.5rem; margin-top: 0.5rem;">
+                                                <RadzenCard Variant="Variant.Outlined" Style="padding: 0.35rem; margin-top: 0.35rem;">
                                                     @{
                                                         var mediaInPlaylist = GetMediaInPlaylistSync(playlist.Id);
                                                     }
                                                     @if (mediaInPlaylist.Any())
                                                     {
-                                                        <RadzenStack Gap="0.35rem" class="media-in-playlist-list">
+                                                        <RadzenStack Gap="0.25rem" class="media-in-playlist-list">
                                                             @foreach (var media in mediaInPlaylist)
                                                             {
                                                                 <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center" 
-                                                                           Style="padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--rz-border-color);">
-                                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                                           Style="padding: 0.25rem 0.35rem; border-bottom: 1px solid var(--rz-border-color);">
+                                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.35rem;">
                                                                         <RadzenIcon Icon="audiotrack" Style="font-size: 0.75rem; color: var(--rz-secondary); opacity: 0.7;" />
-                                                                        <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.7rem;">@media.FileName</RadzenText>
+                                                                        <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.65rem;">@media.FileName</RadzenText>
+                                                                    </RadzenStack>
+                                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.35rem">
+                                                                        <RadzenButton Icon="clear" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small"
+                                                                                    Click="@(() => OpenRemoveMediaFromPlaylistDialog(media, playlist))" Title="플레이리스트에서 제거"
+                                                                                    @onclick:stopPropagation="true" class="expand-button" />
                                                                     </RadzenStack>
                                                                 </RadzenStack>
                                                             }
@@ -251,7 +269,7 @@
 
                 <!-- 우측: 미디어 파일 목록 -->
                 <RadzenColumn Size="12" SizeMD="7">
-                    <RadzenCard class="media-section" Style="padding: 0.75rem;">
+                    <RadzenCard class="media-section" Style="padding: 0.5rem;">
                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="mb-2">
                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
                                 <RadzenIcon Icon="audio_file" Style="font-size: 0.875rem; color: var(--rz-primary);" />
@@ -263,6 +281,12 @@
                                 <RadzenText TextStyle="TextStyle.Caption" class="mb-0 text-muted" Style="font-size: 0.7rem;">
                                     전체: <strong>@allMedia.Count()</strong>
                                 </RadzenText>
+                                <RadzenButton Icon="add" 
+                                              Text="추가" 
+                                              Click="@OpenAddMediaDialog" 
+                                              ButtonStyle="ButtonStyle.Light" 
+                                              Size="ButtonSize.Small"
+                                              Style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" />
                             </RadzenStack>
                         </RadzenStack>
 
@@ -282,7 +306,8 @@
                                             AllowPaging="true"
                                             PageSize="10"
                                             Density="Density.Compact"
-                                            Style="font-size: 0.75rem;">
+                                            Style="font-size: 0.75rem;"
+                                            RowRender="@OnRowRender">
                                 <Columns>
                                     <RadzenDataGridColumn TItem="Medium" Width="40px" TextAlign="TextAlign.Center" Frozen="true">
                                         <Template Context="media">
@@ -293,7 +318,19 @@
                                     </RadzenDataGridColumn>
                                     <RadzenDataGridColumn TItem="Medium" Width="30px" TextAlign="TextAlign.Center" Frozen="true">
                                         <Template Context="media">
-                                            <RadzenIcon Icon="audiotrack" Style="font-size: 0.75rem; color: var(--rz-secondary); opacity: 0.5;" />
+                                            @if (IsMediaSelected(media.Id))
+                                            {
+                                                <div draggable="true"
+                                                     @ondragstart="@(() => HandleDragStart(media))"
+                                                     @ondragend="@HandleDragEnd"
+                                                     style="cursor: grab; display: flex; align-items: center; justify-content: center;">
+                                                    <RadzenIcon Icon="drag_indicator" Style="font-size: 0.875rem; color: var(--rz-primary); cursor: grab;" />
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <RadzenIcon Icon="audiotrack" Style="font-size: 0.75rem; color: var(--rz-secondary); opacity: 0.5;" />
+                                            }
                                         </Template>
                                     </RadzenDataGridColumn>
                                     <RadzenDataGridColumn TItem="Medium" Property="FileName" Title="파일명">
@@ -308,6 +345,39 @@
                                             <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="font-size: 0.7rem;">
                                                 @media.CreatedAt.ToString("yy.MM.dd")
                                             </RadzenText>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="Medium" Title="작업" Width="80px" TextAlign="TextAlign.Center" Frozen="true" FrozenPosition="FrozenColumnPosition.Right">
+                                        <Template Context="media">
+                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" JustifyContent="JustifyContent.Center">
+                                                @if (IsMediaPlaying(media.Id))
+                                                {
+                                                    <RadzenButton Icon="stop" 
+                                                                  ButtonStyle="ButtonStyle.Warning" 
+                                                                  Variant="Variant.Flat" 
+                                                                  Size="ButtonSize.ExtraSmall"
+                                                                  Click="@(() => PlayMedia(media))" 
+                                                                  Title="정지"
+                                                                  Style="min-width: 24px; height: 24px; padding: 0;" />
+                                                }
+                                                else
+                                                {
+                                                    <RadzenButton Icon="play_arrow" 
+                                                                  ButtonStyle="ButtonStyle.Success" 
+                                                                  Variant="Variant.Flat" 
+                                                                  Size="ButtonSize.ExtraSmall"
+                                                                  Click="@(() => PlayMedia(media))" 
+                                                                  Title="재생"
+                                                                  Style="min-width: 24px; height: 24px; padding: 0;" />
+                                                }
+                                                <RadzenButton Icon="delete" 
+                                                              ButtonStyle="ButtonStyle.Light" 
+                                                              Variant="Variant.Flat" 
+                                                              Size="ButtonSize.ExtraSmall"
+                                                              Click="@(() => OpenDeleteMediaDialog(media))" 
+                                                              Title="삭제"
+                                                              Style="min-width: 24px; height: 24px; padding: 0; color: var(--rz-danger);" />
+                                            </RadzenStack>
                                         </Template>
                                     </RadzenDataGridColumn>
                                 </Columns>
@@ -375,7 +445,7 @@
     /* 섹션 스타일 */
     .group-section, .media-section {
         height: 100%;
-        min-height: 450px;
+        min-height: 350px;
     }
 
     /* 그룹 아이템 스타일 */
@@ -399,6 +469,37 @@
             background: linear-gradient(90deg, rgba(var(--rz-primary-rgb), 0.2) 0%, rgba(var(--rz-primary-rgb), 0.15) 100%) !important;
             border: 2px solid var(--rz-primary) !important;
             box-shadow: 0 0 8px rgba(var(--rz-primary-rgb), 0.3) !important;
+        }
+
+        .group-item.drag-over {
+            background-color: rgba(var(--rz-success-rgb), 0.15) !important;
+            border: 2px dashed var(--rz-success) !important;
+            box-shadow: 0 0 12px rgba(var(--rz-success-rgb), 0.4) !important;
+            transform: scale(1.02);
+        }
+
+    /* 처리 중 오버레이 */
+    .processing-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.85);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        border-radius: var(--rz-border-radius);
+    }
+
+    /* 드래그 가능한 항목 커서 */
+    [draggable="true"] {
+        cursor: grab;
+    }
+
+        [draggable="true"]:active {
+            cursor: grabbing;
         }
 
     /* 그룹 내 미디어 목록 */

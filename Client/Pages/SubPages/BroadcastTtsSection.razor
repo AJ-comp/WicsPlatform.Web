@@ -1,9 +1,9 @@
-﻿@using WicsPlatform.Server.Models.wics
+@using WicsPlatform.Server.Models.wics
 
 <RadzenCard class="mt-3 collapsible-panel-container">
 <!-- 패널 헤더 -->
 <div @onclick="TogglePanel" 
-     style="background-color: var(--rz-sidebar-background-color); padding: 0.75rem 1rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
+     style="background-color: var(--rz-sidebar-background-color); padding: 0.5rem 0.75rem; cursor: pointer; transition: all 0.3s ease; user-select: none; border-radius: var(--rz-border-radius) var(--rz-border-radius) 0 0; border-bottom: 1px solid var(--rz-border-color);">
     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="width: 100%;">
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.375rem">
             <RadzenIcon Icon="record_voice_over" Style="font-size: 1.25rem; color: var(--rz-primary);" />
@@ -61,7 +61,7 @@
 
     @if (!IsCollapsed)
     {
-        <div class="panel-content" Style="padding: 1rem;">
+        <div class="panel-content" Style="padding: 0.5rem;">
             @* 방송 중 상태 표시 *@
             @if (IsBroadcasting)
             {
@@ -69,7 +69,7 @@
                              Variant="Variant.Flat"
                              Shade="Shade.Lighter"
                              AllowClose="false"
-                             Style="margin-bottom: 1rem;">
+                             Style="margin-bottom: 0.5rem;">
                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
                         <RadzenIcon Icon="broadcast_on_home" Style="color: var(--rz-info);" />
                         <RadzenText TextStyle="TextStyle.Caption">
@@ -83,7 +83,7 @@
                 </RadzenAlert>
             }
 
-            <RadzenStack Gap="1rem">
+            <RadzenStack Gap="0.5rem;">
                 <!-- TTS 툴바 -->
                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Wrap="FlexWrap.Wrap" Gap="0.5rem">
                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -96,14 +96,16 @@
                             <RadzenButton Text="선택 해제"
                                           Icon="clear"
                                           ButtonStyle="ButtonStyle.Light"
-                                          Size="ButtonSize.Small"
+                                          Size="ButtonSize.ExtraSmall"
                                           Variant="Variant.Flat"
+                                          Style="font-size: 0.7rem; padding: 0.2rem 0.4rem;"
                                           Click="@ClearTtsSelection" />
                         }
                         <RadzenButton Icon="add_circle"
                                       Text="TTS 추가"
-                                      Size="ButtonSize.Small"
+                                      Size="ButtonSize.ExtraSmall"
                                       ButtonStyle="ButtonStyle.Primary"
+                                      Style="font-size: 0.7rem; padding: 0.2rem 0.5rem;"
                                       Click="@ShowAddTtsDialog" />
                     </RadzenStack>
                 </RadzenStack>
@@ -118,66 +120,70 @@
                 }
                 else if (ttsList.Any())
                 {
-                    <div class="tts-list-container" Style="max-height: 350px; overflow-y: auto; border: 1px solid var(--rz-border-color); border-radius: var(--rz-border-radius); padding: 0.5rem;">
+                    <div class="tts-list-container" Style="max-height: 350px; overflow-y: auto; border: 1px solid var(--rz-border-color); border-radius: var(--rz-border-radius); padding: 0.25rem;">
                         @foreach (var tts in ttsList)
                         {
                             <div class="tts-item @(selectedTtsId == tts.Id ? "tts-selected" : "")"
                                  @onclick="@(() => { selectedTtsId = tts.Id; OnRadioButtonListChanged(); })"
-                                 Style="padding: 0.75rem; margin-bottom: 0.5rem; border-radius: var(--rz-border-radius); background: var(--rz-base-background-color); border: 2px solid transparent; cursor: pointer; transition: all 0.2s ease;">
-                                <RadzenRow AlignItems="AlignItems.Center" Gap="0.5rem">
-                                    <RadzenColumn Size="1">
-                                        <RadzenRadioButton Value="@tts.Id" 
-                                                           TValue="ulong?" 
-                                                           SelectedValue="@selectedTtsId" 
-                                                           Name="@($"tts-radio-{Channel?.Id}")"
-                                                           Style="cursor: pointer;" />
+                                 Style="padding: 0.35rem 0.5rem; margin-bottom: 0.25rem; border-radius: var(--rz-border-radius); background: var(--rz-base-background-color); border: 2px solid transparent; cursor: pointer; transition: all 0.2s ease;">
+                                <RadzenRow AlignItems="AlignItems.Center" Gap="0.35rem">
+                                    <RadzenColumn Size="1" Style="display: flex; justify-content: flex-start; align-items: center; padding-left: 0.25rem; padding-right: 0.25rem; max-width: 30px;">
+                                        <input type="radio" 
+                                               name="@($"tts-radio-{Channel?.Id}")"
+                                               checked="@(selectedTtsId == tts.Id)"
+                                               @onclick="@(() => { selectedTtsId = tts.Id; OnRadioButtonListChanged(); })"
+                                               @onclick:stopPropagation="true"
+                                               style="cursor: pointer; width: 16px; height: 16px; margin: 0;" />
                                     </RadzenColumn>
 
-                                    <RadzenColumn Size="7">
-                                        <RadzenStack Gap="0.25rem">
-                                            <RadzenText TextStyle="TextStyle.Subtitle2">
-                                                <strong>@tts.Name</strong>
+                                    <RadzenColumn Size="6">
+                                        <RadzenStack Gap="0.15rem">
+                                            <RadzenText TextStyle="TextStyle.Body2" Style="font-size: 0.75rem; font-weight: 600;">
+                                                @tts.Name
                                             </RadzenText>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary"
-                                                        Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px;">
+                                                        Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px; font-size: 0.65rem;">
                                                 @tts.Content
                                             </RadzenText>
                                         </RadzenStack>
                                     </RadzenColumn>
 
                                     <RadzenColumn Size="2">
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            @tts.CreatedAt.ToString("yyyy.MM.dd")
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" Style="font-size: 0.65rem;">
+                                            @tts.CreatedAt.ToString("yy.MM.dd")
                                         </RadzenText>
                                     </RadzenColumn>
 
-                                    <RadzenColumn Size="2">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.25rem">
+                                    <RadzenColumn Size="3">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.2rem">
                                             <!-- 재생/정지 버튼 -->
                                             <RadzenButton Icon="@(playingTtsId == tts.Id ? "stop" : "play_arrow")"
                                                           ButtonStyle="@(playingTtsId == tts.Id ? ButtonStyle.Warning : ButtonStyle.Success)"
                                                           Variant="Variant.Flat"
-                                                          Size="ButtonSize.Small"
+                                                          Size="ButtonSize.ExtraSmall"
                                                           Click="@(() => ToggleTtsPlayback(tts))"
                                                           @onclick:stopPropagation="true"
+                                                          Style="min-width: 24px; height: 24px; padding: 0;"
                                                           Title="@(playingTtsId == tts.Id ? "정지" : "미리듣기")" />
 
                                             <!-- 편집 버튼 -->
                                             <RadzenButton Icon="edit"
                                                           ButtonStyle="ButtonStyle.Info"
                                                           Variant="Variant.Flat"
-                                                          Size="ButtonSize.Small"
+                                                          Size="ButtonSize.ExtraSmall"
                                                           Click="@(() => OpenEditTtsDialog(tts))"
                                                           @onclick:stopPropagation="true"
+                                                          Style="min-width: 24px; height: 24px; padding: 0;"
                                                           Title="편집" />
 
                                             <!-- 삭제 버튼 -->
                                             <RadzenButton Icon="delete"
                                                           ButtonStyle="ButtonStyle.Danger"
                                                           Variant="Variant.Flat"
-                                                          Size="ButtonSize.Small"
+                                                          Size="ButtonSize.ExtraSmall"
                                                           Click="@(() => OpenDeleteTtsDialog(tts))"
                                                           @onclick:stopPropagation="true"
+                                                          Style="min-width: 24px; height: 24px; padding: 0;"
                                                           Title="삭제" />
                                         </RadzenStack>
                                     </RadzenColumn>
@@ -271,6 +277,22 @@
             border: 2px solid var(--rz-primary) !important;
             box-shadow: 0 0 8px rgba(var(--rz-primary-rgb), 0.3) !important;
         }
+
+    /* 네이티브 라디오 버튼 스타일 */
+    .tts-item input[type="radio"] {
+        display: inline-block !important;
+        width: 16px !important;
+        height: 16px !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        cursor: pointer !important;
+        margin: 0 !important;
+        accent-color: var(--rz-primary) !important;
+    }
+
+    .tts-item input[type="radio"]:checked {
+        accent-color: var(--rz-primary) !important;
+    }
 
     /* 애니메이션 */
     @@keyframes slideDown {

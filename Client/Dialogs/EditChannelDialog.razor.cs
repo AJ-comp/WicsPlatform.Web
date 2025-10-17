@@ -46,8 +46,8 @@ namespace WicsPlatform.Client.Dialogs
             {
                 isProcessing = true;
 
-                // 채널 데이터 가져오기
-                var channel = await Http.GetFromJsonAsync<ChannelData>($"odata/wics/Channels(Id={ChannelId})");
+                // 채널 데이터 가져오기 - OData 키 형식 수정
+                var channel = await Http.GetFromJsonAsync<ChannelData>($"odata/wics/Channels({ChannelId})");
 
                 if (channel != null)
                 {
@@ -97,7 +97,7 @@ namespace WicsPlatform.Client.Dialogs
                 };
 
                 // API 호출하여 채널 업데이트 (PATCH 메서드 사용)
-                var response = await Http.PatchAsJsonAsync($"odata/wics/Channels(Id={ChannelId})", channel);
+                var response = await Http.PatchAsJsonAsync($"odata/wics/Channels({ChannelId})", channel);
 
                 // 응답 확인
                 if (response.IsSuccessStatusCode)

@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Radzen;
 using System.Net.Http;
 using System.Net.Http.Json;
 using WicsPlatform.Shared;
+using Microsoft.JSInterop;
 
 namespace WicsPlatform.Client.Pages.SubPages
 {
@@ -26,8 +28,13 @@ namespace WicsPlatform.Client.Pages.SubPages
         [Inject] protected DialogService DialogService { get; set; }
         [Inject] protected wicsService WicsService { get; set; }
         [Inject] protected HttpClient Http { get; set; }
+        [Inject] protected IJSRuntime JSRuntime { get; set; }
 
         [Inject] protected ILogger<BroadcastPlaylistSection> _logger { get; set; }
+
+        private IJSObjectReference jsModule;
+        private IJSObjectReference jsPlayer;
+        private DotNetObjectReference<BroadcastPlaylistSection> dotNetRef;
 
         /* ────────────────────── [State - 기존] ────────────────────── */
         // 플레이리스트 관련 필드
@@ -64,6 +71,18 @@ namespace WicsPlatform.Client.Pages.SubPages
         // alias for Razor handler
         private Task OnSeek(int seconds) => Seek(seconds);
 
+        // 드래그 앤 드롭 관련 필드
+        private bool isDragging = false;
+        private ulong? isDraggingOverPlaylist = null;
+        private bool isAddingToPlaylist = false;
+        private int addProgress = 0;
+        private int addTotal = 0;
+
+        protected int AddProgressPercent => addTotal == 0 ? 0 : (int)((double)addProgress / addTotal * 100);
+
+        // 미디어 재생 관련 필드
+        private ulong? playingMediaId = null;
+
         /* ────────────────────── [Life-Cycle] ────────────────────── */
         protected override async Task OnInitializedAsync()
         {
@@ -93,8 +112,29 @@ namespace WicsPlatform.Client.Pages.SubPages
                 _npTimer?.Stop();
                 _npTimer?.Dispose();
                 _npTimer = null;
+                dotNetRef?.Dispose();
             }
             catch { }
+        }
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (firstRender)
+            {
+                try
+                {
+                    // 버전 쿼리 스트링으로 캐시 무효화
+                    var version = DateTime.Now.Ticks.ToString();
+                    jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", $"./js/dragdrop.js?v={version}");
+                    jsPlayer = await JSRuntime.InvokeAsync<IJSObjectReference>("import", $"./js/mediaplayer.js?v={version}");
+                    dotNetRef = DotNetObjectReference.Create(this);
+                    await jsModule.InvokeVoidAsync("initializeDragDrop", dotNetRef);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "JavaScript 모듈 로드 실패");
+                }
+            }
         }
 
         private void SetupNowPlayingTimer()
@@ -673,7 +713,9 @@ namespace WicsPlatform.Client.Pages.SubPages
         // 선택된 미디어 목록 가져오기
         public IEnumerable<WicsPlatform.Server.Models.wics.Medium> GetSelectedMedia()
         {
-            return playlistMedia.Where(m => selectedMedia.ContainsKey(m.Id) && selectedMedia[m.Id]);
+            // playlistMedia가 아닌 allMedia에서 선택된 미디어 가져오기
+            // 이렇게 해야 우측 전체 미디어 목록에서 선택한 미디어도 포함됨
+            return allMedia.Where(m => selectedMedia.ContainsKey(m.Id) && selectedMedia[m.Id]);
         }
 
         // 선택된 미디어가 있는지 확인
@@ -773,7 +815,8 @@ namespace WicsPlatform.Client.Pages.SubPages
             {
                 var query = new Radzen.Query
                 {
-                    Expand = "Group,Medium"
+                    Expand = "Group,Medium",
+                    Filter = "(DeleteYn eq 'N' or DeleteYn eq null) and (Medium/DeleteYn eq 'N' or Medium/DeleteYn eq null)"
                 };
 
                 var result = await WicsService.GetMapMediaGroups(query);
@@ -833,10 +876,23 @@ namespace WicsPlatform.Client.Pages.SubPages
         }
 
         // 개별 미디어 선택 변경
-        private void OnMediaSelectionChanged(ulong mediaId, bool isSelected)
+        private async Task OnMediaSelectionChanged(ulong mediaId, bool isSelected)
         {
             selectedMedia[mediaId] = isSelected;
             StateHasChanged();
+            
+            // JavaScript 드래그 핸들러 새로고침
+            if (jsModule != null && dotNetRef != null)
+            {
+                try
+                {
+                    await jsModule.InvokeVoidAsync("refreshDragDrop", dotNetRef);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "refreshDragDrop 호출 실패");
+                }
+            }
         }
 
         // 플레이리스트의 미디어 개수 가져오기 (int)
@@ -891,6 +947,364 @@ namespace WicsPlatform.Client.Pages.SubPages
             if (result == true)
             {
                 await LoadPlaylists();
+            }
+        }
+
+        // 미디어 추가 다이얼로그 열기
+        protected async Task OpenAddMediaDialog()
+        {
+            var result = await DialogService.OpenAsync<WicsPlatform.Client.Dialogs.AddMediaDialog>("미디어 파일 추가",
+                null,
+                new DialogOptions
+                {
+                    Width = "650px",
+                    Height = "auto",
+                    Resizable = false,
+                    Draggable = true
+                });
+
+            if (result == true)
+            {
+                // 미디어 목록 새로고침
+                await LoadAllMedia();
+                await LoadMediaGroupMappings();
+                StateHasChanged();
+            }
+        }
+
+        // 미디어를 플레이리스트에서 제거하는 다이얼로그 열기
+        protected async Task OpenRemoveMediaFromPlaylistDialog(WicsPlatform.Server.Models.wics.Medium media, WicsPlatform.Server.Models.wics.Group playlist)
+        {
+            var result = await DialogService.Confirm(
+                $"'{media.FileName}' 미디어를 '{playlist.Name}' 플레이리스트에서 제거하시겠습니까?",
+                "미디어 제거",
+                new ConfirmOptions()
+                {
+                    OkButtonText = "제거",
+                    CancelButtonText = "취소"
+                });
+
+            if (result == true)
+            {
+                await RemoveMediaFromPlaylist(media, playlist);
+            }
+        }
+
+        // 미디어를 플레이리스트에서 제거
+        protected async Task RemoveMediaFromPlaylist(WicsPlatform.Server.Models.wics.Medium media, WicsPlatform.Server.Models.wics.Group playlist)
+        {
+            try
+            {
+                var mapping = mediaGroupMappings
+                    .FirstOrDefault(m => m.MediaId == media.Id && m.GroupId == playlist.Id);
+
+                if (mapping != null)
+                {
+                    // 매핑 삭제 (하드 삭제)
+                    var response = await Http.DeleteAsync($"odata/wics/MapMediaGroups({mapping.Id})");
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        NotifySuccess($"'{media.FileName}' 미디어가 '{playlist.Name}' 플레이리스트에서 제거되었습니다.");
+
+                        // 데이터 새로고침
+                        await LoadMediaGroupMappings();
+                        await LoadPlaylists();
+
+                        // 플레이리스트 목록 새로고침
+                        if (expandedPlaylists.Contains(playlist.Id))
+                        {
+                            StateHasChanged();
+                        }
+                    }
+                    else
+                    {
+                        NotifyError("제거 실패", new Exception("미디어를 플레이리스트에서 제거하는 중 오류가 발생했습니다."));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                NotifyError("미디어 제거 중 오류 발생", ex);
+                _logger.LogError(ex, "미디어 제거 중 오류");
+            }
+        }
+
+        // 미디어 재생/정지 토글
+        protected async Task PlayMedia(WicsPlatform.Server.Models.wics.Medium media)
+        {
+            if (jsPlayer == null)
+            {
+                NotifyWarning("미디어 플레이어를 초기화하는 중입니다. 잠시 후 다시 시도해주세요.");
+                return;
+            }
+
+            try
+            {
+                // 현재 재생 중인 미디어를 클릭한 경우 정지
+                if (playingMediaId == media.Id)
+                {
+                    await jsPlayer.InvokeVoidAsync("stopMedia");
+                    playingMediaId = null;
+                    NotifyInfo($"'{media.FileName}' 재생을 중지했습니다.");
+                    StateHasChanged();
+                    return;
+                }
+
+                // 다른 미디어 재생
+                var url = media.FullPath;
+                if (!string.IsNullOrEmpty(url) && !url.StartsWith("/Uploads/", StringComparison.OrdinalIgnoreCase))
+                {
+                    url = $"/Uploads/{System.IO.Path.GetFileName(url)}";
+                }
+
+                await jsPlayer.InvokeVoidAsync("playMedia", url);
+                playingMediaId = media.Id;
+                NotifyInfo($"'{media.FileName}' 재생 중...");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                NotifyError("미디어 재생 실패", ex);
+                _logger.LogError(ex, "미디어 재생 중 오류");
+                playingMediaId = null;
+            }
+        }
+
+        // 미디어가 재생 중인지 확인
+        protected bool IsMediaPlaying(ulong mediaId)
+        {
+            return playingMediaId == mediaId;
+        }
+
+        // 미디어 삭제 다이얼로그 열기
+        protected async Task OpenDeleteMediaDialog(WicsPlatform.Server.Models.wics.Medium media)
+        {
+            var result = await DialogService.Confirm(
+                $"'{media.FileName}' 미디어를 삭제하시겠습니까?\n\n삭제된 미디어는 모든 플레이리스트에서 제거됩니다.",
+                "미디어 삭제",
+                new ConfirmOptions()
+                {
+                    OkButtonText = "삭제",
+                    CancelButtonText = "취소"
+                });
+
+            if (result == true)
+            {
+                await DeleteMedia(media);
+            }
+        }
+
+        // 미디어 삭제
+        protected async Task DeleteMedia(WicsPlatform.Server.Models.wics.Medium media)
+        {
+            try
+            {
+                // 1. 해당 미디어와 연결된 모든 MapMediaGroup 찾기
+                var mapQuery = new Radzen.Query
+                {
+                    Filter = $"MediaId eq {media.Id}"
+                };
+                var mapResult = await WicsService.GetMapMediaGroups(mapQuery);
+                
+                if (mapResult.Value != null && mapResult.Value.Any())
+                {
+                    // 모든 매핑 레코드 삭제
+                    foreach (var mapping in mapResult.Value)
+                    {
+                        mapping.DeleteYn = "Y";
+                        mapping.UpdatedAt = DateTime.Now;
+                        await WicsService.UpdateMapMediaGroup(mapping.Id, mapping);
+                    }
+                }
+
+                // 2. 미디어 Soft Delete: DeleteYn을 Y로 변경
+                media.DeleteYn = "Y";
+                media.UpdatedAt = DateTime.Now;
+                await WicsService.UpdateMedium(media.Id, media);
+                
+                NotifySuccess($"'{media.FileName}' 미디어가 모든 플레이리스트에서 제거되고 삭제되었습니다.");
+
+                // 데이터 새로고침
+                await LoadAllMedia();
+                await LoadMediaGroupMappings();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                NotifyError("미디어 삭제 중 오류 발생", ex);
+                _logger.LogError(ex, "미디어 삭제 중 오류");
+            }
+        }
+
+        /* ────────────────────── [Drag & Drop Handlers] ────────────────────── */
+        protected void OnRowRender(RowRenderEventArgs<WicsPlatform.Server.Models.wics.Medium> args)
+        {
+            if (IsMediaSelected(args.Data.Id))
+            {
+                args.Attributes.Add("draggable", "true");
+                
+                if (args.Attributes.TryGetValue("class", out var existingClass))
+                {
+                    args.Attributes["class"] = $"{existingClass} media-draggable";
+                }
+                else
+                {
+                    args.Attributes.Add("class", "media-draggable");
+                }
+            }
+        }
+
+        [JSInvokable]
+        public async Task HandleDropFromJS(ulong playlistId)
+        {
+            _logger.LogInformation($"===== HandleDropFromJS 호출됨! PlaylistId: {playlistId}, 선택된 미디어 수: {selectedMedia.Count(kvp => kvp.Value)} =====");
+            
+            var playlist = playlists.FirstOrDefault(p => p.Id == playlistId);
+            if (playlist != null && selectedMedia.Any(kvp => kvp.Value))
+            {
+                await AddSelectedMediaToPlaylist(playlist);
+            }
+            
+            isDragging = false;
+            isDraggingOverPlaylist = null;
+            await InvokeAsync(StateHasChanged);
+        }
+
+        protected void HandleDragStart(WicsPlatform.Server.Models.wics.Medium media)
+        {
+            isDragging = true;
+            _logger.LogInformation($"드래그 시작: {media.FileName} (ID: {media.Id})");
+        }
+
+        protected void HandleDragEnd(DragEventArgs e)
+        {
+            isDragging = false;
+            isDraggingOverPlaylist = null;
+            _logger.LogInformation("드래그 종료");
+        }
+
+        protected void HandleDragEnter(WicsPlatform.Server.Models.wics.Group playlist)
+        {
+            if (isDragging && selectedMedia.Any(kvp => kvp.Value))
+            {
+                isDraggingOverPlaylist = playlist.Id;
+                _logger.LogInformation($"드래그 오버: {playlist.Name}");
+            }
+        }
+
+        protected void HandleDragLeave(WicsPlatform.Server.Models.wics.Group playlist)
+        {
+            if (isDraggingOverPlaylist == playlist.Id)
+            {
+                isDraggingOverPlaylist = null;
+            }
+        }
+
+        // 선택된 미디어들을 플레이리스트에 추가
+        protected async Task AddSelectedMediaToPlaylist(WicsPlatform.Server.Models.wics.Group playlist)
+        {
+            var selectedMediaIds = selectedMedia.Where(kvp => kvp.Value).Select(kvp => kvp.Key).ToList();
+            
+            if (!selectedMediaIds.Any())
+            {
+                NotifyWarning("추가할 미디어를 선택하세요.");
+                return;
+            }
+
+            if (isAddingToPlaylist)
+            {
+                _logger.LogInformation("이미 처리 중입니다.");
+                return;
+            }
+
+            try
+            {
+                isAddingToPlaylist = true;
+                StateHasChanged();
+
+                var mediaToAdd = allMedia.Where(m => selectedMediaIds.Contains(m.Id)).ToList();
+
+                addProgress = 0;
+                addTotal = mediaToAdd.Count;
+                StateHasChanged();
+
+                int successCount = 0;
+                int failCount = 0;
+                int alreadyExistsCount = 0;
+
+                await LoadMediaGroupMappings();
+
+                foreach (var media in mediaToAdd)
+                {
+                    try
+                    {
+                        var existingMapping = mediaGroupMappings
+                            .FirstOrDefault(m => m.MediaId == media.Id && m.GroupId == playlist.Id);
+
+                        if (existingMapping != null)
+                        {
+                            alreadyExistsCount++;
+                            continue;
+                        }
+
+                        var mapMediaGroup = new WicsPlatform.Server.Models.wics.MapMediaGroup
+                        {
+                            MediaId = media.Id,
+                            GroupId = playlist.Id,
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        };
+
+                        var response = await Http.PostAsJsonAsync("odata/wics/MapMediaGroups", mapMediaGroup);
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            successCount++;
+                        }
+                        else
+                        {
+                            failCount++;
+                        }
+                    }
+                    catch
+                    {
+                        failCount++;
+                    }
+
+                    addProgress++;
+                    StateHasChanged();
+                }
+
+                if (successCount > 0)
+                {
+                    NotifySuccess($"{successCount}개의 미디어가 '{playlist.Name}' 플레이리스트에 추가되었습니다." +
+                                (alreadyExistsCount > 0 ? $" ({alreadyExistsCount}개는 이미 플레이리스트에 속해있음)" : "") +
+                                (failCount > 0 ? $" ({failCount}개 실패)" : ""));
+
+                    await LoadMediaGroupMappings();
+                    await LoadPlaylists();
+                    StateHasChanged();
+                }
+                else if (alreadyExistsCount > 0)
+                {
+                    NotifyInfo($"선택한 미디어들은 이미 '{playlist.Name}' 플레이리스트에 속해있습니다.");
+                }
+                else
+                {
+                    NotifyWarning("미디어를 플레이리스트에 추가하는데 실패했습니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                NotifyError("미디어 플레이리스트 추가 중 오류 발생", ex);
+                _logger.LogError(ex, "미디어 플레이리스트 추가 중 오류");
+            }
+            finally
+            {
+                addProgress = addTotal;
+                isAddingToPlaylist = false;
+                StateHasChanged();
             }
         }
 

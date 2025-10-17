@@ -69,7 +69,9 @@ namespace WicsPlatform.Client.Pages.SubPages
             {
                 try
                 {
-                    jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/dragdrop.js");
+                    // 버전 쿼리 스트링으로 캐시 무효화
+                    var version = DateTime.Now.Ticks.ToString();
+                    jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", $"./js/dragdrop.js?v={version}");
                     dotNetRef = DotNetObjectReference.Create(this);
                     await jsModule.InvokeVoidAsync("initializeDragDrop", dotNetRef);
                 }

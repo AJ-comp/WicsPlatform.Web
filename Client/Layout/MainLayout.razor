@@ -6,221 +6,110 @@
 
 <ThemeHead />
 
-<RadzenLayout style="grid-template-areas: 'rz-sidebar rz-header' 'rz-sidebar rz-body';">
+<RadzenLayout style="grid-template-areas: 'rz-header' 'rz-body'; grid-template-columns: 1fr;">
     <RadzenHeader>
-        <RadzenRow JustifyContent="JustifyContent.Start" AlignItems="AlignItems.Center" Gap="0">
-            <RadzenColumn Size="5">
-                <RadzenSidebarToggle Click="@SidebarToggleClick"></RadzenSidebarToggle>
-            </RadzenColumn>
-            <RadzenColumn Size="7">
-                <RadzenStack AlignItems="AlignItems.Center" Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-px-2">
-                    <RadzenAppearanceToggle />
-                    <RadzenProfileMenu style="@(Security.IsAuthenticated() ? "" : "visibility: hidden;")" Click="@ProfileMenuClick">
-                        <ChildContent>
-
-                            <RadzenProfileMenuItem Path="profile" Icon="settings" Text="Profile" />
-                            <RadzenProfileMenuItem Path="application-users" Icon="person" Text="Users" />
-                            <RadzenProfileMenuItem Path="application-roles" Icon="security" Text="Roles" />
-                            <RadzenProfileMenuItem Text="Logout" Value="Logout" Icon="power_settings_new" />
-                        </ChildContent>
-                        <Template>
-                            @Security.User?.Name
-                            <RadzenGravatar Email="@Security.User?.Name" />
-                        </Template>
-                    </RadzenProfileMenu>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="1rem" class="rz-px-4" Style="height: 100%;">
+            <!-- 로고 및 메뉴 영역 (왼쪽) -->
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="2rem">
+                <!-- 로고 -->
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenImage Path="images/logo.png" style="width: 32px; height: 32px;" AlternateText="WicsPlatform logo"></RadzenImage>
+                    <RadzenText Text="WicsPlatform" TextStyle="Radzen.Blazor.TextStyle.Subtitle1" class="rz-mb-0" Style="font-weight: 600;" />
                 </RadzenStack>
-            </RadzenColumn>
-        </RadzenRow>
-    </RadzenHeader>
-    <RadzenBody Expanded="@sidebarExpanded">
-        <RadzenRow class="rz-mx-auto rz-px-4 rz-pt-2 rz-pt-md-4 rz-pt-lg-6 rz-pt-xl-12 rz-pb-2 rz-pb-lg-12" Style="max-width: 1440px;">
-            <RadzenColumn Size="12">
-                @Body
-            </RadzenColumn>
-        </RadzenRow>
-    </RadzenBody>
-    <RadzenSidebar @bind-Expanded="@sidebarExpanded" Style="@($"z-index: 2; width: {(sidebarExpanded ? "250px" : "80px")}; transition: width 0.3s ease;")" class="icon-sidebar">
-        <RadzenStack AlignItems="Radzen.AlignItems.Center" class="rz-py-3" Style="padding: 0.5rem; border-bottom: var(--rz-panel-menu-item-border);">
-            <RadzenImage Path="images/logo.png" style="width: 40px; height: 40px;" AlternateText="Application logo"></RadzenImage>
-            @if (sidebarExpanded)
-            {
-                <RadzenText Text="WicsPlatform" TextStyle="Radzen.Blazor.TextStyle.Subtitle2" class="rz-mb-0 rz-mt-2" style="color: var(--rz-sidebar-color);" />
-            }
-        </RadzenStack>
-        <div class="icon-menu-container">
-            <RadzenStack Gap="0.25rem" Style="padding: 0.5rem;">
-                <NavLink href="" class="icon-menu-item" Match="NavLinkMatch.All" data-tooltip="홈">
-                    <RadzenIcon Icon="home" />
-                    @if (sidebarExpanded)
-                    {
-                        <span class="menu-text">홈</span>
-                    }
-                </NavLink>
-                <NavLink href="manage-media" class="icon-menu-item" data-tooltip="미디어 관리">
-                    <RadzenIcon Icon="perm_media" />
-                    @if (sidebarExpanded)
-                    {
-                        <span class="menu-text">미디어 관리</span>
-                    }
-                </NavLink>
-                <NavLink href="manage-broad-cast" class="icon-menu-item" data-tooltip="방송 관리">
-                    <RadzenIcon Icon="settings_input_antenna" />
-                    @if (sidebarExpanded)
-                    {
-                        <span class="menu-text">방송 관리</span>
-                    }
-                </NavLink>
-                <!-- 예약 방송 메뉴 추가 -->
-                <NavLink href="manage-schedule" class="icon-menu-item" data-tooltip="예약 방송">
-                    <RadzenIcon Icon="schedule" />
-                    @if (sidebarExpanded)
-                    {
-                        <span class="menu-text">예약 방송</span>
-                    }
-                </NavLink>
+                
+                <!-- 메뉴 -->
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="top-menu">
+                    <NavLink href="" class="top-menu-item" Match="NavLinkMatch.All">
+                        <RadzenIcon Icon="home" />
+                        <span>홈</span>
+                    </NavLink>
+                    <NavLink href="manage-broad-cast" class="top-menu-item">
+                        <RadzenIcon Icon="settings_input_antenna" />
+                        <span>방송 관리</span>
+                    </NavLink>
+                </RadzenStack>
             </RadzenStack>
-        </div>
-        <RadzenStack AlignItems="Radzen.AlignItems.Center" Gap="0" class="rz-py-3" Style="padding: 0.5rem; position: absolute; bottom: 0; width: 100%;">
-            @if (sidebarExpanded)
-            {
-                <RadzenText Text="WicsPlatform v1.0.0" TextStyle="Radzen.Blazor.TextStyle.Caption" TagName="Radzen.Blazor.TagName.P" TextAlign="Radzen.TextAlign.Center" />
-                <RadzenText Text="Copyright Ⓒ 2025" TextStyle="Radzen.Blazor.TextStyle.Caption" class="rz-mb-0" TagName="Radzen.Blazor.TagName.P" TextAlign="Radzen.TextAlign.Center" />
-            }
-            else
-            {
-                <RadzenText Text="v1.0.0" TextStyle="Radzen.Blazor.TextStyle.Caption" class="rz-mb-0" />
-            }
+
+            <!-- 우측 메뉴 -->
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenAppearanceToggle />
+                <RadzenProfileMenu style="@(Security.IsAuthenticated() ? "" : "visibility: hidden;")" Click="@ProfileMenuClick">
+                    <ChildContent>
+                        <RadzenProfileMenuItem Path="profile" Icon="settings" Text="Profile" />
+                        <RadzenProfileMenuItem Path="application-users" Icon="person" Text="Users" />
+                        <RadzenProfileMenuItem Path="application-roles" Icon="security" Text="Roles" />
+                        <RadzenProfileMenuItem Text="Logout" Value="Logout" Icon="power_settings_new" />
+                    </ChildContent>
+                    <Template>
+                        @Security.User?.Name
+                        <RadzenGravatar Email="@Security.User?.Name" />
+                    </Template>
+                </RadzenProfileMenu>
+            </RadzenStack>
         </RadzenStack>
-    </RadzenSidebar>
+    </RadzenHeader>
+    <RadzenBody>
+        <div class="rz-px-4 rz-pt-2 rz-pt-md-4 rz-pb-2 rz-pb-lg-12">
+            @Body
+        </div>
+    </RadzenBody>
 </RadzenLayout>
 
 <style>
-    /* 아이콘 기반 사이드바 스타일 */
-    .icon-sidebar {
-        overflow-x: hidden;
-        overflow-y: auto;
-    }
-
-    .icon-menu-container {
-        flex: 1;
-        overflow-y: auto;
-    }
-
-    .icon-menu-item {
+    /* 상단 메뉴 스타일 */
+    .top-menu-item {
         display: flex;
         align-items: center;
-        padding: 0.75rem 1rem;
-        margin: 0.25rem 0;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
         border-radius: var(--rz-border-radius);
         text-decoration: none;
-        color: var(--rz-sidebar-color);
+        color: var(--rz-text-color);
         transition: all 0.2s ease;
-        position: relative;
-        overflow: hidden;
-        white-space: nowrap;
+        font-size: 0.9rem;
+        font-weight: 500;
     }
 
-        .icon-menu-item:hover {
-            background-color: var(--rz-sidebar-item-background-color-hover);
-            color: var(--rz-sidebar-item-color-hover);
-        }
-
-        .icon-menu-item.active {
-            background-color: var(--rz-primary);
-            color: var(--rz-on-primary);
-        }
-
-        .icon-menu-item .rz-icon {
-            font-size: 1.5rem;
-            min-width: 1.5rem;
-            transition: transform 0.2s ease;
-        }
-
-        .icon-menu-item:hover .rz-icon {
-            transform: scale(1.1);
-        }
-
-        .icon-menu-item .menu-text {
-            margin-left: 1rem;
-            font-size: 0.9rem;
-            font-weight: 500;
-            opacity: 0;
-            animation: fadeIn 0.3s ease forwards;
-        }
-
-    @@keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateX(-10px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
+    .top-menu-item:hover {
+        background-color: var(--rz-base-200);
+        color: var(--rz-primary);
     }
 
-    /* 축소된 상태에서 툴팁 효과 */
-    .rz-sidebar:not(.rz-sidebar-expanded) .icon-menu-item {
-        justify-content: center;
+    .top-menu-item.active {
+        background-color: var(--rz-primary-lighter);
+        color: var(--rz-primary);
+        font-weight: 600;
     }
 
-        .rz-sidebar:not(.rz-sidebar-expanded) .icon-menu-item::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            left: 100%;
-            margin-left: 0.5rem;
-            padding: 0.5rem 1rem;
-            background-color: var(--rz-base-900);
-            color: var(--rz-on-base-900);
-            border-radius: var(--rz-border-radius);
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
-            z-index: 1000;
-        }
+    .top-menu-item .rz-icon {
+        font-size: 1.25rem;
+    }
 
-        .rz-sidebar:not(.rz-sidebar-expanded) .icon-menu-item:hover::after {
-            opacity: 1;
-        }
+    /* 헤더 높이 조정 */
+    .rz-header {
+        height: 60px;
+        border-bottom: 1px solid var(--rz-border-color);
+    }
+
+    /* Body 영역 전체 너비 사용 */
+    .rz-body {
+        width: 100%;
+        max-width: 100%;
+    }
 
     /* 다크 테마 지원 */
-    :root[data-theme='dark'] .icon-menu-item {
-        color: var(--rz-sidebar-color);
-    }
-
-        :root[data-theme='dark'] .icon-menu-item:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-
-        :root[data-theme='dark'] .icon-menu-item.active {
-            background-color: var(--rz-primary);
-            color: var(--rz-on-primary);
-        }
-
-    /* 스크롤바 스타일 */
-    .icon-sidebar::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .icon-sidebar::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .icon-sidebar::-webkit-scrollbar-thumb {
-        background: var(--rz-sidebar-item-background-color-hover);
-        border-radius: 3px;
+    :root[data-theme='dark'] .top-menu-item:hover {
+        background-color: rgba(255, 255, 255, 0.1);
     }
 
     /* 반응형 대응 */
     @@media (max-width: 768px) {
-        .icon-sidebar {
-            width: 80px !important;
+        .top-menu-item span {
+            display: none;
         }
 
-        .icon-menu-item .menu-text {
-            display: none;
+        .top-menu {
+            gap: 0.25rem !important;
         }
     }
 </style>

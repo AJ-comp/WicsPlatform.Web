@@ -1,129 +1,284 @@
 @attribute [Authorize]
 
-<div class="edit-channel-dialog">
-    <div class="dialog-header">
-        <RadzenIcon Icon="settings_input_antenna" Style="font-size: 32px; margin-right: 12px;" />
-        <RadzenText TextStyle="TextStyle.H5" class="mb-0">채널 정보 수정</RadzenText>
-    </div>
-
-    <div class="dialog-description">
-        <RadzenText TextStyle="TextStyle.Body2">
-            채널 정보를 수정합니다. 채널명과 설명을 변경할 수 있습니다.
-        </RadzenText>
-    </div>
-
-    <RadzenTemplateForm TItem="ChannelFormModel" Data="@model" Submit="@FormSubmit">
-        <RadzenAlert Shade="Shade.Lighter" Variant="Variant.Flat" Size="AlertSize.Small"
-                     AlertStyle="AlertStyle.Danger" Visible="@errorVisible">
-            <RadzenIcon Icon="error_outline" class="me-2" />
-            @error
-        </RadzenAlert>
-
-        <div class="form-section">
-            <div class="form-section-header">
-                <RadzenText TextStyle="TextStyle.Subtitle2" Class="mb-2">기본 정보</RadzenText>
-                <div class="section-divider"></div>
+<RadzenStack Gap="1rem" Style="width: 100%;">
+    <!-- 헤더 카드 -->
+    <RadzenCard Variant="Variant.Outlined" class="header-card">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+            <div class="icon-wrapper">
+                <RadzenIcon Icon="edit" Style="font-size: 1.5rem; color: var(--rz-primary);" />
             </div>
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.H6" class="mb-0" Style="color: var(--rz-text-color); font-weight: 600;">
+                    채널 정보 수정
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="color: var(--rz-text-secondary-color); font-size: 0.75rem;">
+                    채널 정보를 수정합니다. 채널명과 설명을 변경할 수 있습니다.
+                </RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
 
-            <RadzenRow style="margin-bottom: 1.5rem">
-                <RadzenColumn SizeMD="3">
-                    <RadzenLabel Text="채널명" Component="Name" style="width: 100%" />
-                </RadzenColumn>
-                <RadzenColumn SizeMD="9">
-                    <div class="custom-input-container">
-                        <RadzenIcon Icon="label" />
-                        <RadzenTextBox style="display: block; width: 100%; padding-left: 35px;"
-                                       Placeholder="채널 이름 입력..."
-                                       @bind-Value="@(model.Name)" Name="Name" />
-                    </div>
-                    <RadzenRequiredValidator Component="Name" Text="채널명은 필수입니다" Style="position: absolute" />
-                </RadzenColumn>
-            </RadzenRow>
+    <!-- 폼 섹션 -->
+    <RadzenTemplateForm TItem="ChannelFormModel" Data="@model" Submit="@FormSubmit">
+        <!-- 에러 알림 -->
+        @if (errorVisible)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger"
+                         Variant="Variant.Flat"
+                         Size="AlertSize.Small"
+                         class="error-alert">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="error_outline" />
+                    <RadzenText TextStyle="TextStyle.Caption">@error</RadzenText>
+                </RadzenStack>
+            </RadzenAlert>
+        }
 
-            <RadzenRow style="margin-bottom: 1.5rem">
-                <RadzenColumn SizeMD="3">
-                    <RadzenLabel Text="설명" Component="Description" style="width: 100%" />
-                </RadzenColumn>
-                <RadzenColumn SizeMD="9">
-                    <div class="custom-input-container">
-                        <RadzenIcon Icon="description" Style="align-self: flex-start; margin-top: 8px;" />
-                        <RadzenTextArea Rows="4" style="display: block; width: 100%; padding-left: 35px;"
-                                        Placeholder="채널 설명 입력..."
-                                        @bind-Value="@(model.Description)" Name="Description" />
-                    </div>
-                </RadzenColumn>
-            </RadzenRow>
-        </div>
+        <!-- 기본 정보 섹션 -->
+        <RadzenCard class="section-card">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="section-header">
+                    <RadzenIcon Icon="info" class="section-icon primary" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="section-title">기본 정보</RadzenText>
+                </RadzenStack>
 
-        <div class="form-actions">
-            <RadzenButton ButtonStyle="ButtonStyle.Light" Text="취소" Click="@CancelClick" Variant="Variant.Flat" class="me-2" Disabled="@isProcessing" />
+                <!-- 채널명 필드 -->
+                <RadzenRow Gap="0.5rem">
+                    <RadzenColumn Size="12" SizeMD="12">
+                        <RadzenFormField Text="채널명" Variant="Variant.Outlined" class="form-field">
+                            <ChildContent>
+                                <RadzenTextBox @bind-Value="@model.Name"
+                                               Placeholder="예: 1층 로비 방송"
+                                               Name="Name"
+                                               class="input-field" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint">
+                                    <RadzenIcon Icon="label" class="hint-icon" />
+                                    채널을 쉽게 식별할 수 있는 이름을 입력하세요
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                        <RadzenRequiredValidator Component="Name"
+                                                 Text="채널명은 필수 입력 항목입니다" />
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <!-- 설명 필드 -->
+                <RadzenRow Gap="0.5rem">
+                    <RadzenColumn Size="12" SizeMD="12">
+                        <RadzenFormField Text="설명 (선택)" Variant="Variant.Outlined" class="form-field">
+                            <ChildContent>
+                                <RadzenTextArea @bind-Value="@model.Description"
+                                                Rows="3"
+                                                Placeholder="채널의 용도나 특징을 간단히 설명해주세요"
+                                                Name="Description"
+                                                class="input-field" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint">
+                                    <RadzenIcon Icon="description" class="hint-icon" />
+                                    채널의 목적이나 사용 위치 등을 입력할 수 있습니다
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- 정보 카드 -->
+        <RadzenCard class="info-card">
+            <RadzenStack Gap="0.75rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="lightbulb" class="info-icon" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="info-title">수정 안내</RadzenText>
+                </RadzenStack>
+                <RadzenStack Gap="0.5rem" class="info-list">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">채널명과 설명만 수정 가능합니다</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">오디오 설정 변경은 방송 설정 메뉴에서 가능합니다</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">변경 사항은 즉시 적용됩니다</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- 액션 버튼 섹션 -->
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" AlignItems="AlignItems.Center" Gap="0.75rem" class="dialog-actions">
+            <RadzenButton ButtonStyle="ButtonStyle.Light"
+                          Text="취소"
+                          Icon="close"
+                          Click="@CancelClick"
+                          Size="ButtonSize.Medium"
+                          Disabled="@isProcessing" />
             @if (isProcessing)
             {
-                <RadzenButton ButtonType="ButtonType.Submit" Text="처리 중..." Icon="sync" IconSpin="true"
-                              Disabled="true" Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" />
+                <RadzenButton ButtonType="ButtonType.Submit"
+                              Text="저장 중..."
+                              Icon="sync"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Medium"
+                              IsBusy="true"
+                              Disabled="true" />
             }
             else
             {
-                <RadzenButton ButtonType="ButtonType.Submit" Icon="save" Text="저장"
-                              Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" />
+                <RadzenButton ButtonType="ButtonType.Submit"
+                              Icon="save"
+                              Text="저장"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Medium" />
             }
-        </div>
+        </RadzenStack>
     </RadzenTemplateForm>
-</div>
+</RadzenStack>
 
 <style>
-    .edit-channel-dialog {
-        padding: 0;
+    /* 헤더 카드 */
+    .header-card {
+        background: linear-gradient(135deg, var(--rz-primary-lighter) 0%, var(--rz-base-background-color) 100%);
+        border: 1px solid var(--rz-primary-light);
     }
 
-    .dialog-header {
+    .icon-wrapper {
+        width: 3rem;
+        height: 3rem;
         display: flex;
         align-items: center;
-        margin-bottom: 16px;
+        justify-content: center;
+        background: var(--rz-base-background-color);
+        border-radius: var(--rz-border-radius);
+        border: 1px solid var(--rz-primary-light);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
-    .dialog-description {
-        margin-bottom: 24px;
-        padding-bottom: 16px;
-        border-bottom: 1px solid var(--rz-border-light);
+    /* 에러 알림 */
+    .error-alert {
+        padding: 0.75rem !important;
+        border-radius: var(--rz-border-radius) !important;
     }
 
-    .form-section {
-        margin-bottom: 20px;
+    /* 섹션 카드 */
+    .section-card {
+        padding: 1.25rem !important;
+        background: rgba(var(--rz-primary-rgb), 0.03) !important;
+        border: 1px solid var(--rz-border-color) !important;
+        border-radius: var(--rz-border-radius) !important;
+        transition: all 0.2s ease;
     }
 
-    .form-section-header {
-        margin-bottom: 16px;
-    }
-
-    .section-divider {
-        height: 2px;
-        background: var(--rz-border-light);
-        width: 100%;
-        margin-top: 4px;
-    }
-
-    .custom-input-container {
-        position: relative;
-    }
-
-        .custom-input-container .rz-icon {
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 1;
+        .section-card:hover {
+            background: rgba(var(--rz-primary-rgb), 0.05) !important;
+            box-shadow: var(--rz-shadow-2) !important;
         }
 
-    .form-actions {
-        display: flex;
-        justify-content: flex-end;
-        padding-top: 16px;
-        margin-top: 16px;
-        border-top: 1px solid var(--rz-border-light);
+    /* 섹션 헤더 */
+    .section-header {
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid rgba(var(--rz-primary-rgb), 0.2);
     }
 
-    /* 스크롤바 스타일 수정 - 테마와 일치하도록 */
+    .section-icon {
+        font-size: 1.125rem !important;
+    }
+
+        .section-icon.primary {
+            color: var(--rz-primary) !important;
+        }
+
+    .section-title {
+        margin: 0 !important;
+        font-weight: 600 !important;
+        color: var(--rz-text-color) !important;
+    }
+
+    /* 폼 필드 */
+    .form-field {
+        width: 100%;
+    }
+
+    .input-field {
+        width: 100% !important;
+        font-size: 0.875rem !important;
+    }
+
+    .field-hint {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        margin-top: 0.25rem;
+        color: var(--rz-text-secondary-color) !important;
+        font-size: 0.75rem !important;
+    }
+
+    .hint-icon {
+        font-size: 0.75rem !important;
+        color: var(--rz-text-tertiary-color) !important;
+    }
+
+    /* 정보 카드 */
+    .info-card {
+        padding: 1.25rem !important;
+        background: rgba(var(--rz-info-rgb), 0.05) !important;
+        border: 1px solid rgba(var(--rz-info-rgb), 0.2) !important;
+        border-radius: var(--rz-border-radius) !important;
+    }
+
+    .info-icon {
+        font-size: 1.25rem !important;
+        color: var(--rz-info) !important;
+    }
+
+    .info-title {
+        margin: 0 !important;
+        font-weight: 600 !important;
+        color: var(--rz-text-color) !important;
+    }
+
+    .info-list {
+        margin: 0 !important;
+    }
+
+    .check-icon {
+        font-size: 0.875rem !important;
+        color: var(--rz-success) !important;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    /* 액션 버튼 섹션 */
+    .dialog-actions {
+        padding-top: 1rem;
+        border-top: 1px solid var(--rz-border-color);
+        margin-right: 0.5rem;
+    }
+
+    /* 애니메이션 */
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .section-card {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    /* 스크롤바 스타일 */
     ::deep .rz-textarea::-webkit-scrollbar {
         width: 8px;
     }
@@ -134,11 +289,11 @@
     }
 
     ::deep .rz-textarea::-webkit-scrollbar-thumb {
-        background: var(--rz-secondary-lighter);
+        background: var(--rz-border-color);
         border-radius: 4px;
     }
 
         ::deep .rz-textarea::-webkit-scrollbar-thumb:hover {
-            background: var(--rz-secondary-light);
+            background: var(--rz-primary);
         }
 </style>

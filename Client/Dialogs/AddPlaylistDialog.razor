@@ -1,658 +1,170 @@
-﻿@attribute [Authorize]
+@attribute [Authorize]
 
-<div class="playlist-dialog">
-    <!-- 헤더 섹션 -->
-    <div class="dialog-header-section">
-        <div class="header-icon-wrapper">
-            <div class="icon-background">
-                <RadzenIcon Icon="playlist_add" class="header-icon" />
+<RadzenStack Gap="1rem" class="playlist-dialog-modern">
+    <!-- 헤더 카드 -->
+    <RadzenCard Variant="Variant.Outlined" class="header-card">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+            <div class="icon-wrapper">
+                <RadzenIcon Icon="library_music" Style="font-size: 1.5rem; color: var(--rz-primary);" />
             </div>
-        </div>
-        <div class="header-content">
-            <h2 class="header-title">새 플레이리스트 생성</h2>
-            <p class="header-subtitle">미디어 파일을 체계적으로 관리할 플레이리스트를 만듭니다</p>
-        </div>
-    </div>
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.H6" class="mb-0" Style="color: var(--rz-text-color); font-weight: 600;">
+                    플레이리스트 생성
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="color: var(--rz-text-secondary-color); font-size: 0.75rem;">
+                    미디어를 효율적으로 구성하고 관리합니다
+                </RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
 
     <!-- 폼 섹션 -->
     <RadzenTemplateForm TItem="GroupFormModel" Data="@model" Submit="@FormSubmit">
-        <!-- 에러 알림 -->
-        <RadzenAlert Shade="Shade.Lighter" Variant="Variant.Flat" Size="AlertSize.Small"
-                     AlertStyle="AlertStyle.Danger" Visible="@errorVisible" class="custom-alert">
-            <div class="alert-content">
-                <RadzenIcon Icon="error_outline" class="alert-icon" />
-                <span class="alert-text">@error</span>
-            </div>
-        </RadzenAlert>
+        <RadzenStack Gap="1rem">
+            <!-- 에러 알림 -->
+            @if (errorVisible)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Danger" 
+                             Variant="Variant.Flat" 
+                             Shade="Shade.Lighter" 
+                             AllowClose="false"
+                             Style="margin-bottom: 0;">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="error_outline" />
+                        <RadzenText TextStyle="TextStyle.Body2" class="mb-0">@error</RadzenText>
+                    </RadzenStack>
+                </RadzenAlert>
+            }
 
-        <!-- 메인 폼 컨테이너 -->
-        <div class="form-container">
-            <!-- 플레이리스트 정보 섹션 -->
-            <div class="section-group">
-                <div class="section-header">
-                    <div class="section-title-wrapper">
-                        <RadzenIcon Icon="music_note" class="section-icon" />
-                        <h3 class="section-title">플레이리스트 정보</h3>
-                    </div>
-                    <div class="section-line"></div>
-                </div>
+            <!-- 플레이리스트 정보 카드 -->
+            <RadzenCard Variant="Variant.Outlined" Style="padding: 1.25rem;">
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="edit_note" Style="font-size: 1rem; color: var(--rz-primary);" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="mb-0" Style="font-weight: 600;">
+                            플레이리스트 정보
+                        </RadzenText>
+                    </RadzenStack>
 
-                <!-- 이름 필드 -->
-                <div class="form-field">
-                    <label class="field-label">
-                        <span class="label-text">플레이리스트 이름</span>
-                        <span class="required-mark">*</span>
-                    </label>
-                    <div class="input-wrapper">
-                        <div class="input-icon-container">
-                            <RadzenIcon Icon="playlist_play" class="input-icon" />
-                        </div>
-                        <RadzenTextBox class="custom-input"
-                                       Placeholder="예: 오전 방송 음악 목록"
-                                       @bind-Value="@(model.Name)"
-                                       Name="Name" />
-                        <RadzenRequiredValidator Component="Name"
-                                                 Text="플레이리스트 이름은 필수 입력 항목입니다"
-                                                 class="custom-validator" />
-                    </div>
-                    <span class="field-hint">플레이리스트를 쉽게 식별할 수 있는 이름을 입력하세요</span>
-                </div>
+                    <!-- 이름 필드 -->
+                    <RadzenFormField Text="플레이리스트 이름" Variant="Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="@(model.Name)" 
+                                          Name="Name"
+                                          Placeholder="예: 오전 방송 음악 목록"
+                                          Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-text-secondary-color); font-size: 0.7rem;">
+                                플레이리스트를 쉽게 식별할 수 있는 이름을 입력하세요
+                            </RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+                    <RadzenRequiredValidator Component="Name" 
+                                            Text="플레이리스트 이름은 필수 입력 항목입니다" 
+                                            Style="font-size: 0.75rem;" />
 
-                <!-- 설명 필드 -->
-                <div class="form-field">
-                    <label class="field-label">
-                        <span class="label-text">설명</span>
-                        <span class="required-mark">*</span>
-                    </label>
-                    <div class="input-wrapper">
-                        <div class="input-icon-container textarea-icon">
-                            <RadzenIcon Icon="description" class="input-icon" />
-                        </div>
-                        <RadzenTextArea Rows="4"
-                                        class="custom-textarea"
-                                        Placeholder="이 플레이리스트의 용도나 특징을 설명해주세요"
-                                        @bind-Value="@(model.Description)"
-                                        Name="Description" />
-                        <RadzenRequiredValidator Component="Description"
-                                                 Text="설명은 필수 입력 항목입니다"
-                                                 class="custom-validator" />
-                    </div>
-                    <span class="field-hint">플레이리스트의 목적이나 사용 시간대 등을 입력할 수 있습니다</span>
-                </div>
-            </div>
+                    <!-- 설명 필드 -->
+                    <RadzenFormField Text="설명" Variant="Variant.Outlined" Style="width: 100%;">
+                        <ChildContent>
+                            <RadzenTextArea @bind-Value="@(model.Description)" 
+                                           Name="Description"
+                                           Rows="4"
+                                           Placeholder="이 플레이리스트의 용도나 특징을 설명해주세요"
+                                           Style="width: 100%; resize: vertical;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-text-secondary-color); font-size: 0.7rem;">
+                                플레이리스트의 목적이나 사용 시간대 등을 입력할 수 있습니다
+                            </RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+                    <RadzenRequiredValidator Component="Description" 
+                                            Text="설명은 필수 입력 항목입니다" 
+                                            Style="font-size: 0.75rem;" />
+                </RadzenStack>
+            </RadzenCard>
 
-            <!-- 정보 카드 -->
-            <div class="info-section">
-                <div class="info-card">
-                    <RadzenIcon Icon="lightbulb" class="info-icon" />
-                    <div class="info-content">
-                        <h4 class="info-title">플레이리스트 생성 안내</h4>
-                        <ul class="info-list">
-                            <li>생성 후 미디어 파일을 추가할 수 있습니다</li>
-                            <li>하나의 미디어를 여러 플레이리스트에 포함시킬 수 있습니다</li>
-                            <li>플레이리스트는 채널별로 방송에 활용됩니다</li>
-                            <li>생성된 플레이리스트는 언제든지 수정 가능합니다</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <!-- 안내 카드 -->
+            <RadzenCard Variant="Variant.Filled" Style="background-color: var(--rz-info-lighter); border: 1px solid var(--rz-info-light); padding: 1rem;">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="info" Style="font-size: 1rem; color: var(--rz-info);" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="mb-0" Style="color: var(--rz-info); font-weight: 600; font-size: 0.8rem;">
+                            생성 안내
+                        </RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Gap="0.5rem" Style="padding-left: 1.5rem;">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                            <RadzenIcon Icon="check_circle" Style="font-size: 0.75rem; color: var(--rz-info); margin-top: 0.125rem;" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="color: var(--rz-text-color); font-size: 0.75rem;">
+                                생성 후 미디어 파일을 추가할 수 있습니다
+                            </RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                            <RadzenIcon Icon="check_circle" Style="font-size: 0.75rem; color: var(--rz-info); margin-top: 0.125rem;" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="color: var(--rz-text-color); font-size: 0.75rem;">
+                                하나의 미디어를 여러 플레이리스트에 포함시킬 수 있습니다
+                            </RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                            <RadzenIcon Icon="check_circle" Style="font-size: 0.75rem; color: var(--rz-info); margin-top: 0.125rem;" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="color: var(--rz-text-color); font-size: 0.75rem;">
+                                채널별 방송에 즉시 활용 가능합니다
+                            </RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                            <RadzenIcon Icon="check_circle" Style="font-size: 0.75rem; color: var(--rz-info); margin-top: 0.125rem;" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="color: var(--rz-text-color); font-size: 0.75rem;">
+                                생성 후 언제든지 수정 및 관리가 가능합니다
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
 
-        <!-- 액션 버튼 섹션 -->
-        <div class="dialog-actions">
-            <div class="action-info">
-                <RadzenIcon Icon="info_outline" class="action-info-icon" />
-                <span class="action-info-text">모든 필수 항목을 입력했는지 확인하세요</span>
-            </div>
-            <div class="action-buttons">
-                <RadzenButton ButtonStyle="ButtonStyle.Light"
-                              Text="취소"
-                              Icon="close"
-                              Click="@CancelClick"
+            <!-- 버튼 영역 -->
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.75rem" Style="padding-top: 0.5rem;">
+                <RadzenButton Text="취소" 
+                              Icon="close" 
+                              ButtonStyle="ButtonStyle.Light" 
                               Variant="Variant.Flat"
-                              class="btn-cancel"
-                              Disabled="@isProcessing" />
-                @if (isProcessing)
-                {
-                    <RadzenButton ButtonType="ButtonType.Submit"
-                                  Text="생성 중..."
-                                  Icon="sync"
-                                  IconSpin="true"
-                                  Disabled="true"
-                                  Variant="Variant.Flat"
-                                  class="btn-primary processing" />
-                }
-                else
-                {
-                    <RadzenButton ButtonType="ButtonType.Submit"
-                                  Icon="add_circle"
-                                  Text="플레이리스트 생성"
-                                  Variant="Variant.Flat"
-                                  class="btn-primary" />
-                }
-            </div>
-        </div>
+                              Click="@CancelClick" 
+                              Disabled="@isProcessing"
+                              Style="min-width: 100px;" />
+                <RadzenButton Text="@(isProcessing ? "생성 중..." : "생성")" 
+                              Icon="@(isProcessing ? "sync" : "add_circle")"
+                              ButtonType="ButtonType.Submit"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Variant="Variant.Flat"
+                              Disabled="@isProcessing"
+                              IsBusy="@isProcessing"
+                              Style="min-width: 120px;" />
+            </RadzenStack>
+        </RadzenStack>
     </RadzenTemplateForm>
-</div>
+</RadzenStack>
 
 <style>
-    /* 메인 컨테이너 */
-    .playlist-dialog {
-        padding: 0;
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    .playlist-dialog-modern {
+        max-width: 600px;
+        margin: 0 auto;
     }
 
-    /* 헤더 섹션 */
-    .dialog-header-section {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 1.5rem;
-        background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
-        border-radius: 12px 12px 0 0;
-        margin: -24px -24px 0 -24px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    .header-card {
+        background: linear-gradient(135deg, var(--rz-primary-lighter) 0%, var(--rz-base-background-color) 100%);
+        border: 1px solid var(--rz-primary-light);
     }
 
-    .header-icon-wrapper {
-        flex-shrink: 0;
-    }
-
-    .icon-background {
+    .icon-wrapper {
         width: 3rem;
         height: 3rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 12px;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    .header-icon {
-        font-size: 1.5rem !important;
-        color: white !important;
-    }
-
-    .header-content {
-        flex: 1;
-    }
-
-    .header-title {
-        margin: 0;
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: white;
-        letter-spacing: -0.02em;
-    }
-
-    .header-subtitle {
-        margin: 0.25rem 0 0 0;
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.9);
-        font-weight: 400;
-    }
-
-    /* 커스텀 알림 */
-    .custom-alert {
-        margin: 1.5rem 0 1rem 0;
-        border-radius: 8px;
-        border: 1px solid rgba(239, 68, 68, 0.2);
-        background: rgba(254, 226, 226, 0.5);
-        backdrop-filter: blur(5px);
-    }
-
-    .alert-content {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .alert-icon {
-        font-size: 1rem !important;
-        color: #dc2626;
-    }
-
-    .alert-text {
-        font-size: 0.75rem;
-        color: #991b1b;
-        font-weight: 500;
-    }
-
-    /* 폼 컨테이너 */
-    .form-container {
-        padding: 1.5rem 0;
-    }
-
-    /* 섹션 그룹 */
-    .section-group {
-        margin-bottom: 2rem;
-        padding: 1.25rem;
-        background: linear-gradient(to bottom, #fafbfc, #ffffff);
-        border-radius: 10px;
-        border: 1px solid #e5e7eb;
-        transition: all 0.3s ease;
-    }
-
-        .section-group:hover {
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-
-    .section-header {
-        margin-bottom: 1.25rem;
-    }
-
-    .section-title-wrapper {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
-
-    .section-icon {
-        font-size: 0.9rem !important;
-        color: #8b5cf6;
-    }
-
-    .section-title {
-        margin: 0;
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #1e293b;
-        letter-spacing: -0.01em;
-    }
-
-    .section-line {
-        height: 2px;
-        background: linear-gradient(90deg, #8b5cf6 0%, transparent 100%);
-        border-radius: 1px;
-    }
-
-    /* 폼 필드 */
-    .form-field {
-        margin-bottom: 1.25rem;
-    }
-
-        .form-field:last-child {
-            margin-bottom: 0;
-        }
-
-    .field-label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
-
-    .label-text {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #374151;
-        letter-spacing: 0.025em;
-    }
-
-    .required-mark {
-        color: #ef4444;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-
-    /* 입력 필드 래퍼 */
-    .input-wrapper {
-        position: relative;
-    }
-
-    .input-icon-container {
-        position: absolute;
-        left: 0.875rem;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.25rem;
-        height: 1.25rem;
-    }
-
-        .input-icon-container.textarea-icon {
-            top: 1rem;
-            transform: none;
-        }
-
-    .input-icon {
-        font-size: 1rem !important;
-        color: #9ca3af;
-        transition: color 0.2s;
-    }
-
-    /* 커스텀 입력 필드 */
-    .custom-input,
-    .custom-textarea {
-        width: 100% !important;
-        padding-left: 2.75rem !important;
-        font-size: 0.8rem !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        background: var(--rz-base-background-color)!important;
-        transition: all 0.2s !important;
-    }
-
-    .custom-input {
-        height: 2.5rem !important;
-    }
-
-    .custom-textarea {
-        min-height: 5rem !important;
-        padding-top: 0.75rem !important;
-        resize: vertical !important;
-    }
-
-        .custom-input:hover,
-        .custom-textarea:hover {
-            border-color: #9ca3af !important;
-        }
-
-        .custom-input:focus,
-        .custom-textarea:focus {
-            border-color: #8b5cf6 !important;
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1) !important;
-            outline: none !important;
-        }
-
-            .custom-input:focus ~ .input-icon-container .input-icon,
-            .custom-textarea:focus ~ .input-icon-container .input-icon {
-                color: #8b5cf6;
-            }
-
-    /* 필드 힌트 */
-    .field-hint {
-        display: block;
-        margin-top: 0.375rem;
-        font-size: 0.7rem;
-        color: #6b7280;
-        padding-left: 2.75rem;
-    }
-
-    /* 커스텀 유효성 검사 */
-    .custom-validator {
-        font-size: 0.7rem !important;
-        color: #ef4444 !important;
-        margin-top: 0.25rem !important;
-        padding-left: 2.75rem !important;
-    }
-
-    /* 정보 섹션 */
-    .info-section {
-        margin-top: 1.5rem;
-    }
-
-    .info-card {
-        display: flex;
-        gap: 0.875rem;
-        padding: 1rem;
-        background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
-        border-radius: 10px;
-        border: 1px solid #ddd6fe;
-    }
-
-    .info-icon {
-        font-size: 1rem !important;
-        color: #8b5cf6;
-        flex-shrink: 0;
-        margin-top: 0.125rem;
-    }
-
-    .info-content {
-        flex: 1;
-    }
-
-    .info-title {
-        margin: 0 0 0.5rem 0;
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #6d28d9;
-    }
-
-    .info-list {
-        margin: 0;
-        padding-left: 1.25rem;
-        list-style: none;
-    }
-
-        .info-list li {
-            position: relative;
-            font-size: 0.7rem;
-            color: #7c3aed;
-            line-height: 1.5;
-            margin-bottom: 0.375rem;
-            padding-left: 1rem;
-        }
-
-            .info-list li:last-child {
-                margin-bottom: 0;
-            }
-
-            .info-list li::before {
-                content: "♪";
-                position: absolute;
-                left: 0;
-                color: #8b5cf6;
-                font-weight: bold;
-                font-size: 0.75rem;
-            }
-
-    /* 액션 버튼 섹션 */
-    .dialog-actions {
-        padding: 1.25rem 0 0 0;
-        margin-top: 1.5rem;
-        border-top: 1px solid #e5e7eb;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .action-info {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-    }
-
-    .action-info-icon {
-        font-size: 0.875rem !important;
-        color: #8b5cf6;
-    }
-
-    .action-info-text {
-        font-size: 0.7rem;
-        color: #6b7280;
-    }
-
-    .action-buttons {
-        display: flex;
-        gap: 0.75rem;
-    }
-
-    /* 버튼 스타일 */
-    .btn-cancel,
-    .btn-primary {
-        font-size: 0.75rem !important;
-        font-weight: 500 !important;
-        padding: 0.5rem 1.25rem !important;
-        border-radius: 8px !important;
-        transition: all 0.2s !important;
-        letter-spacing: 0.025em !important;
-    }
-
-    .btn-cancel {
-        background: var(--rz-base-background-color)!important;
-        color: #6b7280 !important;
-        border: 1px solid #e5e7eb !important;
-    }
-
-        .btn-cancel:hover:not(:disabled) {
-            background: #f9fafb !important;
-            border-color: #d1d5db !important;
-            color: #374151 !important;
-        }
-
-    .btn-primary {
-        background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%) !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 2px 4px rgba(139, 92, 246, 0.2) !important;
-    }
-
-        .btn-primary:hover:not(:disabled) {
-            box-shadow: 0 4px 8px rgba(139, 92, 246, 0.3) !important;
-            transform: translateY(-1px);
-        }
-
-        .btn-primary.processing {
-            background: #9ca3af !important;
-            cursor: not-allowed !important;
-        }
-
-    /* 스크롤바 스타일 */
-    .custom-textarea::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .custom-textarea::-webkit-scrollbar-track {
-        background: #f3f4f6;
-        border-radius: 3px;
-    }
-
-    .custom-textarea::-webkit-scrollbar-thumb {
-        background: #d1d5db;
-        border-radius: 3px;
-    }
-
-        .custom-textarea::-webkit-scrollbar-thumb:hover {
-            background: #9ca3af;
-        }
-
-    /* 다크 모드 지원 */
-    @@media (prefers-color-scheme: dark) {
-        .dialog-header-section
-
-    {
-        background: linear-gradient(135deg, #6d28d9 0%, #581c87 100%);
-    }
-
-    .section-group {
-        background: linear-gradient(to bottom, #1f2937, #111827);
-        border-color: #374151;
-    }
-
-    .custom-input,
-    .custom-textarea {
-        background: #1f2937 !important;
-        border-color: #374151 !important;
-        color: #f3f4f6 !important;
-    }
-
-        .custom-input:hover,
-        .custom-textarea:hover {
-            border-color: #4b5563 !important;
-        }
-
-        .custom-input:focus,
-        .custom-textarea:focus {
-            border-color: #8b5cf6 !important;
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2) !important;
-        }
-
-    .label-text,
-    .section-title {
-        color: #e5e7eb;
-    }
-
-    .field-hint {
-        color: #9ca3af;
-    }
-
-    .info-card {
-        background: linear-gradient(135deg, #581c87 0%, #6d28d9 100%);
-        border-color: #7c3aed;
-    }
-
-    .info-title {
-        color: #ddd6fe;
-    }
-
-    .info-list li {
-        color: #c4b5fd;
-    }
-
-    .btn-cancel {
-        background: #1f2937 !important;
-        border-color: #374151 !important;
-        color: #e5e7eb !important;
-    }
-
-        .btn-cancel:hover:not(:disabled) {
-            background: #374151 !important;
-            border-color: #4b5563 !important;
-        }
-
-    }
-
-    /* 애니메이션 */
-    @@keyframes fadeIn {
-        from
-
-    {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-
-    }
-
-    @@keyframes slideIn {
-        from
-
-    {
-        opacity: 0;
-        transform: translateX(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-
-    }
-
-    @@keyframes pulse {
-        0%, 100%
-
-    {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.5;
-    }
-
-    }
-
-    .playlist-dialog {
-        animation: fadeIn 0.3s ease-out;
-    }
-
-    .section-group {
-        animation: slideIn 0.4s ease-out;
-        animation-fill-mode: both;
-    }
-
-    .btn-primary.processing {
-        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        background: var(--rz-base-background-color);
+        border-radius: var(--rz-border-radius);
+        border: 1px solid var(--rz-primary-light);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 </style>

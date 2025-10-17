@@ -1,437 +1,50 @@
-﻿@page "/manage-broad-cast"
+@page "/manage-broad-cast"
 @attribute [Authorize]
-@using WicsPlatform.Client.Pages.SubPages
 
 <PageTitle>방송 관리</PageTitle>
-
-@* 방송 복구 중 오버레이 *@
-@if (_isRecoveringBroadcast)
-{
-    <div class="recovery-overlay">
-        <RadzenCard class="rz-shadow-3 rz-border-radius-3" Style="padding: 1.5rem; min-width: 320px;">
-            <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem">
-                <RadzenProgressBarCircular Value="100"
-                                           ShowValue="false"
-                                           Mode="ProgressBarMode.Indeterminate"
-                                           Size="ProgressBarCircularSize.Medium" />
-                <RadzenText TextStyle="TextStyle.Body1" class="rz-text-align-center">
-                    <strong>@(selectedChannel?.Name ?? "채널") 방송 복구 중...</strong>
-                </RadzenText>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-text-align-center rz-color-secondary">
-                    잠시만 기다려주세요. 이전 방송 상태를 복구하고 있습니다.
-                </RadzenText>
-            </RadzenStack>
-        </RadzenCard>
-    </div>
-}
 
 <RadzenStack Gap="1rem">
     <!-- 페이지 헤더 -->
     <RadzenStack Gap="0.5rem" Style="padding-bottom: 1rem; border-bottom: 1px solid var(--rz-border-color);">
         <RadzenText Text="방송 관리" TextStyle="TextStyle.H5" TagName="TagName.H1" />
-        <RadzenText Text="채널을 선택하고 실시간 방송을 관리합니다" TextStyle="TextStyle.Caption" class="rz-color-secondary" />
+        <RadzenText Text="실시간 방송과 예약 방송을 관리합니다" TextStyle="TextStyle.Caption" class="rz-color-secondary" />
     </RadzenStack>
 
-    <!-- 채널 리스트 영역 - 가로 스크롤 -->
-    <RadzenCard class="rz-shadow-1 rz-border-radius-2" Style="padding: 1rem;">
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" 
-                     Style="padding-bottom: 0.75rem; border-bottom: 1px solid var(--rz-border-color); margin-bottom: 0.75rem;">
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                <RadzenIcon Icon="settings_input_antenna" Style="color: var(--rz-primary);" />
-                <RadzenText TextStyle="TextStyle.Subtitle1"><strong>채널 목록</strong></RadzenText>
-                @if (channels != null && channels.Any())
-                {
-                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@($"{channels.Count()}개")" IsPill="true" />
-                }
-            </RadzenStack>
-
-            @* 우측 버튼 그룹 *@
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
-                @* 채널 생성 버튼 *@
-                <RadzenButton Text="채널 생성"
-                              Icon="add_circle"
-                              ButtonStyle="ButtonStyle.Primary"
-                              Size="ButtonSize.Small"
-                              Click="@OpenCreateChannelDialog" />
-
-                @* 방송 시작 버튼 *@
-                <RadzenButton Text="@(!isBroadcasting ? "방송 시작" : "방송 중...")"
-                              Icon="@(!isBroadcasting ? "play_circle" : "graphic_eq")"
-                              ButtonStyle="@(!isBroadcasting ? ButtonStyle.Success : ButtonStyle.Warning)"
-                              Size="ButtonSize.Small"
-                              Disabled="@(isBroadcasting || selectedChannel == null)"
-                              Click="@(() => StartBroadcast())"
-                              Title="@(selectedChannel == null ? "먼저 채널을 선택하세요" : "")" />
-
-                @* 오디오 설정 버튼 *@
-                <RadzenButton Icon="settings"
-                              ButtonStyle="ButtonStyle.Info"
-                              Size="ButtonSize.Small"
-                              Variant="Variant.Flat"
-                              Click="@OpenAudioSettingsDialog"
-                              Title="오디오 설정"
-                              Disabled="@(selectedChannel == null)" />
-
-                @* 볼륨 제어 버튼 *@
-                <RadzenButton Icon="tune"
-                              ButtonStyle="ButtonStyle.Secondary"
-                              Size="ButtonSize.Small"
-                              Variant="Variant.Flat"
-                              Click="@OpenVolumeControlDialog"
-                              Title="볼륨 제어"
-                              Disabled="@(selectedChannel == null)" />
-
-                @if (isBroadcasting)
-                {
-                    @* 녹음 버튼 *@
-                    @if (!isRecording)
-                    {
-                        <RadzenButton Icon="fiber_manual_record"
-                                      ButtonStyle="ButtonStyle.Danger"
-                                      Size="ButtonSize.Small"
-                                      Variant="Variant.Flat"
-                                      Click="@StartRecording"
-                                      Title="녹음 시작" />
-                    }
-                    else
-                    {
-                        <RadzenButton Icon="stop"
-                                      ButtonStyle="ButtonStyle.Warning"
-                                      Size="ButtonSize.Small"
-                                      Variant="Variant.Flat"
-                                      Click="@StopRecording"
-                                      Title="녹음 중지" />
-                    }
-
-                    @* 루프백 버튼 *@
-                    <RadzenButton Icon="@(_currentLoopbackSetting ? "hearing" : "hearing_disabled")"
-                                  ButtonStyle="@(_currentLoopbackSetting ? ButtonStyle.Success : ButtonStyle.Secondary)"
-                                  Size="ButtonSize.Small"
-                                  Variant="Variant.Flat"
-                                  Click="@ToggleLoopback"
-                                  Title="@(_currentLoopbackSetting ? "루프백 끄기" : "루프백 켜기")" />
-                }
-            </RadzenStack>
-        </RadzenStack>
-
-        @* 방송 상태 표시 영역 *@
-        @if (isBroadcasting)
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Success" 
-                         Variant="Variant.Flat" 
-                         Shade="Shade.Lighter"
-                         AllowClose="false"
-                         Style="margin-top: 0.75rem; margin-bottom: 0.75rem;">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Wrap="FlexWrap.Wrap">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                        <RadzenIcon Icon="broadcast_on_home" class="broadcast-icon-pulse" />
-                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="방송 중" IsPill="true" />
-                    </RadzenStack>
-
-                    @if (selectedChannel != null)
-                    {
-                        <RadzenText TextStyle="TextStyle.Caption">
-                            채널: <strong>@selectedChannel.Name</strong>
-                        </RadzenText>
-                    }
-
-                    @if (isRecording)
-                    {
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                            <RadzenIcon Icon="fiber_manual_record" class="recording-icon-blink" />
-                            <RadzenText TextStyle="TextStyle.Caption">
-                                녹음: <strong>@recordingDuration</strong>
-                            </RadzenText>
-                        </RadzenStack>
-                    }
-
-                    @if (_currentLoopbackSetting)
-                    {
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                            <RadzenIcon Icon="hearing" Style="color: var(--rz-success);" />
-                            <RadzenText TextStyle="TextStyle.Caption">
-                                루프백 활성
-                            </RadzenText>
-                        </RadzenStack>
-                    }
-
-                    <RadzenText TextStyle="TextStyle.Caption" Style="margin-left: auto;">
-                        <strong>@recordingDataSize.ToString("F2") MB</strong>
-                    </RadzenText>
-                </RadzenStack>
-            </RadzenAlert>
-        }
-
-        <div class="channel-list-container">
-            @if (channels != null && channels.Any())
-            {
-                <div class="channel-list-scroll">
-                    @foreach (var channel in channels)
-                    {
-                        <div class="channel-card-wrapper">
-                            <RadzenCard class="@($"channel-card {(selectedChannel?.Id == channel.Id ? "channel-selected" : "")}")"
-                                        @onclick="@(() => SelectChannel(channel))"
-                                        Style="cursor: pointer; transition: all 0.2s ease;">
-                                <RadzenStack Gap="0.5rem">
-                                    <!-- 채널 헤더 -->
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                            <RadzenIcon Icon="@GetChannelIcon(channel.Type)" Style="color: var(--rz-primary);" />
-                                            <RadzenText TextStyle="TextStyle.Subtitle2">
-                                                <strong>@channel.Name</strong>
-                                            </RadzenText>
-                                        </RadzenStack>
-                                        <RadzenBadge BadgeStyle="@GetChannelBadgeStyle(channel.State)"
-                                                     IsPill="true"
-                                                     Text="@GetChannelStateText(channel.State)" />
-                                    </RadzenStack>
-
-                                    <!-- 채널 설명 -->
-                                    @if (!string.IsNullOrEmpty(channel.Description))
-                                    {
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" 
-                                                    Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            @channel.Description
-                                        </RadzenText>
-                                    }
-
-                                    <!-- 채널 메타 정보 -->
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
-                                            <RadzenIcon Icon="access_time" Style="font-size: 0.8rem; color: var(--rz-text-secondary-color);" />
-                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                @channel.CreatedAt.ToString("yyyy.MM.dd")
-                                            </RadzenText>
-                                        </RadzenStack>
-                                        <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@($"{channel.SamplingRate} Hz")" />
-                                    </RadzenStack>
-
-                                    <!-- 개별 채널 방송 버튼 -->
-                                    <RadzenButton Text="@(isChannelBroadcasting.ContainsKey(channel.Id) && isChannelBroadcasting[channel.Id] ? "방송 중지" : "빠른 시작")"
-                                                  Icon="@(isChannelBroadcasting.ContainsKey(channel.Id) && isChannelBroadcasting[channel.Id] ? "stop" : "play_arrow")"
-                                                  ButtonStyle="@(isChannelBroadcasting.ContainsKey(channel.Id) && isChannelBroadcasting[channel.Id] ? ButtonStyle.Danger : ButtonStyle.Light)"
-                                                  Size="ButtonSize.Small"
-                                                  Variant="Variant.Flat"
-                                                  Style="width: 100%;"
-                                                  @onclick:stopPropagation="true"
-                                                  Click="@(() => ToggleBroadcast(channel.Id))" />
-                                </RadzenStack>
-                            </RadzenCard>
-                        </div>
-                    }
-                </div>
-            }
-            else if (isLoading)
-            {
-                <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" Style="padding: 2rem;">
-                    <RadzenProgressBarCircular Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">채널 목록을 불러오는 중...</RadzenText>
-                </RadzenStack>
-            }
-            else
-            {
-                <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" Style="padding: 2rem; text-align: center;">
-                    <RadzenIcon Icon="tv_off" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
-                    <RadzenText TextStyle="TextStyle.Body2">생성된 채널이 없습니다</RadzenText>
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                        상단의 '채널 생성' 버튼을 클릭하여 첫 번째 채널을 생성해보세요
-                    </RadzenText>
-                </RadzenStack>
-            }
-        </div>
-    </RadzenCard>
-
-    <!-- 선택된 채널이 없을 때 가이드 표시 -->
-    @if (selectedChannel == null && channels != null && channels.Any())
-    {
-        <RadzenCard class="rz-shadow-1 rz-border-radius-2" Style="padding: 1rem; background: var(--rz-base-background-color);">
-            <RadzenStack Gap="1rem">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                    <RadzenIcon Icon="help_outline" Style="color: var(--rz-info);" />
-                    <RadzenText TextStyle="TextStyle.Subtitle1"><strong>방송 관리 가이드</strong></RadzenText>
-                </RadzenStack>
-
-                <RadzenRow Gap="0.75rem">
-                    @foreach (var step in new[] {
-                                new { Number = "1", Title = "채널 선택", Description = "위의 채널 목록에서 방송할 채널을 선택하세요" },
-                                new { Number = "2", Title = "스피커 설정", Description = "방송할 스피커 그룹을 선택하고 체크하세요" },
-                                new { Number = "3", Title = "방송 구성", Description = "볼륨, TTS, 플레이리스트 등을 설정하세요" },
-                                new { Number = "4", Title = "방송 시작", Description = "상단의 방송 시작 버튼을 클릭하세요" }
-                                })
-                    {
-                        <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-                            <RadzenCard class="rz-shadow-1" Style="padding: 0.75rem; height: 100%; transition: transform 0.2s ease;"
-                                        onmouseover="this.style.transform='translateY(-2px)'"
-                                        onmouseout="this.style.transform='translateY(0)'">
-                                <RadzenStack Gap="0.5rem">
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                        <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@step.Number" Style="width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;" />
-                                        <RadzenText TextStyle="TextStyle.Subtitle2"><strong>@step.Title</strong></RadzenText>
-                                    </RadzenStack>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" Style="line-height: 1.4;">
-                                        @step.Description
-                                    </RadzenText>
-                                </RadzenStack>
-                            </RadzenCard>
-                        </RadzenColumn>
-                    }
-                </RadzenRow>
-            </RadzenStack>
-        </RadzenCard>
-    }
-
-    <!-- 선택된 채널의 섹션들 -->
-    @if (selectedChannel != null)
-    {
-        <!-- 방송 모니터링 패널 (방송 중일 때만 표시) -->
-        @if (isBroadcasting)
-        {
-            <BroadcastMonitoringSection Channel="@selectedChannel"
-                                        @bind-IsCollapsed="@monitoringPanelCollapsed"
-                                        IsMicEnabled="true"
-                                        IsMediaEnabled="false"
-                                        IsTtsEnabled="false"
-                                        OnBroadcastStatusChanged="@OnBroadcastStatusChanged"
-                                        OnBroadcastStopped="@OnBroadcastStopped"
-                                        @ref="monitoringSection" />
-        }
-
-        <!-- 스피커 그룹 관리 패널 -->
-        <BroadcastSpeakerSection Channel="@selectedChannel"
-                                 @bind-IsCollapsed="@speakerGroupPanelCollapsed"
-                                 @ref="speakerSection" />
-
-        <!-- TTS 설정 패널 -->
-        <BroadcastTtsSection Channel="@selectedChannel"
-                             @bind-IsCollapsed="@ttsPanelCollapsed"
-                             IsBroadcasting="@isBroadcasting"
-                             BroadcastId="@currentBroadcastId?.ToString()"
-                             @ref="ttsSection" />
-
-        <!-- 플레이리스트 설정 패널 -->
-        <BroadcastPlaylistSection Channel="@selectedChannel"
-                                  @bind-IsCollapsed="@playlistPanelCollapsed"
-                                  IsBroadcasting="@isBroadcasting"
-                                  BroadcastId="@currentBroadcastId?.ToString()"
-                                  @ref="playlistSection" />
-    }
+    <!-- 탭 UI -->
+    <RadzenTabs @bind-SelectedIndex="@selectedTabIndex" RenderMode="TabRenderMode.Client">
+        <Tabs>
+            <RadzenTabsItem Text="실시간 방송" Icon="broadcast_on_home">
+                <BroadcastLiveTab />
+            </RadzenTabsItem>
+            <RadzenTabsItem Text="예약 방송" Icon="schedule">
+                <BroadcastScheduleTab />
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
 </RadzenStack>
 
 <style>
-    /* 복구 오버레이 */
-    .recovery-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        animation: fadeIn 0.3s ease-in;
-    }
-
-    /* 채널 리스트 스크롤 컨테이너 */
-    .channel-list-container {
-        position: relative;
-        width: 100%;
-        overflow: hidden;
-    }
-
-    .channel-list-scroll {
-        display: flex;
-        gap: 0.75rem;
-        overflow-x: auto;
-        overflow-y: hidden;
+    /* 탭 스타일 개선 */
+    .rz-tabview-nav-content {
         padding: 0.5rem 0;
-        scroll-behavior: smooth;
     }
 
-        .channel-list-scroll::-webkit-scrollbar {
-            height: 6px;
-        }
-
-        .channel-list-scroll::-webkit-scrollbar-track {
-            background: var(--rz-base-200);
-            border-radius: 3px;
-        }
-
-        .channel-list-scroll::-webkit-scrollbar-thumb {
-            background: var(--rz-base-400);
-            border-radius: 3px;
-        }
-
-            .channel-list-scroll::-webkit-scrollbar-thumb:hover {
-                background: var(--rz-base-500);
-            }
-
-    .channel-card-wrapper {
-        flex: 0 0 auto;
-        width: 220px;
-        min-width: 220px;
-    }
-
-    .channel-card {
-        height: 100%;
-        border: 2px solid var(--rz-border-color) !important;
+    .rz-tabview-nav .rz-tabview-nav-link {
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
         transition: all 0.2s ease;
     }
 
-        .channel-card:hover {
-            border-color: var(--rz-primary) !important;
-            transform: translateY(-2px);
-            box-shadow: var(--rz-shadow-3) !important;
-        }
-
-        .channel-card.channel-selected {
-            border-color: var(--rz-primary) !important;
-            background-color: var(--rz-primary-lighter) !important;
-            box-shadow: var(--rz-shadow-2) !important;
-        }
-
-    /* 방송 아이콘 애니메이션 */
-    .broadcast-icon-pulse {
-        animation: pulse 2s infinite;
-        color: var(--rz-success) !important;
+    .rz-tabview-nav .rz-tabview-nav-link:hover {
+        background-color: var(--rz-base-200);
     }
 
-    .recording-icon-blink {
-        animation: blink 1s infinite;
-        color: var(--rz-danger) !important;
+    .rz-tabview-nav .rz-tabview-nav-link.rz-state-active {
+        font-weight: 600;
+        border-bottom: 2px solid var(--rz-primary);
     }
 
-    /* 애니메이션 */
-    @@keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: scale(0.95);
-        }
-
-        to {
-            opacity: 1;
-            transform: scale(1);
-        }
-    }
-
-    @@keyframes pulse {
-        0%, 100% {
-            opacity: 1;
-        }
-
-        50% {
-            opacity: 0.5;
-        }
-    }
-
-    @@keyframes blink {
-        0%, 50%, 100% {
-            opacity: 1;
-        }
-
-        25%, 75% {
-            opacity: 0.3;
-        }
+    .rz-tabview-panels {
+        padding-top: 1rem;
     }
 </style>
