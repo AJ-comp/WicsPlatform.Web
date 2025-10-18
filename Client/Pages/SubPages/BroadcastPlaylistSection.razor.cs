@@ -898,11 +898,14 @@ namespace WicsPlatform.Client.Pages.SubPages
         // 플레이리스트의 미디어 개수 가져오기 (int)
         private int GetPlaylistMediaCountInt(ulong playlistId)
         {
-            if (playlistMediaCounts.ContainsKey(playlistId))
-            {
-                return playlistMediaCounts[playlistId];
-            }
-            return 0;
+            // mediaGroupMappings에서 실제 개수를 계산하여 일관성 유지
+            var count = mediaGroupMappings
+                .Where(m => m.GroupId == playlistId)
+                .Select(m => m.MediaId)
+                .Distinct()
+                .Count();
+            
+            return count;
         }
 
         // 플레이리스트 내 미디어 목록 가져오기

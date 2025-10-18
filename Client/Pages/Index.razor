@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @attribute [Authorize]
 
 <PageTitle>홈 - WICS 방송 관리 시스템</PageTitle>
@@ -73,71 +73,6 @@
         </RadzenColumn>
     </RadzenRow>
 
-    <!-- 퀵 액션 섹션 -->
-    <RadzenCard class="quick-actions-card">
-        <RadzenStack Gap="1rem">
-            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Center" AlignItems="AlignItems.Center" Gap="0.75rem">
-                <RadzenText TextStyle="TextStyle.Subtitle1" class="section-ornament">❖</RadzenText>
-                <RadzenText TextStyle="TextStyle.H6" class="section-title-elegant">빠른 실행</RadzenText>
-                <RadzenText TextStyle="TextStyle.Subtitle1" class="section-ornament">❖</RadzenText>
-            </RadzenStack>
-
-            <RadzenRow Gap="1rem">
-                <RadzenColumn Size="6" SizeMD="3">
-                    <RadzenButton Click="@(() => NavigationManager.NavigateTo("/manage-broad-cast"))" 
-                                  Variant="Variant.Outlined" 
-                                  ButtonStyle="ButtonStyle.Primary"
-                                  Style="width: 100%; height: 100px;">
-                        <RadzenStack Gap="0.25rem" Style="align-items: center;">
-                            <RadzenIcon Icon="play_circle" Style="font-size: 1.75rem;" />
-                            <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: 600;">방송 시작</RadzenText>
-                            <RadzenText TextStyle="TextStyle.Caption" Style="opacity: 0.7;">실시간 송출 시작</RadzenText>
-                        </RadzenStack>
-                    </RadzenButton>
-                </RadzenColumn>
-
-                <RadzenColumn Size="6" SizeMD="3">
-                    <RadzenButton Click="@(() => NavigationManager.NavigateTo("/manage-speaker"))" 
-                                  Variant="Variant.Outlined" 
-                                  ButtonStyle="ButtonStyle.Secondary"
-                                  Style="width: 100%; height: 100px;">
-                        <RadzenStack Gap="0.25rem" Style="align-items: center;">
-                            <RadzenIcon Icon="add_circle" Style="font-size: 1.75rem;" />
-                            <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: 600;">스피커 추가</RadzenText>
-                            <RadzenText TextStyle="TextStyle.Caption" Style="opacity: 0.7;">새 장치 등록</RadzenText>
-                        </RadzenStack>
-                    </RadzenButton>
-                </RadzenColumn>
-
-                <RadzenColumn Size="6" SizeMD="3">
-                    <RadzenButton Click="@(() => NavigationManager.NavigateTo("/manage-media"))" 
-                                  Variant="Variant.Outlined" 
-                                  ButtonStyle="ButtonStyle.Warning"
-                                  Style="width: 100%; height: 100px;">
-                        <RadzenStack Gap="0.25rem" Style="align-items: center;">
-                            <RadzenIcon Icon="cloud_upload" Style="font-size: 1.75rem;" />
-                            <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: 600;">미디어 업로드</RadzenText>
-                            <RadzenText TextStyle="TextStyle.Caption" Style="opacity: 0.7;">오디오 파일 추가</RadzenText>
-                        </RadzenStack>
-                    </RadzenButton>
-                </RadzenColumn>
-
-                <RadzenColumn Size="6" SizeMD="3">
-                    <RadzenButton Click="@(() => NavigationManager.NavigateTo("/manage-media?tab=tts"))" 
-                                  Variant="Variant.Outlined" 
-                                  ButtonStyle="ButtonStyle.Success"
-                                  Style="width: 100%; height: 100px;">
-                        <RadzenStack Gap="0.25rem" Style="align-items: center;">
-                            <RadzenIcon Icon="mic" Style="font-size: 1.75rem;" />
-                            <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: 600;">음성 생성</RadzenText>
-                            <RadzenText TextStyle="TextStyle.Caption" Style="opacity: 0.7;">TTS 메시지 작성</RadzenText>
-                        </RadzenStack>
-                    </RadzenButton>
-                </RadzenColumn>
-            </RadzenRow>
-        </RadzenStack>
-    </RadzenCard>
-
     <!-- 최근 활동 및 시스템 상태 -->
     <RadzenRow Gap="1rem">
         <!-- 최근 방송 활동 -->
@@ -159,7 +94,7 @@
                     else if (recentActivities.Any())
                     {
                         <RadzenStack Gap="1rem" class="activity-timeline">
-                            @foreach (var activity in recentActivities.Take(5))
+                            @foreach (var activity in recentActivities)
                             {
                                 <RadzenCard Variant="Variant.Outlined" Style="padding: 0.75rem;">
                                     <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" AlignItems="AlignItems.Start">
@@ -336,21 +271,6 @@
         opacity: 0.8;
     }
 
-    .quick-actions-card {
-        background: var(--rz-panel-background-color) !important;
-        border: 1px solid var(--rz-border-color) !important;
-    }
-
-    .section-ornament {
-        color: var(--rz-primary) !important;
-    }
-
-    .section-title-elegant {
-        font-family: 'Nanum Myeongjo', 'Georgia', serif !important;
-        font-weight: 300 !important;
-        letter-spacing: 1px;
-    }
-
     .panel-header-content {
         padding-bottom: 0.75rem;
         border-bottom: 1px solid var(--rz-border-color);
@@ -400,10 +320,6 @@
     :root[data-theme='dark'] .status-icon-box {
         background: #171612 !important;
         border-color: var(--rz-primary) !important;
-    }
-
-    :root[data-theme='dark'] .quick-actions-card {
-        background: linear-gradient(180deg, #1a1916, #141310) !important;
     }
 
     /* 스크롤바 스타일링 */

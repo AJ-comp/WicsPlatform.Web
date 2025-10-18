@@ -1,756 +1,310 @@
-﻿@attribute [Authorize]
+@attribute [Authorize]
 
-<div class="tts-dialog">
-    <!-- 헤더 섹션 -->
-    <div class="dialog-header-section edit-mode">
-        <div class="header-icon-wrapper">
-            <div class="icon-background">
-                <RadzenIcon Icon="edit" class="header-icon" />
+<RadzenStack Gap="1rem" Style="width: 100%;">
+    <!-- 헤더 카드 -->
+    <RadzenCard Variant="Variant.Outlined" class="header-card">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+            <div class="icon-wrapper">
+                <RadzenIcon Icon="edit" Style="font-size: 1.5rem; color: var(--rz-primary);" />
             </div>
-        </div>
-        <div class="header-content">
-            <h2 class="header-title">TTS 메시지 수정</h2>
-            <p class="header-subtitle">기존 TTS 메시지의 내용을 수정하고 업데이트합니다</p>
-        </div>
-    </div>
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.H6" class="mb-0" Style="color: var(--rz-text-color); font-weight: 600;">
+                    TTS 메시지 수정
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="mb-0" Style="color: var(--rz-text-secondary-color); font-size: 0.75rem;">
+                    기존 TTS 메시지의 내용을 수정하고 업데이트합니다
+                </RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
 
     <!-- 폼 섹션 -->
     <RadzenTemplateForm TItem="TtsEditFormModel" Data="@model" Submit="@FormSubmit">
         <!-- 에러 알림 -->
-        <RadzenAlert Shade="Shade.Lighter" Variant="Variant.Flat" Size="AlertSize.Small"
-                     AlertStyle="AlertStyle.Danger" Visible="@errorVisible" class="custom-alert">
-            <div class="alert-content">
-                <RadzenIcon Icon="error_outline" class="alert-icon" />
-                <span class="alert-text">@error</span>
-            </div>
-        </RadzenAlert>
-
-        <!-- 메인 폼 컨테이너 -->
-        <div class="form-container">
-            <!-- 기본 정보 섹션 -->
-            <div class="section-group">
-                <div class="section-header">
-                    <div class="section-title-wrapper">
-                        <RadzenIcon Icon="info" class="section-icon" />
-                        <h3 class="section-title">TTS 정보</h3>
-                    </div>
-                    <div class="section-line"></div>
-                </div>
-
-                <!-- 제목 필드 -->
-                <div class="form-field">
-                    <label class="field-label">
-                        <span class="label-text">제목</span>
-                        <span class="required-mark">*</span>
-                    </label>
-                    <div class="input-wrapper">
-                        <div class="input-icon-container">
-                            <RadzenIcon Icon="title" class="input-icon" />
-                        </div>
-                        <RadzenTextBox class="custom-input"
-                                       Placeholder="예: 오전 안내 방송"
-                                       @bind-Value="@(model.Name)"
-                                       Name="Name" />
-                        <RadzenRequiredValidator Component="Name"
-                                                 Text="제목은 필수 입력 항목입니다"
-                                                 class="custom-validator" />
-                    </div>
-                    <span class="field-hint">TTS 메시지를 쉽게 식별할 수 있는 제목을 입력하세요</span>
-                </div>
-
-                <!-- 내용 필드 -->
-                <div class="form-field">
-                    <label class="field-label">
-                        <span class="label-text">음성 변환 텍스트</span>
-                        <span class="required-mark">*</span>
-                    </label>
-                    <div class="input-wrapper">
-                        <div class="input-icon-container textarea-icon">
-                            <RadzenIcon Icon="text_fields" class="input-icon" />
-                        </div>
-                        <RadzenTextArea Rows="6"
-                                        class="custom-textarea"
-                                        Placeholder="음성으로 변환할 텍스트를 입력하세요..."
-                                        @bind-Value="@(model.Content)"
-                                        Name="Content" />
-                        <RadzenRequiredValidator Component="Content"
-                                                 Text="내용은 필수 입력 항목입니다"
-                                                 class="custom-validator" />
-                    </div>
-                    <div class="field-footer">
-                        <span class="field-hint">명확한 발음을 위해 문장 부호를 적절히 사용하세요</span>
-                        <span class="character-count">
-                            <RadzenIcon Icon="text_format" class="count-icon" />
-                            @(model.Content?.Length ?? 0) / 1000
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 변경 사항 미리보기 -->
-            <div class="changes-section">
-                <div class="changes-card">
-                    <div class="changes-header">
-                        <RadzenIcon Icon="track_changes" class="changes-icon" />
-                        <span class="changes-title">변경 사항 미리보기</span>
-                    </div>
-                    <div class="changes-content">
-                        <div class="change-item">
-                            <span class="change-label">제목:</span>
-                            <span class="change-value">@(model.Name ?? "입력 대기 중...")</span>
-                        </div>
-                        <div class="change-item">
-                            <span class="change-label">내용:</span>
-                            <span class="change-value">
-                                @if (!string.IsNullOrWhiteSpace(model.Content))
-                                {
-                                    @(model.Content.Length > 100 ? model.Content.Substring(0, 100) + "..." : model.Content)
-                                }
-                                else
-                                {
-                                    <span class="change-placeholder">입력 대기 중...</span>
-                                }
-                            </span>
-                        </div>
-                        <div class="change-stats">
-                            <span class="stat-item">
-                                <RadzenIcon Icon="schedule" class="stat-icon" />
-                                마지막 수정: @(originalTts?.UpdatedAt.ToString("yyyy-MM-dd HH:mm") ?? "-")
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 정보 카드 -->
-            <div class="info-section">
-                <div class="info-card edit-info">
-                    <RadzenIcon Icon="edit_note" class="info-icon" />
-                    <div class="info-content">
-                        <h4 class="info-title">수정 시 주의사항</h4>
-                        <ul class="info-list">
-                            <li>수정된 내용은 즉시 적용됩니다</li>
-                            <li>현재 방송 중인 TTS는 다음 재생부터 변경사항이 적용됩니다</li>
-                            <li>최대 1000자까지 입력 가능합니다</li>
-                            <li>채널에 할당된 TTS의 경우 모든 채널에 동일하게 적용됩니다</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 액션 버튼 섹션 -->
-        <div class="dialog-actions">
-            <div class="action-info">
-                <RadzenIcon Icon="save_alt" class="action-info-icon" />
-                <span class="action-info-text">변경사항을 저장하시겠습니까?</span>
-            </div>
-            <div class="action-buttons">
-                <RadzenButton ButtonStyle="ButtonStyle.Light"
-                              Text="취소"
-                              Icon="close"
-                              Click="@CancelClick"
-                              Variant="Variant.Flat"
-                              class="btn-cancel"
-                              Disabled="@isProcessing" />
-                @if (isProcessing)
-                {
-                    <RadzenButton ButtonType="ButtonType.Submit"
-                                  Text="저장 중..."
-                                  Icon="sync"
-                                  IconSpin="true"
-                                  Disabled="true"
-                                  Variant="Variant.Flat"
-                                  class="btn-primary processing" />
-                }
-                else
-                {
-                    <RadzenButton ButtonType="ButtonType.Submit"
-                                  Icon="save"
-                                  Text="변경사항 저장"
-                                  Variant="Variant.Flat"
-                                  class="btn-primary btn-save" />
-                }
-            </div>
-        </div>
-    </RadzenTemplateForm>
-</div>
-
-<style>
-    /* 메인 컨테이너 */
-    .tts-dialog {
-        padding: 0;
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    /* 헤더 섹션 */
-    .dialog-header-section {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 1.5rem;
-        background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
-        border-radius: 12px 12px 0 0;
-        margin: -24px -24px 0 -24px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-        .dialog-header-section.edit-mode {
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        @if (errorVisible)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger"
+                         Variant="Variant.Flat"
+                         Size="AlertSize.Small"
+                         class="error-alert">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="error_outline" />
+                    <RadzenText TextStyle="TextStyle.Caption">@error</RadzenText>
+                </RadzenStack>
+            </RadzenAlert>
         }
 
-    .header-icon-wrapper {
-        flex-shrink: 0;
+        <!-- 기본 정보 섹션 -->
+        <RadzenCard class="section-card">
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="section-header">
+                    <RadzenIcon Icon="info" class="section-icon primary" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="section-title">TTS 정보</RadzenText>
+                </RadzenStack>
+
+                <!-- 제목 필드 -->
+                <RadzenRow Gap="0.5rem">
+                    <RadzenColumn Size="12">
+                        <RadzenFormField Text="제목" Variant="Variant.Outlined" class="form-field">
+                            <ChildContent>
+                                <RadzenTextBox @bind-Value="@model.Name"
+                                               Placeholder="예: 오전 안내 방송"
+                                               Name="Name"
+                                               class="input-field" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint">
+                                    <RadzenIcon Icon="label" class="hint-icon" />
+                                    TTS 메시지를 쉽게 식별할 수 있는 제목을 입력하세요
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                        <RadzenRequiredValidator Component="Name"
+                                                 Text="제목은 필수 입력 항목입니다" />
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <!-- 내용 필드 -->
+                <RadzenRow Gap="0.5rem">
+                    <RadzenColumn Size="12">
+                        <RadzenFormField Text="음성 변환 텍스트" Variant="Variant.Outlined" class="form-field">
+                            <ChildContent>
+                                <RadzenTextArea @bind-Value="@model.Content"
+                                                Rows="6"
+                                                Placeholder="음성으로 변환할 텍스트를 입력하세요..."
+                                                Name="Content"
+                                                class="input-field" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                                    <RadzenText TextStyle="TextStyle.Caption" class="field-hint">
+                                        <RadzenIcon Icon="description" class="hint-icon" />
+                                        명확한 발음을 위해 문장 부호를 적절히 사용하세요
+                                    </RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" Style="color: var(--rz-primary); font-weight: 600;">
+                                        @(model.Content?.Length ?? 0) / 1000
+                                    </RadzenText>
+                                </RadzenStack>
+                            </Helper>
+                        </RadzenFormField>
+                        <RadzenRequiredValidator Component="Content"
+                                                 Text="내용은 필수 입력 항목입니다" />
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- 정보 카드 -->
+        <RadzenCard class="info-card">
+            <RadzenStack Gap="0.75rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="lightbulb" class="info-icon" />
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="info-title">수정 안내</RadzenText>
+                </RadzenStack>
+                <RadzenStack Gap="0.5rem" class="info-list">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">수정된 내용은 즉시 적용됩니다</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">현재 방송 중인 TTS는 다음 재생부터 변경사항이 적용됩니다</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">최대 1000자까지 입력 가능합니다</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
+                        <RadzenIcon Icon="check_circle" class="check-icon" />
+                        <RadzenText TextStyle="TextStyle.Caption">마지막 수정: @(originalTts?.UpdatedAt.ToString("yyyy-MM-dd HH:mm") ?? "-")</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- 액션 버튼 섹션 -->
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" AlignItems="AlignItems.Center" Gap="0.75rem" class="dialog-actions">
+            <RadzenButton ButtonStyle="ButtonStyle.Light"
+                          Text="취소"
+                          Icon="close"
+                          Click="@CancelClick"
+                          Size="ButtonSize.Medium"
+                          Disabled="@isProcessing" />
+            @if (isProcessing)
+            {
+                <RadzenButton ButtonType="ButtonType.Submit"
+                              Text="저장 중..."
+                              Icon="sync"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Medium"
+                              IsBusy="true"
+                              Disabled="true" />
+            }
+            else
+            {
+                <RadzenButton ButtonType="ButtonType.Submit"
+                              Icon="save"
+                              Text="저장"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Medium" />
+            }
+        </RadzenStack>
+    </RadzenTemplateForm>
+</RadzenStack>
+
+<style>
+    /* 헤더 카드 */
+    .header-card {
+        background: linear-gradient(135deg, var(--rz-primary-lighter) 0%, var(--rz-base-background-color) 100%);
+        border: 1px solid var(--rz-primary-light);
     }
 
-    .icon-background {
+    .icon-wrapper {
         width: 3rem;
         height: 3rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 12px;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        background: var(--rz-base-background-color);
+        border-radius: var(--rz-border-radius);
+        border: 1px solid var(--rz-primary-light);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
-    .header-icon {
-        font-size: 1.5rem !important;
-        color: white !important;
+    /* 에러 알림 */
+    .error-alert {
+        padding: 0.75rem !important;
+        border-radius: var(--rz-border-radius) !important;
     }
 
-    .header-content {
-        flex: 1;
+    /* 섹션 카드 */
+    .section-card {
+        padding: 1.25rem !important;
+        background: rgba(var(--rz-primary-rgb), 0.03) !important;
+        border: 1px solid var(--rz-border-color) !important;
+        border-radius: var(--rz-border-radius) !important;
+        transition: all 0.2s ease;
     }
 
-    .header-title {
-        margin: 0;
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: white;
-        letter-spacing: -0.02em;
-    }
-
-    .header-subtitle {
-        margin: 0.25rem 0 0 0;
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.9);
-        font-weight: 400;
-    }
-
-    /* 커스텀 알림 */
-    .custom-alert {
-        margin: 1.5rem 0 1rem 0;
-        border-radius: 8px;
-        border: 1px solid rgba(239, 68, 68, 0.2);
-        background: rgba(254, 226, 226, 0.5);
-        backdrop-filter: blur(5px);
-    }
-
-    .alert-content {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .alert-icon {
-        font-size: 1rem !important;
-        color: #dc2626;
-    }
-
-    .alert-text {
-        font-size: 0.75rem;
-        color: #991b1b;
-        font-weight: 500;
-    }
-
-    /* 폼 컨테이너 */
-    .form-container {
-        padding: 1.5rem 0;
-    }
-
-    /* 섹션 그룹 */
-    .section-group {
-        margin-bottom: 2rem;
-        padding: 1.25rem;
-        background: linear-gradient(to bottom, #fafbfc, #ffffff);
-        border-radius: 10px;
-        border: 1px solid #e5e7eb;
-        transition: all 0.3s ease;
-    }
-
-        .section-group:hover {
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        .section-card:hover {
+            background: rgba(var(--rz-primary-rgb), 0.05) !important;
+            box-shadow: var(--rz-shadow-2) !important;
         }
 
+    /* 섹션 헤더 */
     .section-header {
-        margin-bottom: 1.25rem;
-    }
-
-    .section-title-wrapper {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid rgba(var(--rz-primary-rgb), 0.2);
     }
 
     .section-icon {
-        font-size: 0.9rem !important;
-        color: #14b8a6;
+        font-size: 1.125rem !important;
     }
+
+        .section-icon.primary {
+            color: var(--rz-primary) !important;
+        }
 
     .section-title {
-        margin: 0;
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #1e293b;
-        letter-spacing: -0.01em;
-    }
-
-    .section-line {
-        height: 2px;
-        background: linear-gradient(90deg, #14b8a6 0%, transparent 100%);
-        border-radius: 1px;
+        margin: 0 !important;
+        font-weight: 600 !important;
+        color: var(--rz-text-color) !important;
     }
 
     /* 폼 필드 */
     .form-field {
-        margin-bottom: 1.25rem;
+        width: 100%;
     }
 
-        .form-field:last-child {
-            margin-bottom: 0;
-        }
-
-    .field-label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
-
-    .label-text {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #374151;
-        letter-spacing: 0.025em;
-    }
-
-    .required-mark {
-        color: #ef4444;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-
-    /* 입력 필드 래퍼 */
-    .input-wrapper {
-        position: relative;
-    }
-
-    .input-icon-container {
-        position: absolute;
-        left: 0.875rem;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.25rem;
-        height: 1.25rem;
-    }
-
-        .input-icon-container.textarea-icon {
-            top: 1rem;
-            transform: none;
-        }
-
-    .input-icon {
-        font-size: 1rem !important;
-        color: #9ca3af;
-        transition: color 0.2s;
-    }
-
-    /* 커스텀 입력 필드 */
-    .custom-input,
-    .custom-textarea {
+    .input-field {
         width: 100% !important;
-        padding-left: 2.75rem !important;
-        font-size: 0.8rem !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        background: var(--rz-base-background-color)!important;
-        transition: all 0.2s !important;
-    }
-
-    .custom-input {
-        height: 2.5rem !important;
-    }
-
-    .custom-textarea {
-        min-height: 7rem !important;
-        padding-top: 0.75rem !important;
-        resize: vertical !important;
-    }
-
-        .custom-input:hover,
-        .custom-textarea:hover {
-            border-color: #9ca3af !important;
-        }
-
-        .custom-input:focus,
-        .custom-textarea:focus {
-            border-color: #14b8a6 !important;
-            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1) !important;
-            outline: none !important;
-        }
-
-            .custom-input:focus ~ .input-icon-container .input-icon,
-            .custom-textarea:focus ~ .input-icon-container .input-icon {
-                color: #14b8a6;
-            }
-
-    /* 필드 힌트 및 푸터 */
-    .field-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 0.375rem;
+        font-size: 0.875rem !important;
     }
 
     .field-hint {
-        font-size: 0.7rem;
-        color: #6b7280;
-        padding-left: 2.75rem;
-    }
-
-    .character-count {
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-        font-size: 0.7rem;
-        color: #14b8a6;
-        font-weight: 600;
-    }
-
-    .count-icon {
-        font-size: 0.75rem !important;
-    }
-
-    /* 커스텀 유효성 검사 */
-    .custom-validator {
-        font-size: 0.7rem !important;
-        color: #ef4444 !important;
-        margin-top: 0.25rem !important;
-        padding-left: 2.75rem !important;
-    }
-
-    /* 변경 사항 섹션 */
-    .changes-section {
-        margin-bottom: 1.5rem;
-    }
-
-    .changes-card {
-        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-        border: 1px solid #6ee7b7;
-        border-radius: 10px;
-        padding: 1rem;
-    }
-
-    .changes-header {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.75rem;
-    }
-
-    .changes-icon {
-        font-size: 1rem !important;
-        color: #0d9488;
-    }
-
-    .changes-title {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #047857;
-    }
-
-    .changes-content {
-        background: var(--rz-base-background-color);
-        border-radius: 6px;
-        padding: 0.75rem;
-    }
-
-    .change-item {
-        display: flex;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
-        font-size: 0.75rem;
-    }
-
-        .change-item:last-child {
-            margin-bottom: 0;
-        }
-
-    .change-label {
-        font-weight: 600;
-        color: #065f46;
-        min-width: 3rem;
-    }
-
-    .change-value {
-        color: #1e293b;
-        flex: 1;
-    }
-
-    .change-placeholder {
-        color: #9ca3af;
-        font-style: italic;
-    }
-
-    .change-stats {
-        margin-top: 0.75rem;
-        padding-top: 0.75rem;
-        border-top: 1px solid #e5e7eb;
-    }
-
-    .stat-item {
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-        font-size: 0.7rem;
-        color: #64748b;
-    }
-
-    .stat-icon {
-        font-size: 0.75rem !important;
-        color: #14b8a6;
-    }
-
-    /* 정보 섹션 */
-    .info-section {
-        margin-top: 1.5rem;
-    }
-
-    .info-card {
-        display: flex;
-        gap: 0.875rem;
-        padding: 1rem;
-        background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-        border-radius: 10px;
-        border: 1px solid #7dd3fc;
-    }
-
-        .info-card.edit-info {
-            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-            border-color: #6ee7b7;
-        }
-
-    .info-icon {
-        font-size: 1rem !important;
-        color: #14b8a6;
-        flex-shrink: 0;
-        margin-top: 0.125rem;
-    }
-
-    .info-content {
-        flex: 1;
-    }
-
-    .info-title {
-        margin: 0 0 0.5rem 0;
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #047857;
-    }
-
-    .info-list {
-        margin: 0;
-        padding-left: 1.25rem;
-        list-style: none;
-    }
-
-        .info-list li {
-            position: relative;
-            font-size: 0.7rem;
-            color: #059669;
-            line-height: 1.5;
-            margin-bottom: 0.375rem;
-            padding-left: 1rem;
-        }
-
-            .info-list li:last-child {
-                margin-bottom: 0;
-            }
-
-            .info-list li::before {
-                content: "⚠";
-                position: absolute;
-                left: 0;
-                color: #f59e0b;
-                font-size: 0.65rem;
-            }
-
-    /* 액션 버튼 섹션 */
-    .dialog-actions {
-        padding: 1.25rem 0 0 0;
-        margin-top: 1.5rem;
-        border-top: 1px solid #e5e7eb;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .action-info {
         display: flex;
         align-items: center;
         gap: 0.375rem;
-    }
-
-    .action-info-icon {
-        font-size: 0.875rem !important;
-        color: #14b8a6;
-    }
-
-    .action-info-text {
-        font-size: 0.7rem;
-        color: #6b7280;
-    }
-
-    .action-buttons {
-        display: flex;
-        gap: 0.75rem;
-    }
-
-    /* 버튼 스타일 */
-    .btn-cancel,
-    .btn-primary {
+        margin-top: 0.25rem;
+        color: var(--rz-text-secondary-color) !important;
         font-size: 0.75rem !important;
-        font-weight: 500 !important;
-        padding: 0.5rem 1.25rem !important;
-        border-radius: 8px !important;
-        transition: all 0.2s !important;
-        letter-spacing: 0.025em !important;
     }
 
-    .btn-cancel {
-        background: var(--rz-base-background-color)!important;
-        color: #6b7280 !important;
-        border: 1px solid #e5e7eb !important;
+    .hint-icon {
+        font-size: 0.75rem !important;
+        color: var(--rz-text-tertiary-color) !important;
     }
 
-        .btn-cancel:hover:not(:disabled) {
-            background: #f9fafb !important;
-            border-color: #d1d5db !important;
-            color: #374151 !important;
-        }
-
-    .btn-primary {
-        background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 2px 4px rgba(6, 182, 212, 0.2) !important;
+    /* 정보 카드 */
+    .info-card {
+        padding: 1.25rem !important;
+        background: rgba(var(--rz-info-rgb), 0.05) !important;
+        border: 1px solid rgba(var(--rz-info-rgb), 0.2) !important;
+        border-radius: var(--rz-border-radius) !important;
     }
 
-        .btn-primary.btn-save {
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important;
-            box-shadow: 0 2px 4px rgba(20, 184, 166, 0.2) !important;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            box-shadow: 0 4px 8px rgba(6, 182, 212, 0.3) !important;
-            transform: translateY(-1px);
-        }
-
-        .btn-primary.btn-save:hover:not(:disabled) {
-            box-shadow: 0 4px 8px rgba(20, 184, 166, 0.3) !important;
-        }
-
-        .btn-primary.processing {
-            background: #9ca3af !important;
-            cursor: not-allowed !important;
-        }
-
-    /* 스크롤바 스타일 */
-    .custom-textarea::-webkit-scrollbar {
-        width: 6px;
+    .info-icon {
+        font-size: 1.25rem !important;
+        color: var(--rz-info) !important;
     }
 
-    .custom-textarea::-webkit-scrollbar-track {
-        background: #f3f4f6;
-        border-radius: 3px;
+    .info-title {
+        margin: 0 !important;
+        font-weight: 600 !important;
+        color: var(--rz-text-color) !important;
     }
 
-    .custom-textarea::-webkit-scrollbar-thumb {
-        background: #d1d5db;
-        border-radius: 3px;
+    .info-list {
+        margin: 0 !important;
     }
 
-        .custom-textarea::-webkit-scrollbar-thumb:hover {
-            background: #9ca3af;
-        }
+    .check-icon {
+        font-size: 0.875rem !important;
+        color: var(--rz-success) !important;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    /* 액션 버튼 섹션 */
+    .dialog-actions {
+        padding-top: 1rem;
+        border-top: 1px solid var(--rz-border-color);
+        margin-right: 0.5rem;
+    }
 
     /* 애니메이션 */
     @@keyframes fadeIn {
-        from
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
 
-    {
-        opacity: 0;
-        transform: translateY(-10px);
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-
-    }
-
-    @@keyframes slideIn {
-        from
-
-    {
-        opacity: 0;
-        transform: translateX(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-
-    }
-
-    @@keyframes pulse {
-        0%, 100%
-
-    {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.5;
-    }
-
-    }
-
-    .tts-dialog {
+    .section-card {
         animation: fadeIn 0.3s ease-out;
     }
 
-    .section-group {
-        animation: slideIn 0.4s ease-out;
-        animation-fill-mode: both;
+    /* 스크롤바 스타일 */
+    ::deep .rz-textarea::-webkit-scrollbar {
+        width: 8px;
     }
 
-    .changes-section {
-        animation: slideIn 0.5s ease-out;
-        animation-delay: 0.2s;
-        animation-fill-mode: both;
+    ::deep .rz-textarea::-webkit-scrollbar-track {
+        background: var(--rz-base-background-color);
+        border-radius: 4px;
     }
 
-    .btn-primary.processing {
-        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    ::deep .rz-textarea::-webkit-scrollbar-thumb {
+        background: var(--rz-border-color);
+        border-radius: 4px;
     }
+
+        ::deep .rz-textarea::-webkit-scrollbar-thumb:hover {
+            background: var(--rz-primary);
+        }
 </style>

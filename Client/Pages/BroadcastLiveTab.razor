@@ -226,29 +226,36 @@
             <!-- 선택된 채널이 없을 때 가이드 표시 -->
             @if (selectedChannel == null && channels != null && channels.Any())
             {
-                <RadzenCard class="rz-shadow-1 rz-border-radius-2">
-                    <RadzenStack Gap="1rem">
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                            <RadzenIcon Icon="help_outline" Style="color: var(--rz-info);" />
-                            <RadzenText TextStyle="TextStyle.Subtitle1"><strong>방송 관리 가이드</strong></RadzenText>
+                <RadzenCard class="rz-shadow-1 rz-border-radius-2 guide-card">
+                    <RadzenStack Gap="1.5rem" Style="min-height: 500px;">
+                        <!-- 헤더 -->
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="0.75rem">
+                            <RadzenIcon Icon="broadcast_on_home" class="guide-icon-animate" Style="color: var(--rz-primary); font-size: 2.5rem;" />
+                            <RadzenText TextStyle="TextStyle.H5" Style="margin: 0;"><strong>방송 관리 가이드</strong></RadzenText>
                         </RadzenStack>
 
-                        <RadzenRow Gap="0.75rem">
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-text-align-center rz-color-secondary" Style="max-width: 600px; margin: 0 auto;">
+                            채널을 선택하고 방송 설정을 구성한 후 방송을 시작하세요
+                        </RadzenText>
+
+                        <!-- 스텝 카드들 -->
+                        <RadzenRow Gap="1rem">
                             @foreach (var step in new[] {
-                                        new { Number = "1", Title = "채널 선택", Description = "좌측 채널 목록에서 방송할 채널을 선택하세요" },
-                                        new { Number = "2", Title = "스피커 설정", Description = "방송할 스피커 그룹을 선택하고 체크하세요" },
-                                        new { Number = "3", Title = "방송 구성", Description = "볼륨, TTS, 플레이리스트 등을 설정하세요" },
-                                        new { Number = "4", Title = "방송 시작", Description = "좌측 상단의 방송 시작 버튼을 클릭하세요" }
+                                        new { Number = "1", Title = "채널 선택", Description = "좌측 채널 목록에서 방송할 채널을 선택하세요", Icon = "radio" },
+                                        new { Number = "2", Title = "스피커 설정", Description = "방송할 스피커 그룹을 선택하고 체크하세요", Icon = "speaker" },
+                                        new { Number = "3", Title = "방송 구성", Description = "볼륨, TTS, 플레이리스트 등을 설정하세요", Icon = "tune" },
+                                        new { Number = "4", Title = "방송 시작", Description = "좌측 상단의 방송 시작 버튼을 클릭하세요", Icon = "play_circle" }
                                         })
                             {
                                 <RadzenColumn Size="12" SizeSM="6" SizeMD="3">
-                                    <RadzenCard class="rz-shadow-1" Style="padding: 0.75rem; height: 100%;">
-                                        <RadzenStack Gap="0.5rem">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@step.Number" Style="width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;" />
-                                                <RadzenText TextStyle="TextStyle.Subtitle2"><strong>@step.Title</strong></RadzenText>
-                                            </RadzenStack>
-                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary" Style="line-height: 1.4;">
+                                    <RadzenCard class="rz-shadow-2 step-card" Style="padding: 1.25rem; height: 100%; border: 2px solid transparent; transition: all 0.3s ease;">
+                                        <RadzenStack Gap="0.75rem" AlignItems="AlignItems.Center" class="rz-text-align-center">
+                                            <div class="step-icon-wrapper">
+                                                <RadzenIcon Icon="@step.Icon" Style="font-size: 2rem; color: var(--rz-primary);" />
+                                            </div>
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@step.Number" IsPill="true" Style="padding: 0.25rem 0.75rem;" />
+                                            <RadzenText TextStyle="TextStyle.Subtitle1" Style="margin: 0;"><strong>@step.Title</strong></RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" Style="line-height: 1.6;">
                                                 @step.Description
                                             </RadzenText>
                                         </RadzenStack>
@@ -256,6 +263,21 @@
                                 </RadzenColumn>
                             }
                         </RadzenRow>
+
+                        <!-- 추가 팁 섹션 -->
+                        <RadzenCard Variant="Variant.Outlined" Style="background: rgba(var(--rz-info-rgb), 0.1); border-color: rgba(var(--rz-info-rgb), 0.3); padding: 1rem;">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Start">
+                                <RadzenIcon Icon="lightbulb" class="tip-icon-pulse" Style="color: var(--rz-warning); font-size: 1.5rem; flex-shrink: 0;" />
+                                <RadzenStack Gap="0.5rem" Style="flex: 1;">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" Style="margin: 0; color: var(--rz-info);"><strong>💡 유용한 팁</strong></RadzenText>
+                                    <RadzenStack Gap="0.25rem">
+                                        <RadzenText TextStyle="TextStyle.Body2" Style="margin: 0;">• 방송 시작 전 스피커 연결 상태를 확인하세요</RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body2" Style="margin: 0;">• TTS와 미디어를 함께 사용하여 다양한 방송을 구성할 수 있습니다</RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body2" Style="margin: 0;">• 플레이리스트를 미리 구성해두면 빠른 방송이 가능합니다</RadzenText>
+                                    </RadzenStack>
+                                </RadzenStack>
+                            </RadzenStack>
+                        </RadzenCard>
                     </RadzenStack>
                 </RadzenCard>
             }
@@ -423,6 +445,100 @@
 
         25%, 75% {
             opacity: 0.3;
+        }
+    }
+
+    /* 가이드 카드 애니메이션 */
+    .guide-card {
+        animation: fadeInUp 0.6s ease-out;
+    }
+
+    .guide-icon-animate {
+        animation: bounce 2s infinite;
+    }
+
+    .step-card {
+        animation: fadeInUp 0.6s ease-out;
+        animation-fill-mode: both;
+    }
+
+        .step-card:nth-child(1) {
+            animation-delay: 0.1s;
+        }
+
+        .step-card:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .step-card:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+        .step-card:nth-child(4) {
+            animation-delay: 0.4s;
+        }
+
+        .step-card:hover {
+            border-color: var(--rz-primary) !important;
+            box-shadow: var(--rz-shadow-4) !important;
+            transform: translateY(-4px);
+        }
+
+    .step-icon-wrapper {
+        width: 64px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(var(--rz-primary-rgb), 0.1);
+        border-radius: 50%;
+        transition: all 0.3s ease;
+    }
+
+        .step-card:hover .step-icon-wrapper {
+            background: rgba(var(--rz-primary-rgb), 0.2);
+            transform: scale(1.1);
+        }
+
+    .tip-icon-pulse {
+        animation: tipPulse 3s infinite;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {
+            transform: translateY(0);
+        }
+
+        40% {
+            transform: translateY(-10px);
+        }
+
+        60% {
+            transform: translateY(-5px);
+        }
+    }
+
+    @@keyframes tipPulse {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        50% {
+            opacity: 0.7;
+            transform: scale(1.1);
         }
     }
 </style>

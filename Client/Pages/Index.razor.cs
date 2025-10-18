@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -127,23 +127,176 @@ namespace WicsPlatform.Client.Pages
             try
             {
                 isLoadingActivities = true;
+                var activities = new List<RecentActivity>();
 
-                // ✅ 가상의 최근 활동 데이터 시뮬레이션 제거
-                // 실제 시스템에서는 데이터베이스에서 실제 로그 데이터를 가져와야 함
-                await Task.Delay(500); // 로딩 시뮬레이션
+                // Broadcast 테이블에서 최신 5개 가져오기
+                try
+                {
+                    var broadcasts = await WicsService.GetBroadcasts(
+                        filter: null, 
+                        orderby: "CreatedAt desc", 
+                        expand: "Channel", 
+                        top: 5, 
+                        skip: null, 
+                        count: false
+                    );
+                    if (broadcasts?.Value != null)
+                    {
+                        foreach (var item in broadcasts.Value)
+                        {
+                            var channelName = item.Channel?.Name ?? "알 수 없는 채널";
+                            activities.Add(new RecentActivity
+                            {
+                                Type = "broadcast",
+                                Description = $"{channelName} 채널에서 방송을 시작했습니다",
+                                User = "시스템",
+                                Timestamp = item.CreatedAt
+                            });
+                        }
+                    }
+                }
+                catch { /* 테이블이 없거나 오류 발생시 무시 */ }
 
-                // TODO: 실제 데이터베이스에서 로그 데이터 조회
-                // var query = new Radzen.Query
-                // {
-                //     Filter = "CreatedAt >= @0",
-                //     FilterParameters = new object[] { DateTime.Now.AddDays(-7) },
-                //     OrderBy = "CreatedAt desc",
-                //     Top = 5
-                // };
-                // var result = await WicsService.GetSystemLogs(query);
-                // recentActivities = result.Value.ToList();
-                
-                recentActivities = new List<RecentActivity>(); // 빈 목록으로 초기화
+                // Media 테이블에서 최신 5개 가져오기
+                try
+                {
+                    var mediaQuery = new Radzen.Query
+                    {
+                        Filter = "DeleteYn eq 'N' or DeleteYn eq null",
+                        OrderBy = "CreatedAt desc",
+                        Top = 5
+                    };
+                    var media = await WicsService.GetMedia(mediaQuery);
+                    if (media?.Value != null)
+                    {
+                        foreach (var item in media.Value)
+                        {
+                            var fileName = item.FileName ?? "알 수 없는 파일";
+                            activities.Add(new RecentActivity
+                            {
+                                Type = "media",
+                                Description = $"{fileName} 미디어 파일을 추가했습니다",
+                                User = "시스템",
+                                Timestamp = item.CreatedAt
+                            });
+                        }
+                    }
+                }
+                catch { /* 테이블이 없거나 오류 발생시 무시 */ }
+
+                // Channel 테이블에서 최신 5개 가져오기
+                try
+                {
+                    var channelQuery = new Radzen.Query
+                    {
+                        Filter = "DeleteYn eq 'N' or DeleteYn eq null",
+                        OrderBy = "CreatedAt desc",
+                        Top = 5
+                    };
+                    var channels = await WicsService.GetChannels(channelQuery);
+                    if (channels?.Value != null)
+                    {
+                        foreach (var item in channels.Value)
+                        {
+                            var channelName = item.Name ?? "알 수 없는 채널";
+                            activities.Add(new RecentActivity
+                            {
+                                Type = "channel",
+                                Description = $"{channelName} 채널을 생성했습니다",
+                                User = "시스템",
+                                Timestamp = item.CreatedAt
+                            });
+                        }
+                    }
+                }
+                catch { /* 테이블이 없거나 오류 발생시 무시 */ }
+
+                // Group 테이블에서 최신 5개 가져오기
+                try
+                {
+                    var groupQuery = new Radzen.Query
+                    {
+                        Filter = "DeleteYn eq 'N' or DeleteYn eq null",
+                        OrderBy = "CreatedAt desc",
+                        Top = 5
+                    };
+                    var groups = await WicsService.GetGroups(groupQuery);
+                    if (groups?.Value != null)
+                    {
+                        foreach (var item in groups.Value)
+                        {
+                            var groupName = item.Name ?? "알 수 없는 그룹";
+                            activities.Add(new RecentActivity
+                            {
+                                Type = "group",
+                                Description = $"{groupName} 그룹을 생성했습니다",
+                                User = "시스템",
+                                Timestamp = item.CreatedAt
+                            });
+                        }
+                    }
+                }
+                catch { /* 테이블이 없거나 오류 발생시 무시 */ }
+
+                // Speaker 테이블에서 최신 5개 가져오기
+                try
+                {
+                    var speakerQuery = new Radzen.Query
+                    {
+                        Filter = "DeleteYn eq 'N' or DeleteYn eq null",
+                        OrderBy = "CreatedAt desc",
+                        Top = 5
+                    };
+                    var speakers = await WicsService.GetSpeakers(speakerQuery);
+                    if (speakers?.Value != null)
+                    {
+                        foreach (var item in speakers.Value)
+                        {
+                            var speakerName = item.Name ?? "알 수 없는 스피커";
+                            activities.Add(new RecentActivity
+                            {
+                                Type = "speaker",
+                                Description = $"{speakerName} 스피커를 등록했습니다",
+                                User = "시스템",
+                                Timestamp = item.CreatedAt
+                            });
+                        }
+                    }
+                }
+                catch { /* 테이블이 없거나 오류 발생시 무시 */ }
+
+                // TTS 테이블에서 최신 5개 가져오기
+                try
+                {
+                    var ttsQuery = new Radzen.Query
+                    {
+                        Filter = "DeleteYn eq 'N' or DeleteYn eq null",
+                        OrderBy = "CreatedAt desc",
+                        Top = 5
+                    };
+                    var tts = await WicsService.GetTts(ttsQuery);
+                    if (tts?.Value != null)
+                    {
+                        foreach (var item in tts.Value)
+                        {
+                            var ttsName = item.Name ?? "알 수 없는 TTS";
+                            activities.Add(new RecentActivity
+                            {
+                                Type = "tts",
+                                Description = $"{ttsName} 음성 메시지를 생성했습니다",
+                                User = "시스템",
+                                Timestamp = item.CreatedAt
+                            });
+                        }
+                    }
+                }
+                catch { /* 테이블이 없거나 오류 발생시 무시 */ }
+
+                // 시간순으로 정렬하고 최대 10개만 가져오기
+                recentActivities = activities
+                    .OrderByDescending(a => a.Timestamp)
+                    .Take(10)
+                    .ToList();
             }
             catch (Exception ex)
             {
@@ -169,6 +322,8 @@ namespace WicsPlatform.Client.Pages
                 "speaker" => "speaker",
                 "media" => "audio_file",
                 "tts" => "record_voice_over",
+                "channel" => "radio",
+                "group" => "folder_special",
                 _ => "event"
             };
         }
@@ -181,6 +336,8 @@ namespace WicsPlatform.Client.Pages
                 "speaker" => BadgeStyle.Secondary,
                 "media" => BadgeStyle.Warning,
                 "tts" => BadgeStyle.Success,
+                "channel" => BadgeStyle.Info,
+                "group" => BadgeStyle.Light,
                 _ => BadgeStyle.Light
             };
         }

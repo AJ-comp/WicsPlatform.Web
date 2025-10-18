@@ -30,7 +30,7 @@
             <RadzenRow Gap="0.75rem">
                 <!-- 좌측: 스피커 그룹 목록 -->
                 <RadzenColumn Size="12" SizeMD="5">
-                    <RadzenCard class="group-section" Style="padding: 0.75rem; position: relative;">
+                    <RadzenCard class="group-section" Style="padding: 0.75rem; position: relative; border: 2px solid var(--rz-border-color); box-shadow: var(--rz-shadow-2);">
                         @if (isAddingToGroup)
                         {
                             <div class="processing-overlay">
@@ -70,7 +70,7 @@
                         }
                         else if (speakerGroups.Any())
                         {
-                            <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--rz-border); border-radius: var(--rz-border-radius); background-color: var(--rz-base-background-color);">
+                            <div style="max-height: 400px; overflow-y: auto; border: 2px solid var(--rz-border-color); border-radius: var(--rz-border-radius); background-color: var(--rz-base-background-color);">
                                 @foreach (var group in speakerGroups)
                                 {
                                     var isExpanded = expandedGroups.Contains(group.Id);
@@ -190,7 +190,7 @@
 
                 <!-- 우측: 전체 스피커 목록 -->
                 <RadzenColumn Size="12" SizeMD="7">
-                    <RadzenCard class="speakers-section" Style="padding: 0.75rem;">
+                    <RadzenCard class="speakers-section" Style="padding: 0.75rem; border: 2px solid var(--rz-border-color); box-shadow: var(--rz-shadow-2);">
                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="mb-2">
                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
                                 <RadzenIcon Icon="speaker" Style="font-size: 0.875rem; color: var(--rz-primary);" />

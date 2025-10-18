@@ -4,12 +4,6 @@
 <PageTitle>방송 관리</PageTitle>
 
 <RadzenStack Gap="1rem">
-    <!-- 페이지 헤더 -->
-    <RadzenStack Gap="0.5rem" Style="padding-bottom: 1rem; border-bottom: 1px solid var(--rz-border-color);">
-        <RadzenText Text="방송 관리" TextStyle="TextStyle.H5" TagName="TagName.H1" />
-        <RadzenText Text="실시간 방송과 예약 방송을 관리합니다" TextStyle="TextStyle.Caption" class="rz-color-secondary" />
-    </RadzenStack>
-
     <!-- 탭 UI -->
     <RadzenTabs @bind-SelectedIndex="@selectedTabIndex" RenderMode="TabRenderMode.Client">
         <Tabs>

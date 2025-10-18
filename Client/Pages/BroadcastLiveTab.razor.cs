@@ -885,7 +885,7 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
     protected BadgeStyle GetChannelBadgeStyle(sbyte state) => state switch
     {
         1 => BadgeStyle.Success,
-        0 => BadgeStyle.Danger,
+        0 => BadgeStyle.Light,
         -1 => BadgeStyle.Warning,
         _ => BadgeStyle.Light
     };

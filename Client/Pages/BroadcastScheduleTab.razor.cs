@@ -69,6 +69,10 @@ public partial class BroadcastScheduleTab
     private HashSet<ulong> editingSelectedSpeakerIds = new();
     private Server.Models.wics.Group? viewingGroup = null;
     private HashSet<ulong> expandedGroups = new();
+    
+    // 스피커 그룹 관리 패널
+    private SubPages.BroadcastSpeakerSection speakerSection;
+    private bool speakerGroupPanelCollapsed = false;
 
     // 요일 데이터
     private readonly Dictionary<string, string> weekdays = new Dictionary<string, string>
@@ -481,10 +485,7 @@ public partial class BroadcastScheduleTab
         viewingGroup = null;
         expandedGroups.Clear();
 
-        if (editingChannel != null)
-        {
-            await InitializeChannelSpeakerSelections(editingChannel.Id);
-        }
+        // BroadcastSpeakerSection 컴포넌트가 OnParametersSetAsync에서 자동으로 채널 매핑을 로드합니다
 
         var name = GetChannelNameForSchedule(schedule);
         Logger.LogInformation($"Selected schedule: {name} (ID: {schedule.Id})");
@@ -842,56 +843,14 @@ public partial class BroadcastScheduleTab
     }
 
     // ===== 스피커/그룹 편집 동작 =====
-    private async Task InitializeChannelSpeakerSelections(ulong channelId)
-    {
-        try
-        {
-            // 그룹 매핑 로드
-            var groupQuery = new Radzen.Query
-            {
-                Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)"
-            };
-            var groupMaps = await WicsService.GetMapChannelGroups(groupQuery);
-            var groups = groupMaps.Value.AsODataEnumerable().ToList();
-            editingSelectedGroupIds = groups.Select(g => g.GroupId).ToHashSet();
-
-            // 스피커 매핑 로드
-            var spQuery = new Radzen.Query
-            {
-                Filter = $"ChannelId eq {channelId} and (DeleteYn eq 'N' or DeleteYn eq null)"
-            };
-            var spMaps = await WicsService.GetMapChannelSpeakers(spQuery);
-            var speakers = spMaps.Value.AsODataEnumerable().ToList();
-            var mappedSpeakerIds = speakers.Select(s => s.SpeakerId).ToHashSet();
-
-            if (mappedSpeakerIds.Any())
-            {
-                editingSelectedSpeakerIds = mappedSpeakerIds;
-            }
-            else if (editingSelectedGroupIds.Any())
-            {
-                // 그룹에서 스피커 유추
-                var union = new HashSet<ulong>();
-                foreach (var gid in editingSelectedGroupIds)
-                {
-                    foreach (var s in GetSpeakersInGroupSync(gid))
-                    {
-                        union.Add(s.Id);
-                    }
-                }
-                editingSelectedSpeakerIds = union;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, $"Failed to initialize channel speaker selections for channel {channelId}");
-        }
-    }
-
     private async Task UpdateChannelSpeakerMappings(ulong channelId)
     {
         try
         {
+            // speakerSection에서 선택된 그룹/스피커 가져오기
+            var selectedGroupIds = speakerSection?.GetSelectedGroups()?.Select(id => (ulong)id).ToHashSet() ?? new HashSet<ulong>();
+            var selectedSpeakerIds = speakerSection?.GetSelectedSpeakers()?.Select(id => (ulong)id).ToHashSet() ?? new HashSet<ulong>();
+
             // 기존 그룹 매핑 읽기
             var existingGroupsQuery = new Radzen.Query
             {
@@ -903,7 +862,7 @@ public partial class BroadcastScheduleTab
             var existingGroupIds = existingGroupMaps.Select(m => m.GroupId).ToHashSet();
 
             // 삭제할 그룹 매핑
-            foreach (var toRemove in existingGroupMaps.Where(m => !editingSelectedGroupIds.Contains(m.GroupId)))
+            foreach (var toRemove in existingGroupMaps.Where(m => !selectedGroupIds.Contains(m.GroupId)))
             {
                 toRemove.DeleteYn = "Y";
                 toRemove.UpdatedAt = DateTime.UtcNow;
@@ -911,7 +870,7 @@ public partial class BroadcastScheduleTab
             }
 
             // 추가할 그룹 매핑
-            var groupsToAdd = editingSelectedGroupIds.Except(existingGroupIds);
+            var groupsToAdd = selectedGroupIds.Except(existingGroupIds);
             foreach (var gid in groupsToAdd)
             {
                 var newMap = new MapChannelGroup
@@ -935,7 +894,7 @@ public partial class BroadcastScheduleTab
             var existingSpeakerIds = existingSpeakerMaps.Select(m => m.SpeakerId).ToHashSet();
 
             // 삭제할 스피커 매핑
-            foreach (var toRemove in existingSpeakerMaps.Where(m => !editingSelectedSpeakerIds.Contains(m.SpeakerId)))
+            foreach (var toRemove in existingSpeakerMaps.Where(m => !selectedSpeakerIds.Contains(m.SpeakerId)))
             {
                 toRemove.DeleteYn = "Y";
                 toRemove.UpdatedAt = DateTime.UtcNow;
@@ -943,7 +902,7 @@ public partial class BroadcastScheduleTab
             }
 
             // 추가할 스피커 매핑
-            var speakersToAdd = editingSelectedSpeakerIds.Except(existingSpeakerIds);
+            var speakersToAdd = selectedSpeakerIds.Except(existingSpeakerIds);
             foreach (var sid in speakersToAdd)
             {
                 var newMap = new MapChannelSpeaker
@@ -957,7 +916,7 @@ public partial class BroadcastScheduleTab
                 await WicsService.CreateMapChannelSpeaker(newMap);
             }
 
-            Logger.LogInformation($"Updated channel-speaker mappings for channel {channelId}: groups={editingSelectedGroupIds.Count}, speakers={editingSelectedSpeakerIds.Count}");
+            Logger.LogInformation($"Updated channel-speaker mappings for channel {channelId}: groups={selectedGroupIds.Count}, speakers={selectedSpeakerIds.Count}");
         }
         catch (Exception ex)
         {

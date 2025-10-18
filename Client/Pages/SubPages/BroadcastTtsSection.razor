@@ -90,7 +90,7 @@
                         채널에서 사용할 TTS를 선택하세요 (하나만 선택 가능)
                     </RadzenText>
 
-                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                         @if (selectedTtsId.HasValue)
                         {
                             <RadzenButton Text="선택 해제"
@@ -101,11 +101,10 @@
                                           Style="font-size: 0.7rem; padding: 0.2rem 0.4rem;"
                                           Click="@ClearTtsSelection" />
                         }
-                        <RadzenButton Icon="add_circle"
-                                      Text="TTS 추가"
-                                      Size="ButtonSize.ExtraSmall"
-                                      ButtonStyle="ButtonStyle.Primary"
-                                      Style="font-size: 0.7rem; padding: 0.2rem 0.5rem;"
+                        <RadzenButton Icon="add"
+                                      Text="추가"
+                                      ButtonStyle="ButtonStyle.Light"
+                                      Size="ButtonSize.Small"
                                       Click="@ShowAddTtsDialog" />
                     </RadzenStack>
                 </RadzenStack>
@@ -168,23 +167,24 @@
 
                                             <!-- 편집 버튼 -->
                                             <RadzenButton Icon="edit"
-                                                          ButtonStyle="ButtonStyle.Info"
+                                                          ButtonStyle="ButtonStyle.Light"
                                                           Variant="Variant.Flat"
-                                                          Size="ButtonSize.ExtraSmall"
+                                                          Size="ButtonSize.Small"
+                                                          class="expand-button"
                                                           Click="@(() => OpenEditTtsDialog(tts))"
                                                           @onclick:stopPropagation="true"
-                                                          Style="min-width: 24px; height: 24px; padding: 0;"
                                                           Title="편집" />
 
                                             <!-- 삭제 버튼 -->
                                             <RadzenButton Icon="delete"
-                                                          ButtonStyle="ButtonStyle.Danger"
+                                                          ButtonStyle="ButtonStyle.Light"
                                                           Variant="Variant.Flat"
-                                                          Size="ButtonSize.ExtraSmall"
+                                                          Size="ButtonSize.Small"
+                                                          class="expand-button"
                                                           Click="@(() => OpenDeleteTtsDialog(tts))"
                                                           @onclick:stopPropagation="true"
-                                                          Style="min-width: 24px; height: 24px; padding: 0;"
-                                                          Title="삭제" />
+                                                          Title="삭제"
+                                                          Style="color: var(--rz-danger);" />
                                         </RadzenStack>
                                     </RadzenColumn>
                                 </RadzenRow>
@@ -293,6 +293,17 @@
     .tts-item input[type="radio"]:checked {
         accent-color: var(--rz-primary) !important;
     }
+
+    /* 확장 버튼 스타일 */
+    .expand-button {
+        min-width: 20px !important;
+        padding: 2px !important;
+        height: 20px !important;
+    }
+
+        .expand-button .rz-button-icon {
+            font-size: 0.75rem !important;
+        }
 
     /* 애니메이션 */
     @@keyframes slideDown {

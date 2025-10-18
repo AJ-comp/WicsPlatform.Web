@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Radzen;
 using System;
@@ -265,6 +265,12 @@ public partial class AddScheduleDialog
         {
             isProcessing = false;
         }
+    }
+
+    // 볼륨 퍼센트 텍스트 반환
+    protected string GetVolumePercentText()
+    {
+        return $"{(model.Volume * 100):0}%";
     }
 
     // 선택된 요일 텍스트 반환

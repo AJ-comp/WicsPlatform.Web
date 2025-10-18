@@ -57,10 +57,22 @@ namespace WicsPlatform.Client.Pages.SubPages
 
         protected int AddProgressPercent => addTotal == 0 ? 0 : (int)((double)addProgress / addTotal * 100);
 
+        private WicsPlatform.Server.Models.wics.Channel _previousChannel = null;
+
         protected override async Task OnInitializedAsync()
         {
             Logger.LogInformation("BroadcastSpeakerSection OnInitializedAsync 시작");
             await LoadSpeakerData();
+        }
+
+        protected override async Task OnParametersSetAsync()
+        {
+            // Channel이 변경되었을 때만 매핑 로드
+            if (Channel != null && (Channel != _previousChannel || _previousChannel?.Id != Channel.Id))
+            {
+                _previousChannel = Channel;
+                await LoadChannelMappings();
+            }
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -239,6 +251,67 @@ namespace WicsPlatform.Client.Pages.SubPages
                     Detail = $"스피커 그룹 매핑을 불러오는 중 오류가 발생했습니다: {ex.Message}",
                     Duration = 4000
                 });
+            }
+        }
+
+        private async Task LoadChannelMappings()
+        {
+            if (Channel == null)
+            {
+                selectedGroups.Clear();
+                selectedSpeakers.Clear();
+                return;
+            }
+
+            try
+            {
+                Logger.LogInformation($"채널 {Channel.Id}의 그룹/스피커 매핑 로드 시작");
+
+                // 채널에 할당된 그룹 로드
+                var groupQuery = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {Channel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)"
+                };
+                var groupMaps = await WicsService.GetMapChannelGroups(groupQuery);
+                var channelGroupIds = groupMaps.Value.AsODataEnumerable().Select(g => g.GroupId).ToList();
+
+                // 채널에 할당된 스피커 로드
+                var speakerQuery = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {Channel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)"
+                };
+                var speakerMaps = await WicsService.GetMapChannelSpeakers(speakerQuery);
+                var channelSpeakerIds = speakerMaps.Value.AsODataEnumerable().Select(s => s.SpeakerId).ToHashSet();
+
+                // 그룹 선택 상태 설정
+                selectedGroups = channelGroupIds;
+
+                // 스피커 선택 상태 설정
+                if (channelSpeakerIds.Any())
+                {
+                    selectedSpeakers = channelSpeakerIds;
+                }
+                else if (channelGroupIds.Any())
+                {
+                    // 스피커 매핑이 없으면 그룹에서 스피커 유추
+                    selectedSpeakers.Clear();
+                    foreach (var groupId in channelGroupIds)
+                    {
+                        var speakersInGroup = GetSpeakersInGroupSync(groupId);
+                        foreach (var speaker in speakersInGroup)
+                        {
+                            selectedSpeakers.Add(speaker.Id);
+                        }
+                    }
+                }
+
+                Logger.LogInformation($"채널 {Channel.Id}: {selectedGroups.Count}개 그룹, {selectedSpeakers.Count}개 스피커 선택됨");
+                
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, $"채널 {Channel.Id}의 매핑 로드 실패");
             }
         }
 
@@ -445,6 +518,12 @@ namespace WicsPlatform.Client.Pages.SubPages
             return selectedGroups.ToList();
         }
 
+        // 선택된 스피커 ID 목록 가져오기
+        public List<ulong> GetSelectedSpeakers()
+        {
+            return selectedSpeakers.ToList();
+        }
+
         // 선택 초기화
         public void ClearSelection()
         {
@@ -476,7 +555,7 @@ namespace WicsPlatform.Client.Pages.SubPages
 
         protected BadgeStyle GetSpeakerStatusBadgeStyle(byte state) =>
             state == 1 ? BadgeStyle.Success :
-            state == 0 ? BadgeStyle.Danger : BadgeStyle.Light;
+            state == 0 ? BadgeStyle.Light : BadgeStyle.Light;
 
         protected string GetSpeakerStatusText(byte state) =>
             state == 1 ? "온라인" :
