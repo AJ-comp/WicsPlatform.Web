@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Radzen;
+using System.Diagnostics;
 using System.Net.Http.Json;
 using WicsPlatform.Audio;
 using WicsPlatform.Client.Dialogs;
@@ -351,29 +352,60 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
             await CleanupCurrentBroadcast();
         }
 
-        // 새 채널 선택
+        // ========== 1단계: 채널 선택 및 기본 설정 ==========
         selectedChannel = channel;
+        micVolume = (int)(channel.MicVolume * 100);
+        mediaVolume = (int)(channel.MediaVolume * 100);
+        ttsVolume = (int)(channel.TtsVolume * 100);
+        _preferredSampleRate = channel.SamplingRate > 0 ? (int)channel.SamplingRate : 48000;
+        _preferredChannels = channel.ChannelCount;
+
+        _logger.LogInformation($"[1단계] 채널 선택: {channel.Name} (ID: {channel.Id})");
+
+        // ========== 2단계: UI 패널 초기화 ==========
         ResetAllPanels();
-
-        // SubPage들 초기화
         InitializeSubPages();
+        await InvokeAsync(StateHasChanged);
 
-        if (channel != null)
+        // ========== 3단계: 채널 데이터 로드 (스피커/그룹/플레이리스트/미디어) ==========
+        await LoadChannelData();
+
+        // ========== 4단계: 방송 복구 (state=1인 경우만) ==========
+        if (channel.State == 1)
         {
-            micVolume = (int)(channel.MicVolume * 100);
-            mediaVolume = (int)(channel.MediaVolume * 100);
-            ttsVolume = (int)(channel.TtsVolume * 100);
+            _logger.LogInformation($"[4단계] state=1 감지 - 방송 복구 시작");
+            await RecoverBroadcast();
+        }
+        else
+        {
+            _logger.LogInformation($"[4단계] state=0 - 완료");
+        }
+    }
 
-            _preferredSampleRate = channel.SamplingRate > 0 ? (int)channel.SamplingRate : 48000;
-            _preferredChannels = channel.ChannelCount;
+    /// <summary>
+    /// 채널 데이터 로드: 스피커/그룹/플레이리스트/미디어
+    /// </summary>
+    private async Task LoadChannelData()
+    {
+        _logger.LogInformation("[3단계] 채널 데이터 로드 시작");
 
-            _logger.LogInformation($"Channel selected: {channel.Name}, Settings: {_preferredSampleRate}Hz, {_preferredChannels}ch");
+        // 컴포넌트 렌더링 강제 및 다음 tick 대기 (1-10ms)
+        StateHasChanged();
+        await Task.Yield();
 
-            // 복구 루틴 실행
-            await CheckAndRecoverIfNeeded(channel.Id);
+        // 스피커/그룹 로드
+        if (speakerSection != null)
+        {
+            await speakerSection.LoadChannelMappings();
         }
 
-        await InvokeAsync(StateHasChanged);
+        // 플레이리스트/미디어 로드
+        if (playlistSection != null)
+        {
+            await playlistSection.LoadChannelMappings();
+        }
+
+        _logger.LogInformation("[3단계] 채널 데이터 로드 완료 ✅");
     }
 
     private async Task CleanupCurrentBroadcast()
@@ -428,11 +460,9 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
             monitoringSection.ResetBroadcastState();
         }
 
-        // 스피커 섹션 초기화
-        if (speakerSection != null)
-        {
-            speakerSection.ClearSelection();
-        }
+        // 스피커 섹션: 선택 초기화만 (채널 매핑은 OnParametersSetAsync에서 자동 로드됨)
+        // 참고: BroadcastSpeakerSection의 OnParametersSetAsync가 Channel 파라미터 변경 시 자동으로 LoadChannelMappings 호출
+        // 예약방송과 동일한 방식으로 작동함
 
         // 플레이리스트 섹션 초기화
         if (playlistSection != null)
@@ -450,72 +480,160 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
     }
 
     #region Broadcast Control
-    protected async Task StartBroadcast()
+    protected async Task StartBroadcast(bool isRecovery = false)
     {
-        _logger.LogInformation("StartBroadcast 메서드 호출됨");
+        Debug.WriteLine($"[방송시작] ========== StartBroadcast() 메서드 호출 (복구모드: {isRecovery}) ==========");
+        _logger.LogInformation($"StartBroadcast 메서드 호출됨 (복구모드: {isRecovery})");
 
-        if (!ValidateBroadcastPrerequisites()) return;
+        Debug.WriteLine($"[방송시작] 사전 조건 검증 중...");
+        if (!ValidateBroadcastPrerequisites(isRecovery))
+        {
+            Debug.WriteLine($"[방송시작] ❌ 사전 조건 검증 실패 - 중단");
+            return;
+        }
+        Debug.WriteLine($"[방송시작] ✓ 사전 조건 검증 완료");
 
         try
         {
+            Debug.WriteLine($"[방송시작] 스피커 온라인/오프라인 상태 확인 중...");
             var onlineSpeakers = speakerSection.GetOnlineSpeakers();
             var offlineSpeakers = speakerSection.GetOfflineSpeakers();
+            Debug.WriteLine($"[방송시작] 온라인 스피커: {onlineSpeakers.Count}대, 오프라인: {offlineSpeakers.Count}대");
 
-            if (!await ValidateAndNotifyOnlineStatus(onlineSpeakers, offlineSpeakers)) return;
+            if (!await ValidateAndNotifyOnlineStatus(onlineSpeakers, offlineSpeakers))
+            {
+                Debug.WriteLine($"[방송시작] ❌ 온라인 스피커 검증 실패 - 중단");
+                return;
+            }
+            Debug.WriteLine($"[방송시작] ✓ 온라인 스피커 검증 완료");
 
             var onlineGroups = speakerSection.GetSelectedGroups();
+            Debug.WriteLine($"[방송시작] 선택된 그룹: {onlineGroups.Count}개");
 
-            // DB 저장 작업
-            _logger.LogInformation("1단계: DB 저장 작업");
-            LoggingService.AddLog("INFO", "미디어 선택사항 DB 저장");
-            await SaveSelectedMediaToChannel();
+            // DB 저장 작업 (복구 모드에서는 건너뜀)
+            if (!isRecovery)
+            {
+                Debug.WriteLine($"[방송시작] ===== 1단계: DB 저장 작업 =====");
+                _logger.LogInformation("1단계: DB 저장 작업");
+                
+                Debug.WriteLine($"[방송시작] 1-1. 스피커/그룹 선택사항 DB 저장 중...");
+                LoggingService.AddLog("INFO", "스피커/그룹 선택사항 DB 저장");
+                await SaveSelectedSpeakersToChannel();
+                Debug.WriteLine($"[방송시작] ✓ 1-1. 스피커/그룹 DB 저장 완료");
+                
+                Debug.WriteLine($"[방송시작] 1-2. 플레이리스트 선택사항 DB 저장 중...");
+                LoggingService.AddLog("INFO", "플레이리스트 선택사항 DB 저장");
+                await SaveSelectedPlaylistsToChannel();
+                Debug.WriteLine($"[방송시작] ✓ 1-2. 플레이리스트 DB 저장 완료");
+                
+                Debug.WriteLine($"[방송시작] 1-3. 미디어 선택사항 DB 저장 중...");
+                LoggingService.AddLog("INFO", "미디어 선택사항 DB 저장");
+                await SaveSelectedMediaToChannel();
+                Debug.WriteLine($"[방송시작] ✓ 1-3. 미디어 DB 저장 완료");
 
-            LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
-            await SaveSelectedTtsToChannel();
+                Debug.WriteLine($"[방송시작] 1-4. TTS 선택사항 DB 저장 중...");
+                LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
+                await SaveSelectedTtsToChannel();
+                Debug.WriteLine($"[방송시작] ✓ 1-4. TTS DB 저장 완료");
+            }
+            else
+            {
+                Debug.WriteLine($"[방송시작] ===== 1단계: DB 저장 건너뜀 (복구 모드) =====");
+                _logger.LogInformation("1단계: DB 저장 건너뜀 (복구 모드)");
+            }
 
             // 마이크 초기화
+            Debug.WriteLine($"[방송시작] ===== 2단계: 오디오 믹서 초기화 =====");
             _logger.LogInformation("2단계: 오디오 믹서 초기화 (필요시)");
-            if (!await InitializeAudioMixer()) return;
+            if (!await InitializeAudioMixer())
+            {
+                Debug.WriteLine($"[방송시작] ❌ 오디오 믹서 초기화 실패 - 중단");
+                return;
+            }
+            Debug.WriteLine($"[방송시작] ✓ 오디오 믹서 초기화 완료");
 
+            Debug.WriteLine($"[방송시작] ===== 3단계: WebSocket 연결 시작 =====");
             _logger.LogInformation("3단계: WebSocket 연결 시작");
             LoggingService.AddLog("INFO", "WebSocket 연결 중...");
+            Debug.WriteLine($"[방송시작] WebSocket 연결 중... (채널: {selectedChannel.Id}, 그룹: {onlineGroups.Count}개)");
 
-            if (!await InitializeWebSocketBroadcast(onlineGroups)) return;
+            if (!await InitializeWebSocketBroadcast(onlineGroups))
+            {
+                Debug.WriteLine($"[방송시작] ❌ WebSocket 연결 실패 - 중단");
+                return;
+            }
+            Debug.WriteLine($"[방송시작] ✓ WebSocket 연결 완료 (BroadcastId: {currentBroadcastId})");
 
             // 마이크 활성화
+            Debug.WriteLine($"[방송시작] ===== 4단계: 마이크 활성화 =====");
             _logger.LogInformation("4단계: 마이크 활성화 (필요시)");
             if (!await EnableMicrophone())
             {
+                Debug.WriteLine($"[방송시작] ❌ 마이크 활성화 실패 - 정리 작업 시작");
                 await CleanupFailedBroadcast();
                 return;
             }
+            Debug.WriteLine($"[방송시작] ✓ 마이크 활성화 완료");
 
+            Debug.WriteLine($"[방송시작] ===== 5단계: 방송 상태 초기화 =====");
             InitializeBroadcastState();
+            Debug.WriteLine($"[방송시작] ✓ 방송 상태 초기화 완료");
+            
+            Debug.WriteLine($"[방송시작] ===== 6단계: DB Broadcast 레코드 생성 =====");
             await CreateBroadcastRecords(onlineSpeakers);
+            Debug.WriteLine($"[방송시작] ✓ Broadcast 레코드 생성 완료");
+            
+            // 채널 상태를 방송 중(1)으로 업데이트
+            Debug.WriteLine($"[방송시작] ===== 7단계: 채널 상태 업데이트 (State=1) =====");
+            await UpdateChannelState(1);
+            Debug.WriteLine($"[방송시작] ✓ 채널 상태 업데이트 완료");
 
+            Debug.WriteLine($"[방송시작] ========== 방송 시작 완료! ==========");
             NotifyBroadcastStarted(onlineSpeakers, offlineSpeakers);
             await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"[방송시작] ❌❌❌ 예외 발생 ❌❌❌");
+            Debug.WriteLine($"[방송시작] 예외 타입: {ex.GetType().Name}");
+            Debug.WriteLine($"[방송시작] 에러 메시지: {ex.Message}");
+            Debug.WriteLine($"[방송시작] 스택 트레이스:");
+            Debug.WriteLine(ex.StackTrace);
+            if (ex.InnerException != null)
+            {
+                Debug.WriteLine($"[방송시작] InnerException: {ex.InnerException.Message}");
+                Debug.WriteLine(ex.InnerException.StackTrace);
+            }
             await HandleBroadcastError(ex);
         }
     }
 
-    private bool ValidateBroadcastPrerequisites()
+    private bool ValidateBroadcastPrerequisites(bool isRecovery = false)
     {
         if (selectedChannel == null)
         {
+            Debug.WriteLine($"[검증] ❌ selectedChannel == null");
             NotifyWarn("채널 선택", "먼저 방송할 채널을 선택하세요.");
             return false;
         }
 
-        if (speakerSection == null || !speakerSection.GetSelectedGroups().Any())
+        // 복구 모드가 아닐 때만 그룹 검증 (복구 시에는 DB에서 비동기 로드 중)
+        if (!isRecovery)
         {
-            NotifyWarn("스피커 그룹 선택", "방송할 스피커 그룹을 선택하세요.");
-            return false;
+            if (speakerSection == null || !speakerSection.GetSelectedGroups().Any())
+            {
+                Debug.WriteLine($"[검증] ❌ speakerSection == null: {speakerSection == null}");
+                Debug.WriteLine($"[검증] ❌ 선택된 그룹 수: {speakerSection?.GetSelectedGroups()?.Count() ?? 0}");
+                NotifyWarn("스피커 그룹 선택", "방송할 스피커 그룹을 선택하세요.");
+                return false;
+            }
+        }
+        else
+        {
+            Debug.WriteLine($"[검증] 복구 모드 - 그룹 검증 건너뜀 (DB에서 로드 중)");
         }
 
+        Debug.WriteLine($"[검증] ✓ 사전 조건 검증 통과");
         return true;
     }
 
@@ -582,6 +700,72 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
             _logger.LogError(ex, "Failed to create broadcast record");
             NotifyWarn("기록 생성 실패", "방송 기록 생성 중 오류가 발생했습니다. 방송은 계속됩니다.");
         }
+    }
+
+    /// <summary>
+    /// 채널의 State 값을 업데이트합니다.
+    /// </summary>
+    /// <param name="state">0: 대기, 1: 방송 중</param>
+    private async Task UpdateChannelState(sbyte state)
+    {
+        Debug.WriteLine($"========================================");
+        Debug.WriteLine($"[State업데이트] UpdateChannelState 호출: state={state}");
+        
+        try
+        {
+            if (selectedChannel == null)
+            {
+                Debug.WriteLine($"[State업데이트] ❌ selectedChannel이 null");
+                _logger.LogWarning("UpdateChannelState: selectedChannel is null");
+                return;
+            }
+
+            Debug.WriteLine($"[State업데이트] 채널 ID: {selectedChannel.Id}");
+            Debug.WriteLine($"[State업데이트] 현재 State: {selectedChannel.State}");
+            Debug.WriteLine($"[State업데이트] 변경할 State: {state}");
+
+            var updateData = new
+            {
+                State = state,
+                UpdatedAt = DateTime.Now
+            };
+
+            var url = $"odata/wics/Channels({selectedChannel.Id})";
+            Debug.WriteLine($"[State업데이트] PATCH URL: {url}");
+            Debug.WriteLine($"[State업데이트] PATCH Data: State={state}, UpdatedAt={DateTime.Now}");
+
+            var response = await Http.PatchAsJsonAsync(url, updateData);
+
+            Debug.WriteLine($"[State업데이트] 응답 StatusCode: {response.StatusCode}");
+            Debug.WriteLine($"[State업데이트] 응답 IsSuccessStatusCode: {response.IsSuccessStatusCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                Debug.WriteLine($"[State업데이트] ✓ DB 업데이트 성공!");
+                Debug.WriteLine($"[State업데이트] selectedChannel.State를 {selectedChannel.State} → {state}로 변경");
+                selectedChannel.State = state;
+                Debug.WriteLine($"[State업데이트] 변경 후 selectedChannel.State: {selectedChannel.State}");
+                _logger.LogInformation($"Channel {selectedChannel.Id} state updated to {state}");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Debug.WriteLine($"[State업데이트] ❌ DB 업데이트 실패: {response.StatusCode}");
+                Debug.WriteLine($"[State업데이트] 에러 내용: {errorContent}");
+                _logger.LogWarning($"Failed to update channel state: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[State업데이트] ❌❌❌ 예외 발생 ❌❌❌");
+            Debug.WriteLine($"[State업데이트] 예외 타입: {ex.GetType().Name}");
+            Debug.WriteLine($"[State업데이트] 에러 메시지: {ex.Message}");
+            Debug.WriteLine($"[State업데이트] 스택 트레이스:");
+            Debug.WriteLine(ex.StackTrace);
+            _logger.LogError(ex, "Error updating channel state");
+        }
+        
+        Debug.WriteLine($"========================================");
     }
 
     private async Task UpdateBroadcastRecordsToStopped()
@@ -835,6 +1019,9 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
             {
                 _logger.LogError(ex, "DB 업데이트 실패");
             }
+
+            // 채널 상태를 대기(0)로 업데이트
+            await UpdateChannelState(0);
 
             await StopWebSocketBroadcast();
             await CleanupMicrophone();

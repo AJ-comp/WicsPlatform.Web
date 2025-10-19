@@ -128,7 +128,7 @@
             <RadzenRow Gap="0.5rem">
                 <!-- 좌측: 플레이리스트 목록 -->
                 <RadzenColumn Size="12" SizeMD="5">
-                    <RadzenCard class="group-section" Style="padding: 0.5rem; position: relative;">
+                    <RadzenCard class="group-section" Style="padding: 0.5rem; position: relative; border: 3px dashed rgba(255, 255, 255, 0.3); box-shadow: var(--rz-shadow-2);">
                         @if (isAddingToPlaylist)
                         {
                             <div class="processing-overlay">
@@ -168,7 +168,7 @@
                         }
                         else if (playlists.Any())
                         {
-                            <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--rz-border); border-radius: var(--rz-border-radius); background-color: var(--rz-base-background-color);">
+                            <div style="max-height: 300px; overflow-y: auto; border-radius: var(--rz-border-radius); background-color: var(--rz-base-background-color);">
                                 @foreach (var playlist in playlists)
                                 {
                                     var isExpanded = expandedPlaylists.Contains(playlist.Id);
@@ -269,7 +269,7 @@
 
                 <!-- 우측: 미디어 파일 목록 -->
                 <RadzenColumn Size="12" SizeMD="7">
-                    <RadzenCard class="media-section" Style="padding: 0.5rem;">
+                    <RadzenCard class="media-section" Style="padding: 0.5rem; border: 3px dashed rgba(255, 255, 255, 0.3); box-shadow: var(--rz-shadow-2);">
                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="mb-2">
                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.25rem">
                                 <RadzenIcon Icon="audio_file" Style="font-size: 0.875rem; color: var(--rz-primary);" />

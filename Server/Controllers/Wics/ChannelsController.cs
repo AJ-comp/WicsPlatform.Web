@@ -123,7 +123,7 @@ namespace WicsPlatform.Server.Controllers.wics
             }
         }
 
-        [HttpPatch("/odata/wics/Channels(Id={Id})")]
+        [HttpPatch("/odata/wics/Channels({key})")]
         [EnableQuery(MaxExpansionDepth=10,MaxAnyAllExpressionDepth=10,MaxNodeCount=1000)]
         public IActionResult PatchChannel(ulong key, [FromBody]Delta<WicsPlatform.Server.Models.wics.Channel> patch)
         {

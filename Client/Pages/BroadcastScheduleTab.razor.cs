@@ -485,11 +485,39 @@ public partial class BroadcastScheduleTab
         viewingGroup = null;
         expandedGroups.Clear();
 
-        // BroadcastSpeakerSection 컴포넌트가 OnParametersSetAsync에서 자동으로 채널 매핑을 로드합니다
+        // 채널 데이터 로드 (스피커/그룹/플레이리스트/미디어)
+        if (editingChannel != null)
+        {
+            await LoadChannelData();
+        }
 
         var name = GetChannelNameForSchedule(schedule);
         Logger.LogInformation($"Selected schedule: {name} (ID: {schedule.Id})");
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// 채널 데이터 로드: 스피커/그룹 매핑
+    /// </summary>
+    private async Task LoadChannelData()
+    {
+        Logger.LogInformation("[스케줄] 채널 데이터 로드 시작");
+
+        // 컴포넌트 렌더링 강제 및 다음 tick 대기 (1-10ms)
+        StateHasChanged();
+        await Task.Yield();
+
+        // 스피커/그룹 로드
+        if (speakerSection != null)
+        {
+            await speakerSection.LoadChannelMappings();
+        }
+        else
+        {
+            Logger.LogWarning("[스케줄] speakerSection이 null - 건너뜀");
+        }
+
+        Logger.LogInformation("[스케줄] 채널 데이터 로드 완료 ✅");
     }
 
     // 변경사항 저장

@@ -35,6 +35,9 @@ namespace WicsPlatform.Client.Pages.SubPages
         private IJSObjectReference jsModule;
         private IJSObjectReference jsPlayer;
         private DotNetObjectReference<BroadcastPlaylistSection> dotNetRef;
+        
+        // 이전 채널 ID 추적 (채널 변경 감지용)
+        private ulong? _previousChannelId = null;
 
         /* ────────────────────── [State - 기존] ────────────────────── */
         // 플레이리스트 관련 필드
@@ -102,6 +105,13 @@ namespace WicsPlatform.Client.Pages.SubPages
                 isMediaPlaying = false;
                 currentMediaSessionId = null;
                 StateHasChanged();
+            }
+
+            // 채널이 변경되었을 때 채널 매핑 로드 (예약방송과 동일한 방식)
+            if (Channel != null && Channel.Id != _previousChannelId)
+            {
+                _previousChannelId = Channel.Id;
+                await LoadChannelMappings();
             }
         }
 
@@ -399,7 +409,7 @@ namespace WicsPlatform.Client.Pages.SubPages
                 isLoadingPlaylists = true;
                 var query = new Radzen.Query
                 {
-                    Filter = "(DeleteYn eq 'N' or DeleteYn eq null) and Type eq 1",
+                    Filter = "(DeleteYn eq 'N' or DeleteYn eq null) and Type eq 1",  // Type 1 = 플레이리스트
                     OrderBy = "CreatedAt desc"
                 };
 
@@ -703,6 +713,92 @@ namespace WicsPlatform.Client.Pages.SubPages
         }
 
         /* ────────────────────── [Public Methods] ────────────────────── */
+
+        /// <summary>
+        /// 채널 매핑 로드 (예약방송과 동일한 방식)
+        /// map_channel_group (Type=2) + map_channel_media에서 선택 상태 복구
+        /// </summary>
+        public async Task LoadChannelMappings()
+        {
+            if (Channel == null)
+            {
+                selectedPlaylists.Clear();
+                selectedMedia.Clear();
+                return;
+            }
+
+            try
+            {
+                _logger.LogInformation($"채널 {Channel.Id}의 플레이리스트/미디어 매핑 로드 시작");
+
+                // 플레이리스트 목록이 아직 로드되지 않았으면 먼저 로드
+                if (!playlists.Any())
+                {
+                    await LoadPlaylists();
+                }
+                
+                // 전체 미디어 목록이 아직 로드되지 않았으면 먼저 로드
+                if (!allMedia.Any())
+                {
+                    await LoadAllMedia();
+                }
+
+                // ========== 1. 플레이리스트 그룹 로드 (map_channel_group, Type=2) ==========
+                var groupQuery = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {Channel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)"
+                };
+                
+                var groupMaps = await WicsService.GetMapChannelGroups(groupQuery);
+                var channelGroupIds = groupMaps.Value.AsODataEnumerable().Select(g => g.GroupId).ToList();
+                
+                // Type=1인 플레이리스트 그룹만 필터링
+                var playlistGroupIds = new List<ulong>();
+                foreach (var groupId in channelGroupIds)
+                {
+                    var groupQuery2 = new Radzen.Query { Filter = $"Id eq {groupId}" };
+                    var groups = await WicsService.GetGroups(groupQuery2);
+                    var group = groups.Value.FirstOrDefault();
+                    
+                    if (group != null && group.Type == 1) // Type 1 = 플레이리스트
+                    {
+                        playlistGroupIds.Add(groupId);
+                    }
+                }
+
+                // ========== 2. 개별 미디어 로드 (map_channel_media) ==========
+                var mediaQuery = new Radzen.Query
+                {
+                    Filter = $"ChannelId eq {Channel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)"
+                };
+                
+                var mediaMaps = await WicsService.GetMapChannelMedia(mediaQuery);
+                var channelMediaIds = mediaMaps.Value.AsODataEnumerable().Select(m => m.MediaId).ToHashSet();
+
+                // ========== 3. 선택 상태 복구 ==========
+                // 플레이리스트 선택 상태 설정
+                selectedPlaylists.Clear();
+                foreach (var playlistId in playlistGroupIds)
+                {
+                    selectedPlaylists[playlistId] = true;
+                }
+
+                // 미디어 선택 상태 설정
+                selectedMedia.Clear();
+                foreach (var mediaId in channelMediaIds)
+                {
+                    selectedMedia[mediaId] = true;
+                }
+
+                _logger.LogInformation($"채널 {Channel.Id}: {playlistGroupIds.Count}개 플레이리스트, {channelMediaIds.Count}개 미디어 선택됨");
+                
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"채널 {Channel.Id}의 매핑 로드 실패");
+            }
+        }
 
         // 선택된 플레이리스트 목록 가져오기
         public IEnumerable<WicsPlatform.Server.Models.wics.Group> GetSelectedPlaylists()

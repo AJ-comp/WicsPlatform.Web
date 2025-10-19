@@ -1,138 +1,53 @@
-using System.Net.Http.Json;
-
 namespace WicsPlatform.Client.Pages;
 
 public partial class BroadcastLiveTab
 {
-    #region Recovery Fields
+    #region Recovery
+
     private bool _isRecoveringBroadcast = false;
-    private WicsPlatform.Server.Models.wics.Broadcast _broadcastToRecover = null;
-    #endregion
-
-    #region Recovery Entry Point
 
     /// <summary>
-    /// Ã¤³Î ¼±ÅÃ ½Ã º¹±¸ ÇÊ¿ä ¿©ºÎ¸¦ È®ÀÎÇÏ°í ÇÊ¿ä½Ã º¹±¸ ÇÁ·Î¼¼½º ½ÃÀÛ
+    /// ë°©ì†¡ ë³µêµ¬: ì´ë¯¸ ë¡œë“œëœ ë°ì´í„°ë¡œ ë°©ì†¡ ì„¸ì…˜ë§Œ ë³µêµ¬
     /// </summary>
-    public async Task CheckAndRecoverIfNeeded(ulong channelId)
+    private async Task RecoverBroadcast()
     {
-        try
-        {
-            _logger.LogInformation($"CheckAndRecoverIfNeeded started for channel {channelId}");
+        if (selectedChannel == null) return;
 
-            // 1. ÁøÇà ÁßÀÎ ¹æ¼ÛÀÌ ÀÖ´ÂÁö È®ÀÎ
-            var ongoingBroadcast = await FindOngoingBroadcast(channelId);
-
-            if (ongoingBroadcast == null)
-            {
-                _logger.LogInformation($"No ongoing broadcast found for channel {channelId}");
-                // ¹æ¼ÛÀÌ ¾øÀ¸¸é SubPageµéÀ» ºñ¹æ¼Û »óÅÂ·Î ÃÊ±âÈ­
-                InitializeSubPagesForNoBroadcast();
-                return;
-            }
-
-            // 2. º¹±¸°¡ ÇÊ¿äÇÏ´Ù°í ÆÇ´ÜµÇ¸é º¹±¸ ÇÁ·Î¼¼½º ½ÃÀÛ
-            _logger.LogInformation($"Ongoing broadcast found for channel {channelId}, starting recovery process");
-            _broadcastToRecover = ongoingBroadcast;
-
-            // 3. º¹±¸ ÇÁ·Î¼¼½º ½ÇÇà
-            await StartRecoveryProcess();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Error checking recovery need for channel {channelId}");
-            // º¹±¸ Ã¼Å© ½ÇÆĞ´Â Ä¡¸íÀûÀÌÁö ¾ÊÀ¸¹Ç·Î Á¤»ó ÁøÇà
-            InitializeSubPagesForNoBroadcast();
-        }
-    }
-
-    /// <summary>
-    /// SubPageµéÀ» ºñ¹æ¼Û »óÅÂ·Î ÃÊ±âÈ­
-    /// </summary>
-    private void InitializeSubPagesForNoBroadcast()
-    {
-        _logger.LogInformation("Initializing SubPages for non-broadcasting state");
-
-        // ¸ğ´ÏÅÍ¸µ ¼½¼Ç ÃÊ±âÈ­
-        if (monitoringSection != null)
-        {
-            monitoringSection.ResetBroadcastState();
-        }
-
-        // ÇÃ·¹ÀÌ¸®½ºÆ® ¼½¼Ç ÃÊ±âÈ­
-        if (playlistSection != null)
-        {
-            playlistSection.ResetMediaPlaybackState();
-        }
-
-        // TTS ¼½¼Ç ÃÊ±âÈ­
-        if (ttsSection != null)
-        {
-            ttsSection.ResetTtsPlaybackState();
-        }
-
-        // ½ºÇÇÄ¿ ¼½¼ÇÀº ¼±ÅÃ »óÅÂ¸¸ ÃÊ±âÈ­
-        if (speakerSection != null)
-        {
-            speakerSection.ClearSelection();
-        }
-    }
-
-    #endregion
-
-    #region Recovery Process
-
-    /// <summary>
-    /// º¹±¸ ÇÁ·Î¼¼½º ¸ŞÀÎ ·ÎÁ÷
-    /// </summary>
-    private async Task StartRecoveryProcess()
-    {
-        if (_broadcastToRecover == null) return;
+        _logger.LogInformation("========== ë°©ì†¡ ë³µêµ¬ ì‹œì‘ ==========");
 
         try
         {
-            // 1. º¹±¸ Áß UI Ç¥½Ã
             ShowRecoveryUI();
 
-            // 2. º¹±¸ µ¥ÀÌÅÍ ÁØºñ (½ºÇÇÄ¿, ¹Ìµğ¾î, TTS ¼±ÅÃ º¹¿ø)
-            await PrepareRecoverySelections();
+            // ë°©ì†¡ ì‹œì‘ (ë³µêµ¬ ëª¨ë“œ - DB ì €ì¥ ê±´ë„ˆëœ€)
+            await StartBroadcast(isRecovery: true);
 
-            // 3. ÀÏ¹İ ¹æ¼Û ½ÃÀÛ (º¹±¸¿Í ¹«°üÇÏ°Ô)
-            await StartBroadcast();
-
-            // 4. ¹æ¼Û ½ÃÀÛ ÈÄ Ãß°¡ º¹±¸ ÀÛ¾÷
-            await PerformPostStartRecovery();
-
-            // 5. º¹±¸ ¿Ï·á ¾Ë¸²
-            NotifyRecoveryComplete();
+            NotifySuccess("ë°©ì†¡ ë³µêµ¬ ì™„ë£Œ", $"'{selectedChannel.Name}' ì±„ë„ì˜ ë°©ì†¡ì´ ë³µêµ¬ë˜ì—ˆìŠµë‹ˆë‹¤.");
+            _logger.LogInformation("========== ë°©ì†¡ ë³µêµ¬ ì™„ë£Œ âœ… ==========");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Recovery process failed");
-            NotifyError("¹æ¼Û º¹±¸ ½ÇÆĞ", ex);
-            // ½ÇÆĞ ½Ã¿¡µµ SubPage ÃÊ±âÈ­
-            InitializeSubPagesForNoBroadcast();
+            _logger.LogError(ex, "âŒ ë°©ì†¡ ë³µêµ¬ ì‹¤íŒ¨");
+            NotifyError("ë°©ì†¡ ë³µêµ¬ ì‹¤íŒ¨", ex);
         }
         finally
         {
-            // 6. º¹±¸ UI ¼û±â±â
             HideRecoveryUI();
-            _broadcastToRecover = null;
         }
     }
 
     /// <summary>
-    /// º¹±¸ UI Ç¥½Ã
+    /// ë³µêµ¬ UI í‘œì‹œ
     /// </summary>
     private void ShowRecoveryUI()
     {
         _isRecoveringBroadcast = true;
-        NotifyInfo("¹æ¼Û º¹±¸", $"'{selectedChannel.Name}' Ã¤³ÎÀÇ ÁøÇà ÁßÀÎ ¹æ¼ÛÀ» º¹±¸ÇÏ´Â ÁßÀÔ´Ï´Ù...");
+        NotifyInfo("ë°©ì†¡ ë³µêµ¬", $"'{selectedChannel.Name}' ì±„ë„ì˜ ì§„í–‰ ì¤‘ì¸ ë°©ì†¡ì„ ë³µêµ¬í•˜ëŠ” ì¤‘ì…ë‹ˆë‹¤...");
         InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
-    /// º¹±¸ UI ¼û±â±â
+    /// ë³µêµ¬ UI ìˆ¨ê¸°ê¸°
     /// </summary>
     private void HideRecoveryUI()
     {
@@ -140,232 +55,15 @@ public partial class BroadcastLiveTab
         InvokeAsync(StateHasChanged);
     }
 
-    /// <summary>
-    /// ¹æ¼Û ½ÃÀÛ Àü º¹±¸ µ¥ÀÌÅÍ ÁØºñ
-    /// </summary>
-    private async Task PrepareRecoverySelections()
-    {
-        if (_broadcastToRecover == null) return;
 
-        try
-        {
-            _logger.LogInformation("Preparing recovery selections...");
-
-            // 1. ½ºÇÇÄ¿ ±×·ì ¼±ÅÃ º¹¿ø
-            await RestoreSpeakerGroups(_broadcastToRecover.SpeakerIdList);
-
-            // 2. ¹Ìµğ¾î ¼±ÅÃ º¹¿ø
-            await RestoreMediaSelection(_broadcastToRecover.MediaIdList);
-
-            // 3. TTS ¼±ÅÃ º¹¿ø
-            await RestoreTtsSelection(_broadcastToRecover.TtsIdList);
-
-            // 4. ·çÇÁ¹é ¼³Á¤ º¹¿ø
-            _currentLoopbackSetting = _broadcastToRecover.LoopbackYn == "Y";
-
-            _logger.LogInformation($"Recovery selections prepared - " +
-                $"Speakers: {_broadcastToRecover.SpeakerIdList}, " +
-                $"Media: {_broadcastToRecover.MediaIdList}, " +
-                $"TTS: {_broadcastToRecover.TtsIdList}");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to prepare recovery selections");
-            throw;
-        }
-    }
 
     /// <summary>
-    /// ¹æ¼Û ½ÃÀÛ ÈÄ Ãß°¡ º¹±¸ ÀÛ¾÷
-    /// </summary>
-    private async Task PerformPostStartRecovery()
-    {
-        if (_broadcastToRecover == null) return;
-
-        try
-        {
-            _logger.LogInformation("Performing post-start recovery tasks...");
-
-            // ±âÁ¸ ºê·ÎµåÄ³½ºÆ® ·¹ÄÚµåÀÇ OngoingYnÀ» 'N'À¸·Î º¯°æ
-            await MarkOldBroadcastAsStopped(_broadcastToRecover.Id);
-
-            // ÇÊ¿äÇÑ °æ¿ì Ãß°¡ º¹±¸ ÀÛ¾÷
-            // ¿¹: Àç»ı ÁßÀÌ´ø ¹Ìµğ¾î À§Ä¡ º¹¿ø, º¼·ı ¼³Á¤ º¹¿ø µî
-
-            _logger.LogInformation("Post-start recovery completed");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Post-start recovery failed");
-            // ÀÌ ½ÇÆĞ´Â Ä¡¸íÀûÀÌÁö ¾ÊÀ¸¹Ç·Î °è¼Ó ÁøÇà
-        }
-    }
-
-    /// <summary>
-    /// º¹±¸ ¿Ï·á ¾Ë¸²
+    /// ë³µêµ¬ ì™„ë£Œ ì•Œë¦¼
     /// </summary>
     private void NotifyRecoveryComplete()
     {
-        NotifySuccess("¹æ¼Û º¹±¸ ¿Ï·á",
-            $"'{selectedChannel.Name}' Ã¤³ÎÀÇ ¹æ¼ÛÀÌ ¼º°øÀûÀ¸·Î º¹±¸µÇ¾ú½À´Ï´Ù.");
-    }
-
-    #endregion
-
-    #region Recovery Helper Methods
-
-    /// <summary>
-    /// ÁøÇà ÁßÀÎ ¹æ¼Û Ã£±â
-    /// </summary>
-    private async Task<WicsPlatform.Server.Models.wics.Broadcast> FindOngoingBroadcast(ulong channelId)
-    {
-        var query = new Radzen.Query
-        {
-            Filter = $"ChannelId eq {channelId} and OngoingYn eq 'Y'",
-            Top = 1,
-            OrderBy = "CreatedAt desc"
-        };
-
-        var broadcasts = await WicsService.GetBroadcasts(query);
-        return broadcasts.Value.FirstOrDefault();
-    }
-
-    /// <summary>
-    /// ±âÁ¸ ºê·ÎµåÄ³½ºÆ®¸¦ Á¾·á »óÅÂ·Î º¯°æ
-    /// </summary>
-    private async Task MarkOldBroadcastAsStopped(ulong broadcastId)
-    {
-        try
-        {
-            var updateData = new
-            {
-                OngoingYn = "N",
-                UpdatedAt = DateTime.Now
-            };
-
-            var response = await Http.PatchAsJsonAsync(
-                $"odata/wics/Broadcasts(Id={broadcastId})",
-                updateData
-            );
-
-            if (response.IsSuccessStatusCode)
-            {
-                _logger.LogInformation($"Old broadcast {broadcastId} marked as stopped");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Failed to mark old broadcast {broadcastId} as stopped");
-        }
-    }
-
-    /// <summary>
-    /// ½ºÇÇÄ¿ ±×·ì ¼±ÅÃ º¹¿ø
-    /// </summary>
-    private async Task RestoreSpeakerGroups(string speakerIdList)
-    {
-        if (string.IsNullOrEmpty(speakerIdList) || speakerSection == null)
-            return;
-
-        try
-        {
-            var speakerIds = ParseIdList(speakerIdList);
-            if (!speakerIds.Any()) return;
-
-            var groupIds = await GetGroupIdsFromSpeakers(speakerIds);
-
-            // ¸ÕÀú ¼±ÅÃ ÃÊ±âÈ­
-            speakerSection.ClearSelection();
-
-            // ±×·ì ¼±ÅÃ º¹¿ø
-            foreach (var groupId in groupIds)
-            {
-                await speakerSection.ToggleGroupSelection(groupId);
-            }
-
-            _logger.LogInformation($"Restored {groupIds.Count} speaker groups");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to restore speaker groups");
-        }
-    }
-
-    /// <summary>
-    /// ¹Ìµğ¾î ¼±ÅÃ º¹¿ø
-    /// </summary>
-    private async Task RestoreMediaSelection(string mediaIdList)
-    {
-        if (string.IsNullOrEmpty(mediaIdList) || playlistSection == null)
-            return;
-
-        try
-        {
-            var mediaIds = ParseIdList(mediaIdList);
-            if (mediaIds.Any())
-            {
-                await playlistSection.RecoverSelectedMedia(mediaIds);
-                _logger.LogInformation($"Restored {mediaIds.Count} media selections");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to restore media selection");
-        }
-    }
-
-    /// <summary>
-    /// TTS ¼±ÅÃ º¹¿ø
-    /// </summary>
-    private async Task RestoreTtsSelection(string ttsIdList)
-    {
-        if (string.IsNullOrEmpty(ttsIdList) || ttsSection == null)
-            return;
-
-        try
-        {
-            var ttsIds = ParseIdList(ttsIdList);
-            if (ttsIds.Any())
-            {
-                await ttsSection.RecoverSelectedTts(ttsIds);
-                _logger.LogInformation($"Restored {ttsIds.Count} TTS selections");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to restore TTS selection");
-        }
-    }
-
-    /// <summary>
-    /// ID ¸®½ºÆ® ÆÄ½Ì
-    /// </summary>
-    private List<ulong> ParseIdList(string idList)
-    {
-        if (string.IsNullOrEmpty(idList))
-            return new List<ulong>();
-
-        return idList.Split(' ')
-            .Where(s => !string.IsNullOrEmpty(s))
-            .Select(s => ulong.TryParse(s, out var id) ? id : (ulong?)null)
-            .Where(id => id.HasValue)
-            .Select(id => id.Value)
-            .ToList();
-    }
-
-    /// <summary>
-    /// ½ºÇÇÄ¿ ID·ÎºÎÅÍ ±×·ì ID °¡Á®¿À±â
-    /// </summary>
-    private async Task<List<ulong>> GetGroupIdsFromSpeakers(List<ulong> speakerIds)
-    {
-        var mappings = await WicsService.GetMapSpeakerGroups(
-            new Radzen.Query { Filter = $"LastYn eq 'Y'" });
-
-        return mappings.Value
-            .Where(m => speakerIds.Contains(m.SpeakerId))
-            .Select(m => m.GroupId)
-            .Distinct()
-            .ToList();
+        NotifySuccess("ë°©ì†¡ ë³µêµ¬ ì™„ë£Œ",
+            $"'{selectedChannel.Name}' ì±„ë„ì˜ ë°©ì†¡ì´ ì„±ê³µì ìœ¼ë¡œ ë³µêµ¬ë˜ì—ˆìŠµë‹ˆë‹¤.");
     }
 
     #endregion

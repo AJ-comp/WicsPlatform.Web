@@ -58,6 +58,7 @@ namespace WicsPlatform.Client.Pages.SubPages
         protected int AddProgressPercent => addTotal == 0 ? 0 : (int)((double)addProgress / addTotal * 100);
 
         private WicsPlatform.Server.Models.wics.Channel _previousChannel = null;
+        private Task _loadingMappingsTask = null;
 
         protected override async Task OnInitializedAsync()
         {
@@ -65,14 +66,16 @@ namespace WicsPlatform.Client.Pages.SubPages
             await LoadSpeakerData();
         }
 
-        protected override async Task OnParametersSetAsync()
+        protected override Task OnParametersSetAsync()
         {
-            // Channel이 변경되었을 때만 매핑 로드
-            if (Channel != null && (Channel != _previousChannel || _previousChannel?.Id != Channel.Id))
+            // 채널 변경 추적만 수행
+            // LoadChannelMappings는 복구 프로세스에서 명시적으로 호출됨
+            if (Channel != null && Channel != _previousChannel)
             {
                 _previousChannel = Channel;
-                await LoadChannelMappings();
+                Logger.LogInformation($"OnParametersSetAsync: 채널 변경 감지 - {Channel.Id}");
             }
+            return Task.CompletedTask;
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -254,7 +257,7 @@ namespace WicsPlatform.Client.Pages.SubPages
             }
         }
 
-        private async Task LoadChannelMappings()
+        public async Task LoadChannelMappings()
         {
             if (Channel == null)
             {
@@ -263,46 +266,73 @@ namespace WicsPlatform.Client.Pages.SubPages
                 return;
             }
 
+            // 중복 호출 방지 - 이미 로드 중이면 해당 Task 완료를 기다림
+            if (_loadingMappingsTask != null && !_loadingMappingsTask.IsCompleted)
+            {
+                Logger.LogInformation($"채널 {Channel.Id}의 매핑 로드가 이미 진행 중 - 완료 대기");
+                await _loadingMappingsTask;
+                return;
+            }
+
+            _loadingMappingsTask = LoadChannelMappingsInternal();
+            await _loadingMappingsTask;
+        }
+
+        private async Task LoadChannelMappingsInternal()
+        {
             try
             {
                 Logger.LogInformation($"채널 {Channel.Id}의 그룹/스피커 매핑 로드 시작");
 
-                // 채널에 할당된 그룹 로드
+                // 채널에 할당된 그룹 로드 (스피커 그룹만, Type=0)
                 var groupQuery = new Radzen.Query
                 {
                     Filter = $"ChannelId eq {Channel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)"
                 };
+                
                 var groupMaps = await WicsService.GetMapChannelGroups(groupQuery);
-                var channelGroupIds = groupMaps.Value.AsODataEnumerable().Select(g => g.GroupId).ToList();
+                
+                // Type=0인 스피커 그룹만 필터링
+                var channelGroupIds = new List<ulong>();
+                foreach (var mapping in groupMaps.Value.AsODataEnumerable())
+                {
+                    var groupQuery2 = new Radzen.Query { Filter = $"Id eq {mapping.GroupId}" };
+                    var groups = await WicsService.GetGroups(groupQuery2);
+                    var group = groups.Value.FirstOrDefault();
+                    
+                    Logger.LogInformation($"그룹 조회: GroupId={mapping.GroupId}, Found={group != null}, Type={group?.Type}");
+                    
+                    if (group != null && group.Type == 0) // Type 0 = 스피커 그룹
+                    {
+                        Logger.LogInformation($"✓ 스피커 그룹 추가: GroupId={mapping.GroupId}");
+                        channelGroupIds.Add(mapping.GroupId);
+                    }
+                    else
+                    {
+                        Logger.LogInformation($"✗ 스피커 그룹 아님 - 건너뜀: GroupId={mapping.GroupId}, Type={group?.Type}");
+                    }
+                }
 
-                // 채널에 할당된 스피커 로드
+                // 채널에 할당된 스피커 로드 (map_channel_speaker만 사용)
                 var speakerQuery = new Radzen.Query
                 {
                     Filter = $"ChannelId eq {Channel.Id} and (DeleteYn eq 'N' or DeleteYn eq null)"
                 };
+                
                 var speakerMaps = await WicsService.GetMapChannelSpeakers(speakerQuery);
                 var channelSpeakerIds = speakerMaps.Value.AsODataEnumerable().Select(s => s.SpeakerId).ToHashSet();
 
-                // 그룹 선택 상태 설정
-                selectedGroups = channelGroupIds;
+                // 그룹 선택 상태 설정 (UI 편의 기능)
+                selectedGroups.Clear();
+                selectedGroups.AddRange(channelGroupIds);
 
-                // 스피커 선택 상태 설정
-                if (channelSpeakerIds.Any())
+                // 스피커 선택 상태 설정 (map_channel_speaker만 사용, 그룹과 무관)
+                // 그룹은 단지 빠른 선택을 위한 UI 기능일 뿐이므로
+                // 최종 선택된 스피커 목록만 복구
+                selectedSpeakers.Clear();
+                foreach (var speakerId in channelSpeakerIds)
                 {
-                    selectedSpeakers = channelSpeakerIds;
-                }
-                else if (channelGroupIds.Any())
-                {
-                    // 스피커 매핑이 없으면 그룹에서 스피커 유추
-                    selectedSpeakers.Clear();
-                    foreach (var groupId in channelGroupIds)
-                    {
-                        var speakersInGroup = GetSpeakersInGroupSync(groupId);
-                        foreach (var speaker in speakersInGroup)
-                        {
-                            selectedSpeakers.Add(speaker.Id);
-                        }
-                    }
+                    selectedSpeakers.Add(speakerId);
                 }
 
                 Logger.LogInformation($"채널 {Channel.Id}: {selectedGroups.Count}개 그룹, {selectedSpeakers.Count}개 스피커 선택됨");
@@ -534,7 +564,7 @@ namespace WicsPlatform.Client.Pages.SubPages
         }
 
         // 동기식으로 그룹의 스피커 목록 가져오기
-        protected IEnumerable<WicsPlatform.Server.Models.wics.Speaker> GetSpeakersInGroupSync(ulong groupId)
+        public IEnumerable<WicsPlatform.Server.Models.wics.Speaker> GetSpeakersInGroupSync(ulong groupId)
         {
             var speakerIds = speakerGroupMappings
                 .Where(m => m.GroupId == groupId && m.LastYn == "Y")

@@ -9,7 +9,7 @@ public partial class BroadcastLiveTab
     {
         WebSocketService.OnBroadcastStatusReceived += OnBroadcastStatusReceived;
         WebSocketService.OnConnectionStatusChanged += OnWebSocketConnectionStatusChanged;
-        WebSocketService.OnPlaybackCompleted += OnServerPlaybackCompleted; // Àç»ı ¿Ï·á ¼ö½Å µî·Ï
+        WebSocketService.OnPlaybackCompleted += OnServerPlaybackCompleted; // ì¬ìƒ ì™„ë£Œ ìˆ˜ì‹  ë“±ë¡
     }
 
     private void UnsubscribeFromWebSocketEvents()
@@ -37,7 +37,7 @@ public partial class BroadcastLiveTab
         switch (status)
         {
             case "Connected":
-                NotifySuccess("¿¬°á ¼º°ø", $"Ã¤³Î {selectedChannel?.Name}ÀÇ ½Ç½Ã°£ ¹æ¼ÛÀÌ ½ÃÀÛµÇ¾ú½À´Ï´Ù.");
+                NotifySuccess("ì—°ê²° ì„±ê³µ", $"ì±„ë„ {selectedChannel?.Name}ì˜ ì‹¤ì‹œê°„ ë°©ì†¡ì´ ì‹œì‘ë˜ì—ˆìŠµë‹ˆë‹¤.");
                 break;
             case "Disconnected":
                 HandleWebSocketDisconnection(broadcastId);
@@ -47,7 +47,7 @@ public partial class BroadcastLiveTab
 
     private void HandleWebSocketDisconnection(ulong broadcastId)
     {
-        NotifyError("¿¬°á ²÷±è", new Exception($"Ã¤³Î {selectedChannel?.Name}ÀÇ ¹æ¼Û ¿¬°áÀÌ ²÷¾îÁ³½À´Ï´Ù."));
+        NotifyError("ì—°ê²° ëŠê¹€", new Exception($"ì±„ë„ {selectedChannel?.Name}ì˜ ë°©ì†¡ ì—°ê²°ì´ ëŠì–´ì¡ŒìŠµë‹ˆë‹¤."));
 
         if (isBroadcasting && broadcastId == currentBroadcastId)
         {
@@ -57,13 +57,13 @@ public partial class BroadcastLiveTab
         }
     }
 
-    // ¼­¹ö¿¡¼­ ¸ğµç Àç»ı ¿Ï·á(playbackCompleted) ¼ö½Å ½Ã: ¹æ¼ÛÀº À¯ÁöÇÏ°í, Àç»ı Àü »óÅÂ·Î¸¸ º¹±Í
+    // ì„œë²„ì—ì„œ ëª¨ë“  ì¬ìƒ ì™„ë£Œ(playbackCompleted) ìˆ˜ì‹  ì‹œ: ë°©ì†¡ì€ ìœ ì§€í•˜ê³ , ì¬ìƒ ì „ ìƒíƒœë¡œë§Œ ë³µê·€
     private void OnServerPlaybackCompleted(ulong broadcastId)
     {
         if (currentBroadcastId.HasValue && broadcastId == currentBroadcastId.Value)
         {
             _logger.LogInformation($"Playback completed for broadcast {broadcastId} - resetting playlist/TTS state only");
-            // ¹æ¼Û »óÅÂ(isBroadcasting)³ª »óÀ§ UI´Â º¯°æÇÏÁö ¾ÊÀ½
+            // ë°©ì†¡ ìƒíƒœ(isBroadcasting)ë‚˜ ìƒìœ„ UIëŠ” ë³€ê²½í•˜ì§€ ì•ŠìŒ
             playlistSection?.ResetMediaPlaybackState();
             ttsSection?.ResetTtsPlaybackState();
             InvokeAsync(StateHasChanged);
@@ -74,11 +74,13 @@ public partial class BroadcastLiveTab
     #region WebSocket Broadcast Methods
     private async Task<bool> InitializeWebSocketBroadcast(List<ulong> onlineGroups)
     {
-        var response = await WebSocketService.StartBroadcastAsync(selectedChannel.Id, onlineGroups);
+        // ë¹ˆ ë¦¬ìŠ¤íŠ¸ë©´ nullë¡œ ì „ë‹¬ (ì„œë²„ê°€ ì±„ë„ ë§¤í•‘ ê¸°ë°˜ìœ¼ë¡œ ì¡°íšŒí•˜ë„ë¡)
+        var groupIds = onlineGroups != null && onlineGroups.Count > 0 ? onlineGroups : null;
+        var response = await WebSocketService.StartBroadcastAsync(selectedChannel.Id, groupIds);
 
         if (!response.Success)
         {
-            NotifyError("¹æ¼Û ½ÃÀÛ ½ÇÆĞ", new Exception(response.Error));
+            NotifyError("ë°©ì†¡ ì‹œì‘ ì‹¤íŒ¨", new Exception(response.Error));
             return false;
         }
 
@@ -97,11 +99,11 @@ public partial class BroadcastLiveTab
             try
             {
                 await WebSocketService.StopBroadcastAsync(broadcastIdToStop);
-                _logger.LogInformation($"WebSocket Á¾·á ¿Ï·á: {broadcastIdToStop}");
+                _logger.LogInformation($"WebSocket ì¢…ë£Œ ì™„ë£Œ: {broadcastIdToStop}");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"WebSocket Á¾·á ½ÇÆĞ: {broadcastIdToStop}");
+                _logger.LogError(ex, $"WebSocket ì¢…ë£Œ ì‹¤íŒ¨: {broadcastIdToStop}");
             }
         }
     }
