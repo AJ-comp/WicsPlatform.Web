@@ -1,5 +1,20 @@
-﻿// Server/wwwroot/js/audiomixer.js
-console.log('[audiomixer.js] AudioWorklet 버전 v3.0 - 타이머 제거, 즉시 전송');
+// Server/wwwroot/js/audiomixer.js
+
+// 🔧 디버그 플래그 - false로 설정하면 모든 로그 출력 안 됨
+const DEBUG_MODE = false;
+
+// 조건부 로그 함수
+const debugLog = (...args) => {
+    if (DEBUG_MODE) console.log(...args);
+};
+const debugWarn = (...args) => {
+    if (DEBUG_MODE) console.warn(...args);
+};
+const debugError = (...args) => {
+    console.error(...args); // 에러는 항상 출력
+};
+
+debugLog('[audiomixer.js] AudioWorklet 버전 v3.0 - 타이머 제거, 즉시 전송');
 
 class AudioMixer {
     constructor() {
@@ -52,7 +67,7 @@ class AudioMixer {
 
     async initialize(dotNetRef, config = {}) {
         const timestamp = this.getTimestamp();
-        console.log(`[${timestamp}] 🚀 AudioWorklet 초기화 시작 (타이머 없는 버전)`, config);
+        debugLog(`[${timestamp}] 🚀 AudioWorklet 초기화 시작 (타이머 없는 버전)`, config);
 
         try {
             this.dotNetRef = dotNetRef;
@@ -70,7 +85,7 @@ class AudioMixer {
                 (this.config.sampleRate * this.config.sendIntervalMs) / 1000
             );
 
-            console.log(`[${timestamp}] 📊 설정 완료:`, {
+            debugLog(`[${timestamp}] 📊 설정 완료:`, {
                 sampleRate: `${this.config.sampleRate}Hz`,
                 samplesPerSend: `${this.config.samplesPerSend} 샘플`,
                 targetLatency: `${this.config.sendIntervalMs}ms`
@@ -91,7 +106,7 @@ class AudioMixer {
             // 실제 샘플레이트 확인
             const actualSampleRate = this.audioContext.sampleRate;
             if (actualSampleRate !== this.config.sampleRate) {
-                console.warn(`[${timestamp}] ⚠️ 샘플레이트 불일치! 요청: ${this.config.sampleRate}Hz, 실제: ${actualSampleRate}Hz`);
+                debugWarn(`[${timestamp}] ⚠️ 샘플레이트 불일치! 요청: ${this.config.sampleRate}Hz, 실제: ${actualSampleRate}Hz`);
 
                 this.config.sampleRate = actualSampleRate;
                 this.config.samplesPerSend = Math.floor(
@@ -107,7 +122,7 @@ class AudioMixer {
                 }
             }
 
-            console.log(`[${timestamp}] 🎯 실제 AudioContext 샘플레이트: ${this.audioContext.sampleRate}Hz`);
+            debugLog(`[${timestamp}] 🎯 실제 AudioContext 샘플레이트: ${this.audioContext.sampleRate}Hz`);
 
             // AudioWorklet 모듈 로드
             await this.audioContext.audioWorklet.addModule('./js/pcm-processor.js');
@@ -127,19 +142,19 @@ class AudioMixer {
                     this.handleAudioData(event.data.pcm);
                 } else if (event.data.type === 'debug') {
                     const timestamp = this.getTimestamp();
-                    console.log(`[${timestamp}] [AudioWorklet]`, event.data.message);
+                    debugLog(`[${timestamp}] [AudioWorklet]`, event.data.message);
                 }
             };
 
             // 버퍼 모니터링 시작 (타이머는 모니터링용으로만)
             this.startBufferMonitoring();
 
-            console.log(`[${timestamp}] ✅ AudioWorklet 초기화 완료 - 즉시 전송 모드`);
+            debugLog(`[${timestamp}] ✅ AudioWorklet 초기화 완료 - 즉시 전송 모드`);
             return true;
 
         } catch (error) {
             const timestamp = this.getTimestamp();
-            console.error(`[${timestamp}] ❌ 초기화 실패:`, error);
+            debugError(`[${timestamp}] ❌ 초기화 실패:`, error);
             this.isActive = false;
             return false;
         }
@@ -178,7 +193,7 @@ class AudioMixer {
                 ? (this.stats.receiveIntervals.reduce((a, b) => a + b, 0) / this.stats.receiveIntervals.length).toFixed(1)
                 : 'N/A';
 
-            console.log(`📥 [${timestamp}] 수신: +${samplesReceived} | 버퍼: ${beforeSamples} → ${this.totalSamples} (${(this.totalSamples / this.config.sampleRate * 1000).toFixed(1)}ms) | 평균간격: ${avgInterval}ms`);
+            debugLog(`📥 [${timestamp}] 수신: +${samplesReceived} | 버퍼: ${beforeSamples} → ${this.totalSamples} (${(this.totalSamples / this.config.sampleRate * 1000).toFixed(1)}ms) | 평균간격: ${avgInterval}ms`);
         }
 
         // 통계 업데이트
@@ -197,11 +212,11 @@ class AudioMixer {
             this.sendPCMData();
             sendCount++;
 
-            console.log(`🚀 [${timestamp}] 즉시 전송 #${sendCount} | ${beforeSend} → ${this.totalSamples} 샘플`);
+            debugLog(`🚀 [${timestamp}] 즉시 전송 #${sendCount} | ${beforeSend} → ${this.totalSamples} 샘플`);
 
             // 무한 루프 방지
             if (sendCount > 5) {
-                console.warn(`[${timestamp}] ⚠️ 한 번에 너무 많은 전송 (${sendCount}회)`);
+                debugWarn(`[${timestamp}] ⚠️ 한 번에 너무 많은 전송 (${sendCount}회)`);
                 break;
             }
         }
@@ -209,13 +224,13 @@ class AudioMixer {
         // 버퍼 상태 체크
         const bufferMs = this.totalSamples / this.config.sampleRate * 1000;
         if (bufferMs > 200) {
-            console.warn(`[${timestamp}] ⚠️ 버퍼 과다! ${this.totalSamples} 샘플 (${bufferMs.toFixed(1)}ms)`);
+            debugWarn(`[${timestamp}] ⚠️ 버퍼 과다! ${this.totalSamples} 샘플 (${bufferMs.toFixed(1)}ms)`);
         }
     }
 
     sendPCMData() {
         if (this.isSending) {
-            console.warn(`[${this.getTimestamp()}] ⏭️ 이미 전송 중 - 스킵`);
+            debugWarn(`[${this.getTimestamp()}] ⏭️ 이미 전송 중 - 스킵`);
             return;
         }
 
@@ -269,7 +284,7 @@ class AudioMixer {
                 ? (this.stats.sendIntervals.reduce((a, b) => a + b, 0) / this.stats.sendIntervals.length).toFixed(1)
                 : 'N/A';
 
-            console.log(`📤 [${timestamp}] 전송 완료 #${this.stats.packetsSent} | 버퍼: ${beforeSamples} → ${this.totalSamples} 샘플 (${(this.totalSamples / this.config.sampleRate * 1000).toFixed(1)}ms) | 평균간격: ${avgSendInterval}ms`);
+            debugLog(`📤 [${timestamp}] 전송 완료 #${this.stats.packetsSent} | 버퍼: ${beforeSamples} → ${this.totalSamples} 샘플 (${(this.totalSamples / this.config.sampleRate * 1000).toFixed(1)}ms) | 평균간격: ${avgSendInterval}ms`);
 
             // Int16Array → Base64
             const byteArray = new Uint8Array(combinedPCM.buffer);
@@ -291,7 +306,7 @@ class AudioMixer {
 
         } catch (error) {
             const timestamp = this.getTimestamp();
-            console.error(`[${timestamp}] ❌ PCM 전송 오류:`, error);
+            debugError(`[${timestamp}] ❌ PCM 전송 오류:`, error);
         } finally {
             this.isSending = false;
         }
@@ -307,7 +322,7 @@ class AudioMixer {
             ? (this.stats.sendIntervals.reduce((a, b) => a + b, 0) / this.stats.sendIntervals.length).toFixed(1)
             : 'N/A';
 
-        console.log(`📊 [${timestamp}] 통계`, {
+        debugLog(`📊 [${timestamp}] 통계`, {
             현재버퍼: `${this.totalSamples} 샘플 (${bufferMs}ms)`,
             수신: {
                 packets: this.stats.packetsReceived,
@@ -336,7 +351,7 @@ class AudioMixer {
             const receiveRate = this.stats.samplesReceived / elapsedSeconds;
             const sendRate = this.stats.samplesSent / elapsedSeconds;
 
-            console.log(`⏱️ [${timestamp}] 1초 모니터링`, {
+            debugLog(`⏱️ [${timestamp}] 1초 모니터링`, {
                 현재버퍼: `${this.totalSamples} 샘플 (${bufferMs}ms)`,
                 최소최대: `${minBufferMs}ms ~ ${maxBufferMs}ms`,
                 수신율: `${receiveRate.toFixed(0)} 샘플/초`,
@@ -352,7 +367,7 @@ class AudioMixer {
                 this.stats.samplesSent = 0;
                 this.stats.minBufferSize = Infinity;
                 this.stats.maxBufferSize = 0;
-                console.log(`[${timestamp}] 📊 통계 리셋`);
+                debugLog(`[${timestamp}] 📊 통계 리셋`);
             }
 
         }, 1000);
@@ -366,7 +381,7 @@ class AudioMixer {
             if (this.micStream && this.micSource) {
                 const tracks = this.micStream.getAudioTracks();
                 if (tracks.length > 0 && tracks[0].enabled && tracks[0].readyState === 'live') {
-                    console.log(`[${timestamp}] 🎤 마이크가 이미 활성화되어 있습니다. 스킵합니다.`);
+                    debugLog(`[${timestamp}] 🎤 마이크가 이미 활성화되어 있습니다. 스킵합니다.`);
                     return true;
                 }
             }
@@ -381,13 +396,13 @@ class AudioMixer {
                 }
             };
 
-            console.log(`[${timestamp}] 🎤 마이크 요청:`, constraints);
+            debugLog(`[${timestamp}] 🎤 마이크 요청:`, constraints);
 
             this.micStream = await navigator.mediaDevices.getUserMedia(constraints);
 
             const audioTrack = this.micStream.getAudioTracks()[0];
             const settings = audioTrack.getSettings();
-            console.log(`[${timestamp}] 🎤 마이크 실제 설정:`, settings);
+            debugLog(`[${timestamp}] 🎤 마이크 실제 설정:`, settings);
 
             // 마이크 → AudioWorklet 연결
             this.micSource = this.audioContext.createMediaStreamSource(this.micStream);
@@ -397,17 +412,17 @@ class AudioMixer {
                 gainNode.gain.value = this.config.micVolume;
                 this.micSource.connect(gainNode);
                 gainNode.connect(this.workletNode);
-                console.log(`[${timestamp}] 🎤 마이크 볼륨: ${(this.config.micVolume * 100).toFixed(0)}%`);
+                debugLog(`[${timestamp}] 🎤 마이크 볼륨: ${(this.config.micVolume * 100).toFixed(0)}%`);
             } else {
                 this.micSource.connect(this.workletNode);
             }
 
-            console.log(`[${timestamp}] ✅ 마이크 활성화 완료`);
+            debugLog(`[${timestamp}] ✅ 마이크 활성화 완료`);
             return true;
 
         } catch (error) {
             const timestamp = this.getTimestamp();
-            console.error(`[${timestamp}] ❌ 마이크 활성화 실패:`, error);
+            debugError(`[${timestamp}] ❌ 마이크 활성화 실패:`, error);
 
             if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
                 if (this.dotNetRef) {
@@ -438,13 +453,13 @@ class AudioMixer {
             this.micStream = null;
         }
 
-        console.log(`[${timestamp}] 🎤 마이크 비활성화`);
+        debugLog(`[${timestamp}] 🎤 마이크 비활성화`);
     }
 
     setVolumes(mic, media, tts) {
         const timestamp = this.getTimestamp();
         this.config.micVolume = mic;
-        console.log(`[${timestamp}] 🔊 볼륨 설정:`, { mic, media, tts });
+        debugLog(`[${timestamp}] 🔊 볼륨 설정:`, { mic, media, tts });
     }
 
     getBufferStatus() {
@@ -483,8 +498,8 @@ class AudioMixer {
         this.isActive = false;
 
         const timestamp = this.getTimestamp();
-        console.log(`[${timestamp}] 🔚 Dispose 시작`);
-        console.log(`[${timestamp}] 📊 최종 통계:`, this.getBufferStatus());
+        debugLog(`[${timestamp}] 🔚 Dispose 시작`);
+        debugLog(`[${timestamp}] 📊 최종 통계:`, this.getBufferStatus());
 
         try {
             // 모니터링 타이머만 정리
@@ -516,10 +531,10 @@ class AudioMixer {
             // 참조 정리
             this.dotNetRef = null;
 
-            console.log(`[${timestamp}] ✅ Dispose 완료`);
+            debugLog(`[${timestamp}] ✅ Dispose 완료`);
 
         } catch (error) {
-            console.error(`[${timestamp}] ❌ Dispose 오류:`, error);
+            debugError(`[${timestamp}] ❌ Dispose 오류:`, error);
         }
     }
 }
@@ -534,12 +549,12 @@ export function isMicrophoneEnabled() {
     const timestamp = new Date().toISOString().substr(11, 12);
 
     if (!mixerInstance) {
-        console.log(`[${timestamp}] 🎤 마이크 상태: 믹서 없음 (false)`);
+        debugLog(`[${timestamp}] 🎤 마이크 상태: 믹서 없음 (false)`);
         return false;
     }
 
     if (!mixerInstance.micStream) {
-        console.log(`[${timestamp}] 🎤 마이크 상태: 스트림 없음 (false)`);
+        debugLog(`[${timestamp}] 🎤 마이크 상태: 스트림 없음 (false)`);
         return false;
     }
 
@@ -547,17 +562,17 @@ export function isMicrophoneEnabled() {
     const isEnabled = tracks.length > 0 &&
         tracks.some(track => track.enabled && track.readyState === 'live');
 
-    console.log(`[${timestamp}] 🎤 마이크 상태 확인: ${isEnabled ? 'ACTIVE' : 'INACTIVE'}`);
+    debugLog(`[${timestamp}] 🎤 마이크 상태 확인: ${isEnabled ? 'ACTIVE' : 'INACTIVE'}`);
     return isEnabled;
 }
 
 export async function createMixer(dotNetRef, config) {
     const timestamp = new Date().toISOString().substr(11, 12);
-    console.log(`[${timestamp}] 🚀 createMixer 호출됨 (타이머 없는 버전)`, config);
+    debugLog(`[${timestamp}] 🚀 createMixer 호출됨 (타이머 없는 버전)`, config);
 
     // 이미 믹서가 있고 마이크가 활성화되어 있으면 스킵
     if (mixerInstance && isMicrophoneEnabled()) {
-        console.log(`[${timestamp}] 🎤 믹서와 마이크가 이미 활성화되어 있습니다. 기존 인스턴스 유지`);
+        debugLog(`[${timestamp}] 🎤 믹서와 마이크가 이미 활성화되어 있습니다. 기존 인스턴스 유지`);
 
         // 볼륨 설정만 업데이트
         if (config.micVolume !== undefined) {
@@ -578,7 +593,7 @@ export async function createMixer(dotNetRef, config) {
 
 export async function enableMic() {
     if (!mixerInstance) {
-        console.log(`[${new Date().toISOString().substr(11, 12)}] ❌ enableMic: 믹서 인스턴스가 없습니다`);
+        debugLog(`[${new Date().toISOString().substr(11, 12)}] ❌ enableMic: 믹서 인스턴스가 없습니다`);
         return false;
     }
 
@@ -602,24 +617,24 @@ export async function dispose() {
 
 export async function loadMediaPlaylist(urls) {
     const timestamp = new Date().toISOString().substr(11, 12);
-    console.log(`[${timestamp}] 미디어 재생은 AudioWorklet 버전에서 미구현`);
+    debugLog(`[${timestamp}] 미디어 재생은 AudioWorklet 버전에서 미구현`);
     return false;
 }
 
 export async function loadTtsPlaylist(urls) {
     const timestamp = new Date().toISOString().substr(11, 12);
-    console.log(`[${timestamp}] TTS는 AudioWorklet 버전에서 미구현`);
+    debugLog(`[${timestamp}] TTS는 AudioWorklet 버전에서 미구현`);
     return false;
 }
 
 export function startRecording() {
     const timestamp = new Date().toISOString().substr(11, 12);
-    console.log(`[${timestamp}] startRecording - AudioWorklet에서는 자동`);
+    debugLog(`[${timestamp}] startRecording - AudioWorklet에서는 자동`);
 }
 
 export function stopRecording() {
     const timestamp = new Date().toISOString().substr(11, 12);
-    console.log(`[${timestamp}] stopRecording - AudioWorklet에서는 자동`);
+    debugLog(`[${timestamp}] stopRecording - AudioWorklet에서는 자동`);
 }
 
 // ==== 디버깅 헬퍼 ====
@@ -659,12 +674,12 @@ window.mixerDebug = {
             mixerInstance = null;
         }
         const timestamp = new Date().toISOString().substr(11, 12);
-        console.log(`[${timestamp}] 강제 종료 완료`);
+        debugLog(`[${timestamp}] 강제 종료 완료`);
     }
 };
 
-console.log('[audiomixer.js] 📊 모듈 로드 완료 - 타이머 없는 즉시 전송 버전');
-console.log('  mixerDebug.getStatus() - 현재 상태');
-console.log('  mixerDebug.getStats() - 간단 통계');
-console.log('  mixerDebug.printStats() - 상세 통계');
-console.log('  mixerDebug.isMicEnabled() - 마이크 활성화 상태');
+debugLog('[audiomixer.js] 📊 모듈 로드 완료 - 타이머 없는 즉시 전송 버전');
+debugLog('  mixerDebug.getStatus() - 현재 상태');
+debugLog('  mixerDebug.getStats() - 간단 통계');
+debugLog('  mixerDebug.printStats() - 상세 통계');
+debugLog('  mixerDebug.isMicEnabled() - 마이크 활성화 상태');

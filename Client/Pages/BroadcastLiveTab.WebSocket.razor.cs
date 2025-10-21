@@ -86,6 +86,33 @@ public partial class BroadcastLiveTab
 
         currentBroadcastId = response.BroadcastId;
         _logger.LogInformation($"WebSocket broadcast started with ID: {currentBroadcastId}");
+
+        // 복구 시나리오 처리
+        _logger.LogInformation($"[InitializeWebSocketBroadcast] ConnectedResponse={response.ConnectedResponse != null}, IsRecovery={response.ConnectedResponse?.IsRecovery}, PlaybackState={response.ConnectedResponse?.PlaybackState != null}");
+        
+        if (response.ConnectedResponse != null && response.ConnectedResponse.IsRecovery && response.ConnectedResponse.PlaybackState != null)
+        {
+            _logger.LogInformation($"[InitializeWebSocketBroadcast] 복구 시나리오 감지! Source={response.ConnectedResponse.PlaybackState.Source}");
+            
+            if (response.ConnectedResponse.PlaybackState.Source == "media")
+            {
+                _logger.LogInformation("[InitializeWebSocketBroadcast] playlistSection.RestorePlaybackState 호출");
+                // 플레이리스트 섹션에 재생 상태 복원
+                playlistSection?.RestorePlaybackState(response.ConnectedResponse.PlaybackState);
+                _logger.LogInformation("[InitializeWebSocketBroadcast] RestorePlaybackState 호출 완료");
+            }
+            else if (response.ConnectedResponse.PlaybackState.Source == "tts")
+            {
+                _logger.LogInformation("[InitializeWebSocketBroadcast] ttsSection.RestorePlaybackState 호출");
+                // TTS 섹션에 재생 상태 복원
+                ttsSection?.RestorePlaybackState();
+            }
+        }
+        else
+        {
+            _logger.LogInformation("[InitializeWebSocketBroadcast] 복구 시나리오 아님 - 일반 방송 시작");
+        }
+
         return true;
     }
 

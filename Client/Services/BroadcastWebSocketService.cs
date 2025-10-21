@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -56,6 +56,9 @@ public class BroadcastWebSocketService : IAsyncDisposable
 
             await SendMessageAsync(channelWs.WebSocket, JsonSerializer.Serialize(connectMessage));
 
+            // Connect 응답 대기
+            var connectedResponse = await WaitForConnectResponseAsync(channelWs.WebSocket, channelWs.CancellationTokenSource.Token);
+
             // 수신 작업 시작
             _ = Task.Run(() => ReceiveLoop(broadcastId, channelWs), channelWs.CancellationTokenSource.Token);
 
@@ -64,7 +67,8 @@ public class BroadcastWebSocketService : IAsyncDisposable
             return new StartBroadcastResponse
             {
                 Success = true,
-                BroadcastId = broadcastId
+                BroadcastId = broadcastId,
+                ConnectedResponse = connectedResponse
             };
         }
         catch (Exception ex)
@@ -140,6 +144,77 @@ public class BroadcastWebSocketService : IAsyncDisposable
     {
         var bytes = Encoding.UTF8.GetBytes(message);
         await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+    }
+
+    private async Task<ConnectedResponse> WaitForConnectResponseAsync(ClientWebSocket webSocket, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("[WaitForConnectResponseAsync] 응답 대기 중...");
+        var buffer = new ArraySegment<byte>(new byte[4096]);
+        var result = await webSocket.ReceiveAsync(buffer, cancellationToken);
+
+        if (result.MessageType == WebSocketMessageType.Text)
+        {
+            var message = Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
+            _logger.LogInformation($"[WaitForConnectResponseAsync] 응답 수신: {message.Substring(0, Math.Min(200, message.Length))}...");
+            
+            var jsonDoc = JsonDocument.Parse(message);
+            var root = jsonDoc.RootElement;
+
+            if (root.TryGetProperty("type", out var typeElement) && typeElement.GetString() == "connected")
+            {
+                var connectedResponse = new ConnectedResponse
+                {
+                    BroadcastId = root.GetProperty("broadcastId").GetUInt64(),
+                    IsRecovery = root.GetProperty("isRecovery").GetBoolean(),
+                    PlaybackState = null
+                };
+
+                _logger.LogInformation($"[WaitForConnectResponseAsync] IsRecovery={connectedResponse.IsRecovery}");
+
+                if (root.TryGetProperty("playbackState", out var playbackStateProp) && playbackStateProp.ValueKind != JsonValueKind.Null)
+                {
+                    _logger.LogInformation("[WaitForConnectResponseAsync] playbackState 발견! 파싱 중...");
+                    
+                    var pbState = new PlaybackState
+                    {
+                        Source = playbackStateProp.GetProperty("source").GetString(),
+                        IsPlaying = playbackStateProp.GetProperty("isPlaying").GetBoolean(),
+                        SessionId = playbackStateProp.GetProperty("sessionId").GetString(),
+                        SelectedGroupIds = playbackStateProp.TryGetProperty("selectedGroupIds", out var groupIdsProp)
+                            ? groupIdsProp.EnumerateArray().Select(x => x.GetUInt64()).ToList()
+                            : new List<ulong>(),
+                        MediaList = new List<MediaInfo>(),
+                        CurrentMedia = null
+                    };
+
+                    if (playbackStateProp.TryGetProperty("mediaList", out var mediaListProp))
+                    {
+                        pbState.MediaList = mediaListProp.EnumerateArray().Select(m => new MediaInfo
+                        {
+                            Id = m.GetProperty("id").GetUInt64(),
+                            FileName = m.GetProperty("fileName").GetString(),
+                            FullPath = m.GetProperty("fullPath").GetString()
+                        }).ToList();
+                    }
+
+                    if (playbackStateProp.TryGetProperty("currentMedia", out var currentMediaProp) && currentMediaProp.ValueKind != JsonValueKind.Null)
+                    {
+                        pbState.CurrentMedia = new CurrentMediaInfo
+                        {
+                            MediaId = currentMediaProp.GetProperty("mediaId").GetUInt64(),
+                            FileName = currentMediaProp.GetProperty("fileName").GetString(),
+                            CurrentTrackIndex = currentMediaProp.GetProperty("currentTrackIndex").GetInt32()
+                        };
+                    }
+
+                    connectedResponse.PlaybackState = pbState;
+                }
+
+                return connectedResponse;
+            }
+        }
+
+        return null;
     }
 
     private async Task ReceiveLoop(ulong broadcastId, ChannelWebSocket channelWs)
@@ -252,6 +327,7 @@ public class StartBroadcastResponse
     public bool Success { get; set; }
     public ulong BroadcastId { get; set; }
     public string Error { get; set; }
+    public ConnectedResponse ConnectedResponse { get; set; }
 }
 
 public class StopBroadcastResponse
@@ -266,4 +342,35 @@ public class BroadcastStatus
     public long PacketCount { get; set; }
     public long TotalBytes { get; set; }
     public TimeSpan Duration { get; set; }
+}
+
+public class ConnectedResponse
+{
+    public ulong BroadcastId { get; set; }
+    public bool IsRecovery { get; set; }
+    public PlaybackState PlaybackState { get; set; }
+}
+
+public class PlaybackState
+{
+    public string Source { get; set; }
+    public bool IsPlaying { get; set; }
+    public string SessionId { get; set; }
+    public List<ulong> SelectedGroupIds { get; set; }
+    public List<MediaInfo> MediaList { get; set; }
+    public CurrentMediaInfo CurrentMedia { get; set; }
+}
+
+public class MediaInfo
+{
+    public ulong Id { get; set; }
+    public string FileName { get; set; }
+    public string FullPath { get; set; }
+}
+
+public class CurrentMediaInfo
+{
+    public ulong MediaId { get; set; }
+    public string FileName { get; set; }
+    public int CurrentTrackIndex { get; set; }
 }

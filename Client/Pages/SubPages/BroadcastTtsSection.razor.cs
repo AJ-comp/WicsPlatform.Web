@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Radzen;
@@ -382,6 +382,16 @@ namespace WicsPlatform.Client.Pages.SubPages
         {
             isTtsPlaying = false;
             currentTtsSessionId = null;
+            StateHasChanged();
+        }
+
+        /// <summary>
+        /// TTS 재생 상태 복원 (복구 시나리오)
+        /// </summary>
+        public void RestorePlaybackState()
+        {
+            // TTS 재생 상태 복원
+            isTtsPlaying = true;
             StateHasChanged();
         }
 

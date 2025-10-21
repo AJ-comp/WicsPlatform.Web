@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using WicsPlatform.Server.Contracts;
 using static WicsPlatform.Server.Middleware.WebSocketMiddleware;
@@ -172,32 +173,48 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
 
     public async Task<bool> StopMediaByBroadcastIdAsync(ulong broadcastId)
     {
+        Debug.WriteLine($"[MediaBroadcastService.StopMedia] ========== 시작 ==========");
+        Debug.WriteLine($"[MediaBroadcastService.StopMedia] BroadcastId: {broadcastId}");
         try
         {
             logger.LogInformation($"Stopping media for broadcast: {broadcastId}");
 
             // 1. 믹서에서 미디어 제거
+            Debug.WriteLine($"[MediaBroadcastService.StopMedia] 믹서에서 미디어 제거 중...");
             await audioMixingService.RemoveMediaStream(broadcastId);
 
             // 2. 세션 정리 (남기되 IsPlaying false)
             if (_sessions.TryGetValue(broadcastId, out var session))
             {
                 session.IsPlaying = false;
+                Debug.WriteLine($"[MediaBroadcastService.StopMedia] 세션 IsPlaying=false로 설정");
+            }
+            else
+            {
+                Debug.WriteLine($"[MediaBroadcastService.StopMedia] 세션을 찾을 수 없음");
             }
 
+            Debug.WriteLine($"[MediaBroadcastService.StopMedia] ✅ 미디어 중지 완료");
             return true;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, $"Error stopping media for broadcast {broadcastId}");
+            Debug.WriteLine($"[MediaBroadcastService.StopMedia] ❌ 예외 발생: {ex.Message}");
             return false;
+        }
+        finally
+        {
+            Debug.WriteLine($"[MediaBroadcastService.StopMedia] ========== 종료 ==========");
         }
     }
 
     public async Task<MediaPlaybackStatus> GetStatusByBroadcastIdAsync(ulong broadcastId)
     {
+        Debug.WriteLine($"[MediaBroadcastService.GetStatus] BroadcastId: {broadcastId}");
         if (_sessions.TryGetValue(broadcastId, out var session) && session.IsPlaying)
         {
+            Debug.WriteLine($"[MediaBroadcastService.GetStatus] 세션 존재, IsPlaying: {session.IsPlaying}");
             var currentPosition = TimeSpan.Zero;
             var duration = TimeSpan.Zero;
 
@@ -211,6 +228,7 @@ public class MediaBroadcastService : IMediaBroadcastService, IDisposable
             };
         }
 
+        Debug.WriteLine($"[MediaBroadcastService.GetStatus] 세션 없거나 IsPlaying=false");
         return new MediaPlaybackStatus
         {
             SessionId = broadcastId.ToString(),

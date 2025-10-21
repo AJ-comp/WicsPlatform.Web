@@ -16,7 +16,7 @@ public partial class BroadcastLiveTab
     #region Public Microphone Status Methods
 
     /// <summary>
-    /// ¸¶ÀÌÅ©°¡ ÇöÀç È°¼ºÈ­µÇ¾î ÀÖ´ÂÁö È®ÀÎ
+    /// ë§ˆì´í¬ê°€ í˜„ì¬ í™œì„±í™”ë˜ì–´ ìˆëŠ”ì§€ í™•ì¸
     /// </summary>
     public async Task<bool> IsMicrophoneActive()
     {
@@ -44,19 +44,21 @@ public partial class BroadcastLiveTab
     #region Audio Mixer Initialization
 
     /// <summary>
-    /// ¿Àµğ¿À ¹Í¼­ ÃÊ±âÈ­ ¹× ¸¶ÀÌÅ© ¼³Á¤
+    /// ì˜¤ë””ì˜¤ ë¯¹ì„œ ì´ˆê¸°í™” ë° ë§ˆì´í¬ ì„¤ì •
     /// </summary>
     private async Task<bool> InitializeAudioMixer()
     {
         try
         {
-            // ¸¶ÀÌÅ© »óÅÂ È®ÀÎ
+            // ë§ˆì´í¬ ìƒíƒœ í™•ì¸
             if (await IsMicrophoneActive()) return true;
 
-            // ¹Í¼­ ¸ğµâÀÌ ¾øÀ» ¶§¸¸ import
+            // ë¯¹ì„œ ëª¨ë“ˆì´ ì—†ì„ ë•Œë§Œ import
             if (_mixerModule == null)
             {
-                _mixerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/audiomixer.js");
+                // ë²„ì „ ì¿¼ë¦¬ ìŠ¤íŠ¸ë§ìœ¼ë¡œ ìºì‹œ ë¬´íš¨í™”
+                var version = DateTime.Now.Ticks.ToString();
+                _mixerModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", $"./js/audiomixer.js?v={version}");
             }
 
             var configWithVolume = CreateMicrophoneConfig();
@@ -65,7 +67,7 @@ public partial class BroadcastLiveTab
 
             if (!success)
             {
-                NotifyError("¿Àµğ¿À ¹Í¼­ ÃÊ±âÈ­ ½ÇÆĞ", new Exception("¿Àµğ¿À ¹Í¼­¸¦ ÃÊ±âÈ­ÇÒ ¼ö ¾ø½À´Ï´Ù."));
+                NotifyError("ì˜¤ë””ì˜¤ ë¯¹ì„œ ì´ˆê¸°í™” ì‹¤íŒ¨", new Exception("ì˜¤ë””ì˜¤ ë¯¹ì„œë¥¼ ì´ˆê¸°í™”í•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤."));
                 return false;
             }
 
@@ -74,14 +76,14 @@ public partial class BroadcastLiveTab
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "¿Àµğ¿À ¹Í¼­ ÃÊ±âÈ­ ½ÇÆĞ");
-            NotifyError("¿Àµğ¿À ¹Í¼­ ÃÊ±âÈ­ ½ÇÆĞ", ex);
+            _logger.LogError(ex, "ì˜¤ë””ì˜¤ ë¯¹ì„œ ì´ˆê¸°í™” ì‹¤íŒ¨");
+            NotifyError("ì˜¤ë””ì˜¤ ë¯¹ì„œ ì´ˆê¸°í™” ì‹¤íŒ¨", ex);
             return false;
         }
     }
 
     /// <summary>
-    /// ¸¶ÀÌÅ© ¼³Á¤ °´Ã¼ »ı¼º
+    /// ë§ˆì´í¬ ì„¤ì • ê°ì²´ ìƒì„±
     /// </summary>
     private Dictionary<string, object> CreateMicrophoneConfig()
     {
@@ -103,12 +105,12 @@ public partial class BroadcastLiveTab
     }
 
     /// <summary>
-    /// ¸¶ÀÌÅ© ÃÊ±âÈ­ ·Î±×
+    /// ë§ˆì´í¬ ì´ˆê¸°í™” ë¡œê·¸
     /// </summary>
     private void LogMicrophoneInitialization()
     {
-        _logger.LogInformation($"¿Àµğ¿À ¹Í¼­ ÃÊ±âÈ­ ¿Ï·á - Mic: {_micConfig.SampleRate}Hz/{_micConfig.Channels}ch, Timeslice: {_micConfig.TimesliceMs}ms");
-        LoggingService.AddLog("SUCCESS", $"¸¶ÀÌÅ© ÃÊ±âÈ­ ¿Ï·á ({_micConfig.SampleRate}Hz/¸ğ³ë)");
+        _logger.LogInformation($"ì˜¤ë””ì˜¤ ë¯¹ì„œ ì´ˆê¸°í™” ì™„ë£Œ - Mic: {_micConfig.SampleRate}Hz/{_micConfig.Channels}ch, Timeslice: {_micConfig.TimesliceMs}ms");
+        LoggingService.AddLog("SUCCESS", $"ë§ˆì´í¬ ì´ˆê¸°í™” ì™„ë£Œ ({_micConfig.SampleRate}Hz/ëª¨ë…¸)");
     }
 
     #endregion
@@ -116,7 +118,7 @@ public partial class BroadcastLiveTab
     #region Microphone Activation
 
     /// <summary>
-    /// ¸¶ÀÌÅ© È°¼ºÈ­
+    /// ë§ˆì´í¬ í™œì„±í™”
     /// </summary>
     private async Task<bool> EnableMicrophone()
     {
@@ -124,15 +126,15 @@ public partial class BroadcastLiveTab
         {
             if (_mixerModule == null)
             {
-                _logger.LogError("¹Í¼­ ¸ğµâÀÌ ÃÊ±âÈ­µÇÁö ¾Ê¾Ò½À´Ï´Ù.");
+                _logger.LogError("ë¯¹ì„œ ëª¨ë“ˆì´ ì´ˆê¸°í™”ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.");
                 return false;
             }
 
-            // ¸¶ÀÌÅ© »óÅÂ È®ÀÎ ÇÔ¼ö È£Ãâ
+            // ë§ˆì´í¬ ìƒíƒœ í™•ì¸ í•¨ìˆ˜ í˜¸ì¶œ
             if (await IsMicrophoneActive())
             {
-                _logger.LogInformation("¸¶ÀÌÅ©°¡ ÀÌ¹Ì È°¼ºÈ­µÇ¾î ÀÖ½À´Ï´Ù.");
-                LoggingService.AddLog("INFO", "¸¶ÀÌÅ© ÀÌ¹Ì È°¼ºÈ­µÊ");
+                _logger.LogInformation("ë§ˆì´í¬ê°€ ì´ë¯¸ í™œì„±í™”ë˜ì–´ ìˆìŠµë‹ˆë‹¤.");
+                LoggingService.AddLog("INFO", "ë§ˆì´í¬ ì´ë¯¸ í™œì„±í™”ë¨");
                 return true;
             }
 
@@ -140,17 +142,17 @@ public partial class BroadcastLiveTab
 
             if (!micEnabled)
             {
-                NotifyWarn("¸¶ÀÌÅ© È°¼ºÈ­ ½ÇÆĞ", "¸¶ÀÌÅ© ±ÇÇÑÀ» È®ÀÎÇØÁÖ¼¼¿ä.");
+                NotifyWarn("ë§ˆì´í¬ í™œì„±í™” ì‹¤íŒ¨", "ë§ˆì´í¬ ê¶Œí•œì„ í™•ì¸í•´ì£¼ì„¸ìš”.");
                 return false;
             }
 
-            LoggingService.AddLog("SUCCESS", "¸¶ÀÌÅ© È°¼ºÈ­ ¿Ï·á");
+            LoggingService.AddLog("SUCCESS", "ë§ˆì´í¬ í™œì„±í™” ì™„ë£Œ");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "¸¶ÀÌÅ© È°¼ºÈ­ ½ÇÆĞ");
-            NotifyError("¸¶ÀÌÅ© È°¼ºÈ­", ex);
+            _logger.LogError(ex, "ë§ˆì´í¬ í™œì„±í™” ì‹¤íŒ¨");
+            NotifyError("ë§ˆì´í¬ í™œì„±í™”", ex);
 
             return false;
         }
@@ -161,7 +163,7 @@ public partial class BroadcastLiveTab
     #region Audio Data Processing
 
     /// <summary>
-    /// ¹Í¼­¿¡¼­ Ä¸Ã³µÈ ¿Àµğ¿À µ¥ÀÌÅÍ Ã³¸®
+    /// ë¯¹ì„œì—ì„œ ìº¡ì²˜ëœ ì˜¤ë””ì˜¤ ë°ì´í„° ì²˜ë¦¬
     /// </summary>
     [JSInvokable]
     public async Task OnMixedAudioCaptured(string base64Data)
@@ -172,32 +174,32 @@ public partial class BroadcastLiveTab
         {
             byte[] audioData = Convert.FromBase64String(base64Data);
 
-            // 1. Åë°è ¾÷µ¥ÀÌÆ®
+            // 1. í†µê³„ ì—…ë°ì´íŠ¸
             UpdateAudioStatistics(audioData);
 
-            // 2. ³ìÀ½ µ¥ÀÌÅÍ Ã³¸®
+            // 2. ë…¹ìŒ ë°ì´í„° ì²˜ë¦¬
             ProcessRecordingData(audioData);
 
-            // 3. ¸ğ´ÏÅÍ¸µ ¼½¼Ç¿¡ µ¥ÀÌÅÍ Àü´Ş
+            // 3. ëª¨ë‹ˆí„°ë§ ì„¹ì…˜ì— ë°ì´í„° ì „ë‹¬
             await SendToMonitoringSection(audioData);
 
-            // 4. WebSocketÀ¸·Î Àü¼Û
+            // 4. WebSocketìœ¼ë¡œ ì „ì†¡
             await SendToWebSocket(audioData);
 
-            // 5. ·çÇÁ¹é Ã³¸®
+            // 5. ë£¨í”„ë°± ì²˜ë¦¬
             await ProcessLoopback(base64Data);
 
-            // 6. UI ¾÷µ¥ÀÌÆ® (100ÆĞÅ¶¸¶´Ù)
+            // 6. UI ì—…ë°ì´íŠ¸ (100íŒ¨í‚·ë§ˆë‹¤)
             await UpdateUIIfNeeded();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"OnMixedAudioCaptured ¿À·ù: {ex.Message}");
+            _logger.LogError(ex, $"OnMixedAudioCaptured ì˜¤ë¥˜: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// ¿Àµğ¿À Åë°è ¾÷µ¥ÀÌÆ®
+    /// ì˜¤ë””ì˜¤ í†µê³„ ì—…ë°ì´íŠ¸
     /// </summary>
     private void UpdateAudioStatistics(byte[] data)
     {
@@ -207,7 +209,7 @@ public partial class BroadcastLiveTab
     }
 
     /// <summary>
-    /// ¿Àµğ¿À ·¹º§ °è»ê
+    /// ì˜¤ë””ì˜¤ ë ˆë²¨ ê³„ì‚°
     /// </summary>
     private double CalculateAudioLevel(byte[] audioData)
     {
@@ -228,7 +230,7 @@ public partial class BroadcastLiveTab
     }
 
     /// <summary>
-    /// ¸ğ´ÏÅÍ¸µ ¼½¼Ç¿¡ ¿Àµğ¿À µ¥ÀÌÅÍ Àü¼Û
+    /// ëª¨ë‹ˆí„°ë§ ì„¹ì…˜ì— ì˜¤ë””ì˜¤ ë°ì´í„° ì „ì†¡
     /// </summary>
     private async Task SendToMonitoringSection(byte[] audioData)
     {
@@ -239,7 +241,7 @@ public partial class BroadcastLiveTab
     }
 
     /// <summary>
-    /// WebSocketÀ¸·Î ¿Àµğ¿À µ¥ÀÌÅÍ Àü¼Û
+    /// WebSocketìœ¼ë¡œ ì˜¤ë””ì˜¤ ë°ì´í„° ì „ì†¡
     /// </summary>
     private async Task SendToWebSocket(byte[] audioData)
     {
@@ -250,7 +252,7 @@ public partial class BroadcastLiveTab
     }
 
     /// <summary>
-    /// ·çÇÁ¹é Ã³¸®
+    /// ë£¨í”„ë°± ì²˜ë¦¬
     /// </summary>
     private async Task ProcessLoopback(string base64Data)
     {
@@ -261,7 +263,7 @@ public partial class BroadcastLiveTab
     }
 
     /// <summary>
-    /// UI ¾÷µ¥ÀÌÆ® (100ÆĞÅ¶¸¶´Ù)
+    /// UI ì—…ë°ì´íŠ¸ (100íŒ¨í‚·ë§ˆë‹¤)
     /// </summary>
     private async Task UpdateUIIfNeeded()
     {
@@ -276,12 +278,12 @@ public partial class BroadcastLiveTab
     #region Microphone Help
 
     /// <summary>
-    /// ¸¶ÀÌÅ© µµ¿ò¸» Ç¥½Ã
+    /// ë§ˆì´í¬ ë„ì›€ë§ í‘œì‹œ
     /// </summary>
     [JSInvokable]
     public Task ShowMicHelp()
     {
-        DialogService.Open<MicHelpDialog>("¸¶ÀÌÅ© ±ÇÇÑ ÇØÁ¦ ¹æ¹ı",
+        DialogService.Open<MicHelpDialog>("ë§ˆì´í¬ ê¶Œí•œ í•´ì œ ë°©ë²•",
             new Dictionary<string, object>(),
             new DialogOptions { Width = "600px", Resizable = true });
         return Task.CompletedTask;
@@ -292,7 +294,7 @@ public partial class BroadcastLiveTab
     #region Microphone Cleanup
 
     /// <summary>
-    /// ¸¶ÀÌÅ© ¹× ¿Àµğ¿À ¹Í¼­ Á¤¸®
+    /// ë§ˆì´í¬ ë° ì˜¤ë””ì˜¤ ë¯¹ì„œ ì •ë¦¬
     /// </summary>
     private async Task CleanupMicrophone()
     {
@@ -304,22 +306,22 @@ public partial class BroadcastLiveTab
             {
                 await _mixerModule.InvokeVoidAsync("dispose");
                 await _mixerModule.DisposeAsync();
-                _logger.LogInformation("¹Í¼­ ¸ğµâ Á¤¸® ¿Ï·á");
+                _logger.LogInformation("ë¯¹ì„œ ëª¨ë“ˆ ì •ë¦¬ ì™„ë£Œ");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "¹Í¼­ ¸ğµâ Á¤¸® ½ÇÆĞ");
+                _logger.LogError(ex, "ë¯¹ì„œ ëª¨ë“ˆ ì •ë¦¬ ì‹¤íŒ¨");
             }
             finally
             {
                 _mixerModule = null;
             }
 
-            // _speakerModuleÀº Á¤¸®ÇÏÁö ¾ÊÀ½ (Àç»ç¿ë)
+            // _speakerModuleì€ ì •ë¦¬í•˜ì§€ ì•ŠìŒ (ì¬ì‚¬ìš©)
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "¸¶ÀÌÅ© Á¤¸® Áß ¿À·ù ¹ß»ı");
+            _logger.LogError(ex, "ë§ˆì´í¬ ì •ë¦¬ ì¤‘ ì˜¤ë¥˜ ë°œìƒ");
         }
     }
 
@@ -328,7 +330,7 @@ public partial class BroadcastLiveTab
     #region Microphone Volume Control
 
     /// <summary>
-    /// ½Ç½Ã°£ ¸¶ÀÌÅ© º¼·ı Á¶Àı
+    /// ì‹¤ì‹œê°„ ë§ˆì´í¬ ë³¼ë¥¨ ì¡°ì ˆ
     /// </summary>
     public async Task SetMicrophoneVolume(float volume)
     {
@@ -341,7 +343,7 @@ public partial class BroadcastLiveTab
     }
 
     /// <summary>
-    /// ÀüÃ¼ º¼·ı ¼³Á¤ ¾÷µ¥ÀÌÆ®
+    /// ì „ì²´ ë³¼ë¥¨ ì„¤ì • ì—…ë°ì´íŠ¸
     /// </summary>
     public async Task UpdateAllVolumes()
     {

@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -97,38 +98,51 @@ public partial class WebSocketMiddleware
         }
         finally
         {
+            Debug.WriteLine($"[WebSocket.finally] ========== WebSocket 종료 처리 시작 ==========");
+            Debug.WriteLine($"[WebSocket.finally] ConnectionId: {connectionId}");
             var sessionsToRemove = _broadcastSessions
                 .Where(kvp => kvp.Value.ConnectionId == connectionId)
                 .Select(kvp => kvp.Key)
                 .ToList();
+            Debug.WriteLine($"[WebSocket.finally] 제거 대상 세션 수: {sessionsToRemove.Count}");
 
             foreach (var broadcastId in sessionsToRemove)
             {
+                Debug.WriteLine($"[WebSocket.finally] BroadcastId {broadcastId} 처리 중...");
                 if (_broadcastSessions.TryGetValue(broadcastId, out var session))
                 {
+                    Debug.WriteLine($"[WebSocket.finally] 세션 발견: BroadcastId={broadcastId}");
                     // WebSocket 연결만 null로 설정
                     session.WebSocket = null;
+                    Debug.WriteLine($"[WebSocket.finally] WebSocket null로 설정");
 
                     // 마이크 스트림만 제거
                     await audioMixingService.RemoveMicrophoneStream(broadcastId);
+                    Debug.WriteLine($"[WebSocket.finally] 마이크 스트림 제거 완료");
 
                     // 미디어 재생 확인
+                    Debug.WriteLine($"[WebSocket.finally] 미디어 재생 상태 확인 중...");
                     var mediaStatus = await mediaBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
+                    Debug.WriteLine($"[WebSocket.finally] 미디어 재생 상태: {mediaStatus?.IsPlaying}");
 
                     if (mediaStatus?.IsPlaying == true)
                     {
                         // 미디어 재생 중 - 세션 유지, WebSocket만 null
                         logger.LogInformation($"Client disconnected but media continues: {broadcastId}");
+                        Debug.WriteLine($"[WebSocket.finally] ✅ 미디어 재생 중 → 세션 유지 (WebSocket만 null)");
                     }
                     else
                     {
                         // 미디어도 없으면 전체 정리
+                        Debug.WriteLine($"[WebSocket.finally] 미디어 재생 안함 → 전체 정리 시작");
                         await audioMixingService.StopMixer(broadcastId);
                         _broadcastSessions.TryRemove(broadcastId, out _);
                         logger.LogInformation($"Broadcast session fully cleaned up: {broadcastId}");
+                        Debug.WriteLine($"[WebSocket.finally] ✅ 세션 완전 정리 완료");
                     }
                 }
             }
+            Debug.WriteLine($"[WebSocket.finally] ========== WebSocket 종료 처리 완료 ==========");
         }
     }
 

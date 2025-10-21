@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Net.Sockets;
 
 namespace WicsPlatform.Server.Services;
@@ -106,12 +106,8 @@ public class UdpBroadcastService : IUdpBroadcastService, IDisposable
             var packet = CreateAudioPacket(speaker.ChannelId, audioData);
             await udpClient.SendAsync(packet, packet.Length);
 
-            // ✅ UDP 송신 로그 추가 - 빈도 조절 (10번째 패킷마다만 로그)
-            var packetCount = _packetCounters.AddOrUpdate(speaker.Ip, 1, (key, value) => value + 1);
-            if (packetCount % 10 == 0) // 10번째 패킷마다만 로그 출력 (약 500ms마다)
-            {
-                _logger.LogInformation($"UDP 송신: {speaker.Ip}:{_speakerPort} → {packet.Length} bytes (스피커: {speaker.Name}) [#{packetCount}]");
-            }
+            // 패킷 카운터만 업데이트 (로그 출력 제거)
+            _packetCounters.AddOrUpdate(speaker.Ip, 1, (key, value) => value + 1);
         }
         catch (Exception ex)
         {

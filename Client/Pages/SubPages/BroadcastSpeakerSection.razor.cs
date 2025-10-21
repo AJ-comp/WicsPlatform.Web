@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -526,7 +526,6 @@ namespace WicsPlatform.Client.Pages.SubPages
                 .Where(s => selectedSpeakers.Contains(s.Id) && s.State == 1)
                 .ToList();
 
-            Logger.LogInformation($"온라인 스피커 수: {onlineSpeakers.Count}");
             return onlineSpeakers;
         }
 
@@ -538,7 +537,6 @@ namespace WicsPlatform.Client.Pages.SubPages
                 .Where(s => selectedSpeakers.Contains(s.Id) && s.State != 1)
                 .ToList();
 
-            Logger.LogInformation($"오프라인 스피커 수: {offlineSpeakers.Count}");
             return offlineSpeakers;
         }
 

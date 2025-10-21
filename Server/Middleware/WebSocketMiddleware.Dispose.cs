@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text.Json;
 using WicsPlatform.Server.Data;
@@ -80,47 +81,67 @@ public partial class WebSocketMiddleware
     /// <returns>정리 성공 여부</returns>
     private async Task<bool> CleanupBroadcastSessionAsync(ulong broadcastId, bool forceCleanup = false, bool updateDatabase = true)
     {
+        Debug.WriteLine($"[CleanupBroadcastSessionAsync] ========== 시작 ==========");
+        Debug.WriteLine($"[CleanupBroadcastSessionAsync] BroadcastId: {broadcastId}");
+        Debug.WriteLine($"[CleanupBroadcastSessionAsync] forceCleanup: {forceCleanup}");
+        Debug.WriteLine($"[CleanupBroadcastSessionAsync] updateDatabase: {updateDatabase}");
         try
         {
             // 강제 정리가 아닌 경우에만 미디어/TTS 재생 확인
             if (!forceCleanup)
             {
+                Debug.WriteLine($"[CleanupBroadcastSessionAsync] forceCleanup=false → 미디어/TTS 상태 확인");
                 var mediaStatus = await mediaBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
+                Debug.WriteLine($"[CleanupBroadcastSessionAsync] 미디어 재생 상태: {mediaStatus?.IsPlaying}");
                 if (mediaStatus?.IsPlaying == true)
                 {
                     logger.LogInformation($"Media is still playing, skipping cleanup: {broadcastId}");
+                    Debug.WriteLine($"[CleanupBroadcastSessionAsync] ❌ 미디어 재생 중 → 정리 중단");
                     return false;
                 }
 
                 // TTS 재생 상태도 확인
                 var ttsStatus = await ttsBroadcastService.GetStatusByBroadcastIdAsync(broadcastId);
+                Debug.WriteLine($"[CleanupBroadcastSessionAsync] TTS 재생 상태: {ttsStatus?.IsPlaying}");
                 if (ttsStatus?.IsPlaying == true)
                 {
                     logger.LogInformation($"TTS is still playing, skipping cleanup: {broadcastId}");
+                    Debug.WriteLine($"[CleanupBroadcastSessionAsync] ❌ TTS 재생 중 → 정리 중단");
                     return false;
                 }
+            }
+            else
+            {
+                Debug.WriteLine($"[CleanupBroadcastSessionAsync] forceCleanup=true → 미디어/TTS 상태 무시하고 강제 정리");
             }
 
             // 세션 가져오기
             _broadcastSessions.TryGetValue(broadcastId, out var session);
+            Debug.WriteLine($"[CleanupBroadcastSessionAsync] 세션 조회 결과: {(session != null ? "존재" : "없음")}");
 
             // DB 업데이트 (channelId만 전달)
             if (updateDatabase && session != null)
             {
+                Debug.WriteLine($"[CleanupBroadcastSessionAsync] DB 업데이트 시작 (ChannelId: {session.ChannelId})");
                 await HandleSpeakerOwnershipOnBroadcastEnd(session.ChannelId);
                 await UpdateBroadcastStatusInDatabase(session.ChannelId, false);
+                Debug.WriteLine($"[CleanupBroadcastSessionAsync] DB 업데이트 완료");
             }
 
             // 1. 오디오 믹서 정리
+            Debug.WriteLine($"[CleanupBroadcastSessionAsync] 오디오 믹서 정리 시작");
             await audioMixingService.StopMixer(broadcastId);
 
             // 2. 미디어 재생 중지
+            Debug.WriteLine($"[CleanupBroadcastSessionAsync] ❌ 미디어 재생 중지 호출");
             await mediaBroadcastService.StopMediaByBroadcastIdAsync(broadcastId);
 
             // 3. TTS 재생 중지
+            Debug.WriteLine($"[CleanupBroadcastSessionAsync] ❌ TTS 재생 중지 호출");
             await ttsBroadcastService.StopTtsByBroadcastIdAsync(broadcastId);
 
             // 4. 세션 제거
+            Debug.WriteLine($"[CleanupBroadcastSessionAsync] 세션 제거 시작");
             bool removed = _broadcastSessions.TryRemove(broadcastId, out _);
 
             if (removed && session != null)
@@ -129,17 +150,21 @@ public partial class WebSocketMiddleware
                     $"Channel: {session.ChannelId}, " +
                     $"Packets: {session.PacketCount}, " +
                     $"Duration: {(DateTime.UtcNow - session.StartTime):hh\\:mm\\:ss}");
+                Debug.WriteLine($"[CleanupBroadcastSessionAsync] ✅ 세션 정리 완료");
             }
             else if (!removed)
             {
                 logger.LogWarning($"Broadcast session not found for cleanup: {broadcastId}");
+                Debug.WriteLine($"[CleanupBroadcastSessionAsync] ⚠️ 세션을 찾을 수 없음");
             }
 
+            Debug.WriteLine($"[CleanupBroadcastSessionAsync] ========== 완료 ==========");
             return removed;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, $"Error cleaning up broadcast session: {broadcastId}");
+            Debug.WriteLine($"[CleanupBroadcastSessionAsync] ❌ 예외 발생: {ex.Message}");
             return false;
         }
     }

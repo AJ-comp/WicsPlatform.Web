@@ -828,6 +828,62 @@ namespace WicsPlatform.Client.Pages.SubPages
             StateHasChanged();
         }
 
+        // 미디어 재생 상태 복원 (복구 시나리오)
+        public void RestorePlaybackState(WicsPlatform.Client.Services.PlaybackState playbackState)
+        {
+            if (playbackState == null || playbackState.Source != "media")
+                return;
+
+            _logger.LogInformation($"Restoring playlist playback state: SessionId={playbackState.SessionId}");
+
+            // 재생 상태 복원
+            isMediaPlaying = true;
+            currentMediaSessionId = playbackState.SessionId;
+
+            // 선택된 플레이리스트 복원
+            if (playbackState.SelectedGroupIds != null && playbackState.SelectedGroupIds.Any())
+            {
+                foreach (var key in selectedPlaylists.Keys.ToList())
+                {
+                    selectedPlaylists[key] = false;
+                }
+
+                foreach (var groupId in playbackState.SelectedGroupIds)
+                {
+                    if (selectedPlaylists.ContainsKey(groupId))
+                    {
+                        selectedPlaylists[groupId] = true;
+                    }
+                }
+            }
+
+            // 미디어 리스트 복원
+            if (playbackState.MediaList != null && playbackState.MediaList.Any())
+            {
+                foreach (var key in selectedMedia.Keys.ToList())
+                {
+                    selectedMedia[key] = false;
+                }
+
+                foreach (var media in playbackState.MediaList)
+                {
+                    if (selectedMedia.ContainsKey(media.Id))
+                    {
+                        selectedMedia[media.Id] = true;
+                    }
+                }
+            }
+
+            // 현재 재생 중인 미디어 설정
+            if (playbackState.CurrentMedia != null)
+            {
+                playingMediaId = playbackState.CurrentMedia.MediaId;
+                _logger.LogInformation($"Current playing media: {playbackState.CurrentMedia.FileName}");
+            }
+
+            StateHasChanged();
+        }
+
         // 미디어 재생 시 현재 위치로 이동
         private async Task SeekToCurrentMediaPosition()
         {
