@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using WicsPlatform.Server.Models;
+using System.IO; // added for file logging
 
 namespace WicsPlatform.Server.Controllers
 {
@@ -24,6 +25,8 @@ namespace WicsPlatform.Server.Controllers
         private readonly IWebHostEnvironment env;
         private readonly IConfiguration configuration;
         private readonly ILogger<AccountController> logger;
+
+        private readonly string loginLogDirectory; // configured login log directory
 
         public AccountController(
             IWebHostEnvironment env,
@@ -39,6 +42,47 @@ namespace WicsPlatform.Server.Controllers
             this.env = env;
             this.configuration = configuration;
             this.logger = logger;
+
+            // Read login log directory from configuration: AuthLogging:LoginLogPath
+            var cfgPath = configuration["AuthLogging:LoginLogPath"];
+            if (!string.IsNullOrWhiteSpace(cfgPath))
+            {
+                try
+                {
+                    // If relative path, resolve against content root
+                    loginLogDirectory = Path.IsPathRooted(cfgPath)
+                        ? cfgPath
+                        : Path.Combine(env.ContentRootPath, cfgPath);
+
+                    Directory.CreateDirectory(loginLogDirectory);
+                }
+                catch
+                {
+                    loginLogDirectory = null; // if fails, disable file logging
+                }
+            }
+        }
+
+        private void WriteLoginLog(string message)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(loginLogDirectory))
+                {
+                    return; // not configured or not available
+                }
+
+                var ip = HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "-";
+                var ua = HttpContext?.Request?.Headers["User-Agent"].ToString() ?? "-";
+                var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] IP={ip} UA={ua} :: {message}";
+
+                var file = Path.Combine(loginLogDirectory, $"login-{DateTime.Now:yyyyMMdd}.log");
+                System.IO.File.AppendAllText(file, line + Environment.NewLine);
+            }
+            catch
+            {
+                // ignore file logging errors
+            }
         }
 
         private IActionResult RedirectWithError(string error, string redirectUrl = null)
@@ -57,6 +101,7 @@ namespace WicsPlatform.Server.Controllers
         public async Task<IActionResult> Login(string returnUrl)
         {
             logger.LogInformation($"GET Login called with returnUrl: {returnUrl}");
+            WriteLoginLog($"GET /Account/Login returnUrl='{returnUrl}'");
 
             if (returnUrl != "/" && !string.IsNullOrEmpty(returnUrl))
             {
@@ -69,7 +114,9 @@ namespace WicsPlatform.Server.Controllers
         [HttpPost]
         public async Task<IActionResult> Login([FromForm] LoginModel model)
         {
+            // Never log password!
             logger.LogInformation($"POST Login called with userName: {model.userName}, redirectUrl: {model.redirectUrl}");
+            WriteLoginLog($"POST /Account/Login userName='{model.userName}' redirectUrl='{model.redirectUrl}'");
 
             string redirectUrl = string.IsNullOrEmpty(model.redirectUrl) ? "/" : model.redirectUrl.StartsWith("/") ? model.redirectUrl : $"/{model.redirectUrl}";
 
@@ -91,6 +138,7 @@ namespace WicsPlatform.Server.Controllers
                     await signInManager.SignInWithClaimsAsync(new ApplicationUser { UserName = model.userName, Email = model.userName }, isPersistent: false, claims);
 
                     logger.LogInformation("Development admin login successful");
+                    WriteLoginLog($"SUCCESS user='{model.userName}' (dev admin) -> redirect='{redirectUrl}'");
                     return Redirect(redirectUrl);
                 }
 
@@ -109,16 +157,19 @@ namespace WicsPlatform.Server.Controllers
                         if (result.Succeeded)
                         {
                             logger.LogInformation($"User {model.userName} logged in successfully");
+                            WriteLoginLog($"SUCCESS user='{model.userName}' -> redirect='{redirectUrl}'");
                             return Redirect(redirectUrl);
                         }
                         else
                         {
                             logger.LogWarning($"Failed login attempt for {model.userName}: {result.ToString()}");
+                            WriteLoginLog($"FAIL user='{model.userName}' result='{result}'");
                         }
                     }
                     else
                     {
                         logger.LogWarning($"User not found: {model.userName}");
+                        WriteLoginLog($"FAIL user not found: '{model.userName}'");
                     }
                 }
 
@@ -127,6 +178,7 @@ namespace WicsPlatform.Server.Controllers
             catch (Exception ex)
             {
                 logger.LogError(ex, "Login error");
+                WriteLoginLog($"ERROR user='{model.userName}' ex='{ex.Message}'");
                 return RedirectWithError($"Login error: {ex.Message}", model.redirectUrl);
             }
         }
@@ -169,6 +221,7 @@ namespace WicsPlatform.Server.Controllers
         public async Task<IActionResult> Logout()
         {
             await signInManager.SignOutAsync();
+            WriteLoginLog($"LOGOUT user='{User?.Identity?.Name ?? "(anonymous)"}'");
 
             return Redirect("~/");
         }

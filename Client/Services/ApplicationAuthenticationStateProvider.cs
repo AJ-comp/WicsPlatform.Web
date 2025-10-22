@@ -15,7 +15,6 @@ namespace WicsPlatform.Client
     {
         private readonly SecurityService securityService;
         private ApplicationAuthenticationState authenticationState;
-        private AuthenticationState cachedAuthState;
 
         public ApplicationAuthenticationStateProvider(SecurityService securityService)
         {
@@ -24,45 +23,38 @@ namespace WicsPlatform.Client
 
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            if (cachedAuthState != null)
-            {
-                return cachedAuthState;
-            }
-
             var identity = new ClaimsIdentity();
 
             try
             {
-                var state = await GetApplicationAuthenticationStateAsync();
+                var state = await GetApplicationAuthenticationStateAsync(true /*forceRefresh*/);
 
                 if (state.IsAuthenticated)
                 {
                     identity = new ClaimsIdentity(state.Claims.Select(c => new Claim(c.Type, c.Value)), "WicsPlatform.Server");
                 }
             }
-            catch (HttpRequestException ex)
+            catch (HttpRequestException)
             {
-                // 네트워크 오류 처리
+                // 네트워크 오류 시 익명 처리
             }
 
             var result = new AuthenticationState(new ClaimsPrincipal(identity));
 
             await securityService.InitializeAsync(result);
-            cachedAuthState = result;
 
             return result;
         }
 
         public void NotifyAuthenticationStateChanged()
         {
-            cachedAuthState = null;
             authenticationState = null;
             NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
         }
 
-        private async Task<ApplicationAuthenticationState> GetApplicationAuthenticationStateAsync()
+        private async Task<ApplicationAuthenticationState> GetApplicationAuthenticationStateAsync(bool forceRefresh = false)
         {
-            if (authenticationState == null)
+            if (authenticationState == null || forceRefresh)
             {
                 authenticationState = await securityService.GetAuthenticationStateAsync();
             }

@@ -12,10 +12,13 @@ using WicsPlatform.Server.Contracts;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Models;
 using WicsPlatform.Server.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http; // Added for CookiePolicyOptions
+using Microsoft.AspNetCore.HttpOverrides; // add forwarded headers
 
 static void RegisterDBContext(WebApplicationBuilder builder)
 {
-    // Radzen Blazor Studioì—ì„œ ìŠ¤ìºí´ë”© ì‹œ ì´ê±¸ë¡œ í•´ì•¼ í•¨
+    // Radzen Blazor Studio¿¡¼­ ½ºÄ³Æúµù ½Ã ÀÌ°É·Î ÇØ¾ß ÇÔ
     builder.Services.AddDbContext<wicsContext>(options =>
     {
         options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
@@ -25,24 +28,6 @@ static void RegisterDBContext(WebApplicationBuilder builder)
         options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
     });
     builder.Services.AddIdentity<ApplicationUser, ApplicationRole>().AddEntityFrameworkStores<ApplicationIdentityDbContext>().AddDefaultTokenProviders();
-// appsettings.jsonì—ì„œ ì—°ê²° ë¬¸ìì—´ ê°€ì ¸ì˜¤ê¸°
-/*
-        var connectionString = builder.Configuration.GetConnectionString("wicsConnection");
-
-        // DbContextë¥¼ ì¢…ì†ì„± ì£¼ì…ì„ í†µí•´ ë“±ë¡
-        builder.Services.AddDbContext<wicsContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
-        builder.Services.AddDbContext<ApplicationIdentityDbContext>(options =>
-        {
-            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
-        });
-        builder.Services.AddIdentity<ApplicationUser, ApplicationRole>().AddEntityFrameworkStores<ApplicationIdentityDbContext>().AddDefaultTokenProviders();
-
-        builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
-        {
-            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
-        });
-        builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastWebSocketService>();
-    */
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,6 +40,70 @@ builder.Services.AddRadzenCookieThemeService(options =>
     options.Name = "WicsPlatformTheme";
     options.Duration = TimeSpan.FromDays(365);
 });
+
+// µ¥ÀÌÅÍ º¸È£ Å° ÀúÀå °æ·Î¸¦ ¼³Á¤ ÆÄÀÏ¿¡¼­ ¿ì¼± ÀĞ°í(IIS ±ÇÇÑ ¹®Á¦ ´ëºñ)
+string? dataProtectionKeysPath = null;
+var configuredKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(configuredKeysPath))
+{
+    try
+    {
+        var resolved = Path.IsPathRooted(configuredKeysPath)
+            ? configuredKeysPath
+            : Path.Combine(builder.Environment.ContentRootPath, configuredKeysPath);
+        Directory.CreateDirectory(resolved);
+        dataProtectionKeysPath = resolved;
+    }
+    catch
+    {
+        // ¼³Á¤µÈ °æ·Î°¡ Àß¸øµÆ°Å³ª ±ÇÇÑÀÌ ¾øÀ¸¸é ¾Æ·¡ ÀÚµ¿ ¼±ÅÃ ·ÎÁ÷À¸·Î Æú¹é
+        dataProtectionKeysPath = null;
+    }
+}
+
+if (string.IsNullOrEmpty(dataProtectionKeysPath))
+{
+    try
+    {
+        // 1¼øÀ§: ¾ÖÇÃ¸®ÄÉÀÌ¼Ç Æú´õ ³»ºÎ (¹èÆ÷ °æ·Î) - ±ÇÇÑÀÌ ÀÖ´Â °æ¿ì¿¡¸¸
+        var candidate1 = Path.Combine(builder.Environment.ContentRootPath, "keys");
+        Directory.CreateDirectory(candidate1);
+        dataProtectionKeysPath = candidate1;
+    }
+    catch
+    {
+        try
+        {
+            // 2¼øÀ§: »ç¿ëÀÚ ÇÁ·ÎÇÊ(LocalApplicationData) - AppPool¿¡¼­ Load User ProfileÀÌ ÄÑÁ® ÀÖ¾î¾ß ÇÔ
+            var candidate2 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WicsPlatform", "keys");
+            Directory.CreateDirectory(candidate2);
+            dataProtectionKeysPath = candidate2;
+        }
+        catch
+        {
+            try
+            {
+                // 3¼øÀ§: °ø¿ë ProgramData - ¼­¹ö Á¤Ã¥¿¡ µû¶ó ±ÇÇÑ ÇÊ¿ä
+                var candidate3 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "WicsPlatform", "keys");
+                Directory.CreateDirectory(candidate3);
+                dataProtectionKeysPath = candidate3;
+            }
+            catch
+            {
+                // ¸ğµç °æ·Î ½ÇÆĞ ½Ã ¿µ¼ÓÈ­ ¾øÀÌ ÁøÇà(·Î±×ÀÎ ·çÇÁ Àç¹ß °¡´É) -> IIS ±ÇÇÑ ¼³Á¤ ÇÊ¿ä
+                dataProtectionKeysPath = null;
+            }
+        }
+    }
+}
+
+var dataProtectionAppName = builder.Configuration["DataProtection:ApplicationName"] ?? "WicsPlatform";
+var dp = builder.Services.AddDataProtection().SetApplicationName(dataProtectionAppName);
+if (!string.IsNullOrEmpty(dataProtectionKeysPath))
+{
+    dp.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
+
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<WicsPlatform.Server.wicsService>();
 builder.Services.AddSingleton<IAudioMixingService, AudioMixingService>();
@@ -89,11 +138,10 @@ builder.Services.AddControllers().AddOData(opt =>
 builder.Services.AddScoped<WicsPlatform.Client.wicsService>();
 builder.Services.AddHttpClient("WicsPlatform.Server").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseCookies = false }).AddHeaderPropagation(o => o.Headers.Add("Cookie"));
 builder.Services.AddHeaderPropagation(o => o.Headers.Add("Cookie"));
-builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<WicsPlatform.Client.SecurityService>();
 
-// Client ì„œë¹„ìŠ¤ ë“±ë¡ (Server-Side Renderingì„ ìœ„í•´ í•„ìš”)
+// Client ¼­ºñ½º µî·Ï (Server-Side RenderingÀ» À§ÇØ ÇÊ¿ä)
 builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastWebSocketService>();
 builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastRecordingService>();
 builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastLoggingService>();
@@ -115,15 +163,30 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyMethod().AllowAnyHeader().SetIsOriginAllowed(_ => true) // ë˜ëŠ” .WithOrigins("https://localhost:50553")
-        .AllowCredentials(); // ì´ ë¶€ë¶„ì´ ì¤‘ìš”!
+        policy.AllowAnyMethod().AllowAnyHeader().SetIsOriginAllowed(_ => true) // ¶Ç´Â .WithOrigins("https://localhost:50553")
+        .AllowCredentials(); // ÀÌ ºÎºĞÀÌ Áß¿ä!
     });
 });
+// Identity ÄíÅ° ¸í½ÃÀû ±¸¼º (°æ·Î ¹× ÀÌ¸§ µî)
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Cookie.SameSite = SameSiteMode.Lax; // None -> Lax ë³€ê²½
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Always -> SameAsRequest ë³€ê²½
+    options.LoginPath = "/Account/Login"; // Ã§¸°Áö ½Ã ÀÌµ¿ °æ·Î
+    options.LogoutPath = "/Account/Logout";
+    options.AccessDeniedPath = "/Login";
+    options.Cookie.Name = ".WicsPlatform.Identity";
+    // HTTPS »çÀÌÆ®¿¡¼­ ºê¶ó¿ìÀú Á¤Ã¥°ú È£È¯µÇµµ·Ï ¼³Á¤
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.SlidingExpiration = true;
 });
+
+// Àü¿ª ÄíÅ° Á¤Ã¥ (IIS/ÇÁ·Ï½Ã È¯°æ¿¡¼­ HTTPS ½Ã Secure °­Á¦)
+builder.Services.Configure<CookiePolicyOptions>(o =>
+{
+    o.MinimumSameSitePolicy = SameSiteMode.None;
+    o.Secure = CookieSecurePolicy.Always;
+});
+
 builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
 {
     options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
@@ -137,15 +200,21 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-// app.UseHsts();  // ì£¼ì„ ì²˜ë¦¬
+    // app.UseHsts();
 }
 
-// app.UseHttpsRedirection();  // ì£¼ì„ ì²˜ë¦¬
-// ì •ì  íŒŒì¼ ì œê³µ ì„¤ì • - ìˆœì„œ ì¤‘ìš”!
-// 1. ê¸°ë³¸ wwwroot í´ë”
+// Add forwarded headers support (IIS/ÇÁ·Ï½Ã È¯°æ¿¡¼­ HTTPS ½ºÅ´ º¸Á¸)
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor,
+    // KnownProxies / KnownNetworks ¼³Á¤ÀÌ ÇÊ¿äÇÏ¸é ¿©±â¼­ ±¸¼º
+});
+
+// app.UseHttpsRedirection();  // ÁÖ¼® Ã³¸®
+// Á¤Àû ÆÄÀÏ Á¦°ø ¼³Á¤ - ¼ø¼­ Áß¿ä!
+// 1. ±âº» wwwroot Æú´õ
 app.UseStaticFiles();
-// 2. Uploads í´ë”ë¥¼ ìœ„í•œ ì¶”ê°€ ì„¤ì •
+// 2. Uploads Æú´õ¸¦ À§ÇÑ Ãß°¡ ¼³Á¤
 var provider = new FileExtensionContentTypeProvider();
 provider.Mappings[".mp3"] = "audio/mpeg";
 provider.Mappings[".wav"] = "audio/wav";
@@ -155,17 +224,21 @@ provider.Mappings[".m4a"] = "audio/mp4";
 provider.Mappings[".flac"] = "audio/flac";
 app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.WebRootPath, "Uploads")), RequestPath = "/Uploads", ContentTypeProvider = provider, ServeUnknownFileTypes = true, DefaultContentType = "audio/mpeg", OnPrepareResponse = ctx =>
 {
-    // CORS í—¤ë” ì¶”ê°€
+    // CORS Çì´õ Ãß°¡
     ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
     ctx.Context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
     ctx.Context.Response.Headers.Append("Access-Control-Allow-Headers", "*");
-    // ìºì‹± ì„¤ì • (ê°œë°œ ì¤‘ì—ëŠ” no-cache)
+    // Ä³½Ì ¼³Á¤ (°³¹ß Áß¿¡´Â no-cache)
     if (app.Environment.IsDevelopment())
     {
         ctx.Context.Response.Headers.Append("Cache-Control", "no-cache, no-store");
         ctx.Context.Response.Headers.Append("Pragma", "no-cache");
     }
 } });
+
+// ÄíÅ° Á¤Ã¥ ¹Ìµé¿ş¾î´Â ÀÎÁõ Àü¿¡ À§Ä¡
+app.UseCookiePolicy();
+
 app.UseCors("AllowAll"); // Apply CORS policy
 app.MapControllers();
 app.UseHeaderPropagation();
