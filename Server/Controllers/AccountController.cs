@@ -13,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using WicsPlatform.Server.Models;
 using System.IO; // added for file logging
+using System.Text.Json.Serialization;
 
 namespace WicsPlatform.Server.Controllers
 {
@@ -111,6 +112,16 @@ namespace WicsPlatform.Server.Controllers
             return Redirect("~/Login");
         }
 
+        private ContentResult ClientRedirect(string url)
+        {
+            // Use JS-based redirect to ensure cookie is committed before navigation
+            var safeUrl = string.IsNullOrWhiteSpace(url) ? "/" : url;
+            var html = $"<!doctype html><html><head><meta http-equiv='cache-control' content='no-store' /><meta http-equiv='pragma' content='no-cache' /><meta http-equiv='expires' content='0' /><script>window.location.replace('{safeUrl.Replace("'", "%27")}');</script></head><body>Redirecting...</body></html>";
+            Response.ContentType = "text/html; charset=utf-8";
+            Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+            return Content(html, "text/html");
+        }
+
         [HttpPost]
         public async Task<IActionResult> Login([FromForm] LoginModel model)
         {
@@ -139,7 +150,7 @@ namespace WicsPlatform.Server.Controllers
 
                     logger.LogInformation("Development admin login successful");
                     WriteLoginLog($"SUCCESS user='{model.userName}' (dev admin) -> redirect='{redirectUrl}'");
-                    return Redirect(redirectUrl);
+                    return ClientRedirect(redirectUrl);
                 }
 
                 if (!string.IsNullOrEmpty(model.userName) && !string.IsNullOrEmpty(model.password))
@@ -158,7 +169,7 @@ namespace WicsPlatform.Server.Controllers
                         {
                             logger.LogInformation($"User {model.userName} logged in successfully");
                             WriteLoginLog($"SUCCESS user='{model.userName}' -> redirect='{redirectUrl}'");
-                            return Redirect(redirectUrl);
+                            return ClientRedirect(redirectUrl);
                         }
                         else
                         {
@@ -221,6 +232,18 @@ namespace WicsPlatform.Server.Controllers
         public async Task<IActionResult> Logout()
         {
             await signInManager.SignOutAsync();
+
+            // 강제 삭제(브라우저 특이 케이스 방지): 동일 이름/경로로 만료 쿠키 발급
+            try
+            {
+                Response.Cookies.Delete(".WicsPlatform.Identity", new Microsoft.AspNetCore.Http.CookieOptions
+                {
+                    Path = "/",
+                    // 도메인/스킴은 자동 일치. SameSite/Secure는 삭제 키 매칭에 영향 없음.
+                });
+            }
+            catch { }
+
             WriteLoginLog($"LOGOUT user='{User?.Identity?.Name ?? "(anonymous)"}'");
 
             return Redirect("~/");
@@ -231,6 +254,53 @@ namespace WicsPlatform.Server.Controllers
             public string userName { get; set; }
             public string password { get; set; }
             public string redirectUrl { get; set; }
+        }
+
+        public class LoginApiResponse
+        {
+            [JsonPropertyName("success")] public bool Success { get; set; }
+            [JsonPropertyName("redirectUrl")] public string RedirectUrl { get; set; }
+            [JsonPropertyName("error")] public string Error { get; set; }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> LoginApi([FromBody] LoginModel model)
+        {
+            logger.LogInformation($"POST LoginApi called with userName: {model.userName}, redirectUrl: {model.redirectUrl}");
+            WriteLoginLog($"POST /Account/LoginApi userName='{model.userName}' redirectUrl='{model.redirectUrl}'");
+
+            string redirectUrl = string.IsNullOrEmpty(model.redirectUrl) ? "/" : model.redirectUrl.StartsWith("/") ? model.redirectUrl : $"/{model.redirectUrl}";
+            try
+            {
+                if (env.IsDevelopment() && model.userName == "admin" && model.password == "admin")
+                {
+                    var claims = new List<Claim>() { new Claim(ClaimTypes.Name, "admin"), new Claim(ClaimTypes.Email, "admin") };
+                    foreach (var role in roleManager.Roles) claims.Add(new Claim(ClaimTypes.Role, role.Name));
+                    await signInManager.SignInWithClaimsAsync(new ApplicationUser { UserName = model.userName, Email = model.userName }, isPersistent: false, claims);
+                    return Ok(new LoginApiResponse { Success = true, RedirectUrl = redirectUrl });
+                }
+
+                if (!string.IsNullOrEmpty(model.userName) && !string.IsNullOrEmpty(model.password))
+                {
+                    var user = await userManager.FindByNameAsync(model.userName) ?? await userManager.FindByEmailAsync(model.userName);
+                    if (user != null)
+                    {
+                        var result = await signInManager.PasswordSignInAsync(user.UserName, model.password, false, false);
+                        if (result.Succeeded)
+                        {
+                            WriteLoginLog($"SUCCESS(api) user='{model.userName}' -> redirect='{redirectUrl}'");
+                            return Ok(new LoginApiResponse { Success = true, RedirectUrl = redirectUrl });
+                        }
+                        return BadRequest(new LoginApiResponse { Success = false, Error = "Invalid username or password" });
+                    }
+                }
+                return BadRequest(new LoginApiResponse { Success = false, Error = "Invalid username or password" });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "LoginApi error");
+                return StatusCode(500, new LoginApiResponse { Success = false, Error = ex.Message });
+            }
         }
     }
 }

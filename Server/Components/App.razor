@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="css/site.css" />
     <link rel="stylesheet" href="WicsPlatform.Client.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet @rendermode="InteractiveWebAssembly" />
+    <HeadOutlet @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
     <style>
         #loading-screen {
             position: fixed;
@@ -78,7 +78,7 @@
         </div>
     </div>
 
-    <Routes @rendermode="InteractiveWebAssembly" />
+    <Routes @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
     <script>

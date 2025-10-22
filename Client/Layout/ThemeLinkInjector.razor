@@ -41,42 +41,79 @@
 }
 
 <script>
-    window.rzThemeLink = {
-        _pickTheme: function (t) {
-            if (!t || typeof t !== 'string' || !t.trim()) {
-                // fallback to cookie if ThemeService.Theme is null at startup
-                var m = (document.cookie || '').match(/(?:^|;\s*)WicsPlatformTheme=([^;]+)/);
-                if (m && m[1]) t = decodeURIComponent(m[1]);
-            }
-            if (!t) t = 'material'; // final fallback
-            return t;
-        },
-        _ensureEl: function () {
+    (function(){
+        function setHtmlDataTheme(theme){
+            try {
+                var isDark = (theme || '').toLowerCase().indexOf('dark') !== -1;
+                document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            } catch (e) { }
+        }
+        function setCookie(name, value, days){
+            try {
+                var maxAge = (days && days > 0) ? `; max-age=${days*24*60*60}` : '';
+                document.cookie = `${name}=${encodeURIComponent(value)}; path=/; SameSite=None; Secure${maxAge}`;
+            } catch (e) { }
+        }
+        function getCookie(name){
+            try {
+                var m = (document.cookie || '').match(new RegExp('(?:^|;\\s*)' + name.replace(/[-\\.\\[\\]]/g,'\\$&') + '=([^;]+)'));
+                return m && m[1] ? decodeURIComponent(m[1]) : '';
+            } catch (e) { return ''; }
+        }
+        function getLocal(name){
+            try { return window.localStorage ? localStorage.getItem(name) || '' : ''; } catch (e) { return ''; }
+        }
+        function setLocal(name, value){
+            try { if (window.localStorage) localStorage.setItem(name, value || ''); } catch (e) { }
+        }
+        function normalizeThemeName(t){
+            var v = (t || '').trim().toLowerCase();
+            if (v === 'light') return 'material';
+            if (v === 'dark') return 'material-dark';
+            return v || '';
+        }
+        function pickTheme(pref){
+            var t = (pref && typeof pref === 'string' && pref.trim()) ? pref : '';
+            if (!t) t = getLocal('WicsPlatformTheme');
+            if (!t) t = getCookie('WicsPlatformTheme');
+            if (!t) t = 'material-dark'; // default first-run to dark
+            return normalizeThemeName(t);
+        }
+        function ensureEl(){
             var el = document.getElementById('rz-theme-dyn');
-            if (!el) {
+            if (!el){
                 el = document.createElement('link');
                 el.id = 'rz-theme-dyn';
                 el.rel = 'stylesheet';
-                // append as the LAST stylesheet in <head> so it overrides earlier static links
-                document.head.appendChild(el);
-            } else if (el.parentNode !== document.head) {
+                document.head.appendChild(el); // append last so it overrides
+            } else if (el.parentNode !== document.head){
                 document.head.appendChild(el);
             }
             return el;
-        },
-        ensure: function (theme) {
-            try {
-                var t = this._pickTheme(theme);
-                var href = '/_content/Radzen.Blazor/css/' + t + '.css';
-                var el = this._ensureEl();
-                if (el.href !== href) el.href = href;
-                return href;
-            } catch (e) {
-                console.error('[rzThemeLink.ensure] failed', e);
-            }
-        },
-        update: function (theme) {
-            return this.ensure(theme);
         }
-    };
+        function applyTheme(theme){
+            var t = pickTheme(theme);
+            var href = '/_content/Radzen.Blazor/css/' + t + '.css';
+            var el = ensureEl();
+            if (el.href !== href) el.href = href;
+            setLocal('WicsPlatformTheme', t);
+            setCookie('WicsPlatformTheme', t, 365);
+            setHtmlDataTheme(t);
+            return href;
+        }
+        window.rzThemeLink = {
+            ensure: function(theme){
+                try { return applyTheme(theme); } catch(e){ console.error('[rzThemeLink.ensure] failed', e); }
+            },
+            update: function(theme){
+                try { return applyTheme(theme); } catch(e){ console.error('[rzThemeLink.update] failed', e); }
+            }
+        };
+        // bootstrap: if DOM already loaded call now, else attach DOMContentLoaded
+        if (document.readyState === 'loading'){
+            document.addEventListener('DOMContentLoaded', function(){ try { applyTheme(); } catch(e){} });
+        } else {
+            try { applyTheme(); } catch(e){}
+        }
+    })();
 </script>

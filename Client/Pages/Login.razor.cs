@@ -87,6 +87,9 @@ namespace WicsPlatform.Client.Pages
             }
         }
 
+        private record LoginApiRequest(string userName, string password, string redirectUrl);
+        private record LoginApiResponse(bool success, string redirectUrl, string error);
+
         protected async Task HandleLogin()
         {
             try
@@ -95,13 +98,28 @@ namespace WicsPlatform.Client.Pages
                 infoVisible = false;
                 isLoading = true;
 
-                // SecurityService를 통한 로그인 대신 직접 폼 제출
-                NavigationManager.NavigateTo("Account/Login", true);
+                var body = new LoginApiRequest(loginModel.UserName, loginModel.Password, loginModel.redirectUrl);
+                var resp = await HttpClient.PostAsJsonAsync("Account/LoginApi", body);
+                var data = await resp.Content.ReadFromJsonAsync<LoginApiResponse>();
+
+                if (resp.IsSuccessStatusCode && data?.success == true)
+                {
+                    // 쿠키가 커밋되었음을 보장하기 위해 짧은 지연 후 이동
+                    await Task.Delay(50);
+                    NavigationManager.NavigateTo(string.IsNullOrWhiteSpace(data.redirectUrl) ? "/" : data.redirectUrl, forceLoad: true);
+                    return;
+                }
+
+                errorVisible = true;
+                error = data?.error ?? ($"Login failed: {resp.StatusCode}");
             }
             catch (Exception ex)
             {
                 errorVisible = true;
                 error = ex.Message;
+            }
+            finally
+            {
                 isLoading = false;
             }
         }

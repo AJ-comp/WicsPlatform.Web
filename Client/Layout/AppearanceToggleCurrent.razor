@@ -1,0 +1,63 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<button class="appearance-toggle-current" @onclick="Toggle" title="테마 전환">
+    <RadzenIcon Icon="@(_isDark ? "dark_mode" : "light_mode")" />
+</button>
+
+@code {
+    private bool _isDark;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isDark = await GetIsDarkAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task Toggle()
+    {
+        var next = _isDark ? "material" : "material-dark";
+        await JS.InvokeVoidAsync("rzThemeLink.update", next);
+        _isDark = await GetIsDarkAsync();
+        StateHasChanged();
+    }
+
+    private async Task<bool> GetIsDarkAsync()
+    {
+        try
+        {
+            // 우선 html[data-theme]
+            var dataTheme = await JS.InvokeAsync<string>("eval", "(document.documentElement.getAttribute('data-theme')||'')");
+            if (!string.IsNullOrWhiteSpace(dataTheme))
+            {
+                return dataTheme.ToLower().Contains("dark");
+            }
+        }
+        catch { }
+        // 동적 링크 href 검사
+        try
+        {
+            var href = await JS.InvokeAsync<string>("eval", "((document.getElementById('rz-theme-dyn')||{}).href||'')");
+            return (href ?? string.Empty).ToLower().Contains("dark");
+        }
+        catch { }
+        return false;
+    }
+}
+
+<style>
+.appearance-toggle-current{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:32px; height:32px;
+    border:none; background:transparent; cursor:pointer;
+    /* Always white icon regardless of theme */
+    color:#fff !important;
+}
+.appearance-toggle-current .rz-icon{ color:#fff !important; }
+.appearance-toggle-current:hover{ color:#fff !important; opacity:.9; }
+</style>

@@ -14,7 +14,7 @@
                 <!-- 로고 -->
                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                     <RadzenImage Path="images/logo.png" style="width: 32px; height: 32px;" AlternateText="WicsPlatform logo"></RadzenImage>
-                    <RadzenText Text="WicsPlatform" TextStyle="Radzen.Blazor.TextStyle.Subtitle1" class="rz-mb-0" Style="font-weight: 600;" />
+                    <RadzenText Text="WicsPlatform" TextStyle="Radzen.Blazor.TextStyle.Subtitle1" class="rz-mb-0 brand-title" Style="font-weight: 600;" />
                 </RadzenStack>
                 
                 <!-- 메뉴 -->
@@ -32,7 +32,7 @@
 
             <!-- 우측 메뉴 -->
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.5rem">
-                <RadzenAppearanceToggle />
+                <AppearanceToggleCurrent />
                 <RadzenProfileMenu style="@(Security.IsAuthenticated() ? "" : "visibility: hidden;")" Click="@ProfileMenuClick">
                     <ChildContent>
                         <RadzenProfileMenuItem Path="profile" Icon="settings" Text="Profile" />
@@ -64,20 +64,23 @@
         padding: 0.5rem 1rem;
         border-radius: var(--rz-border-radius);
         text-decoration: none;
-        color: var(--rz-text-color);
+        /* Always white on header bar */
+        color: #fff !important;
         transition: all 0.2s ease;
         font-size: 0.9rem;
         font-weight: 500;
     }
 
+    .top-menu-item .rz-icon { color: #fff !important; }
+
     .top-menu-item:hover {
-        background-color: var(--rz-base-200);
-        color: var(--rz-primary);
+        background-color: rgba(255, 255, 255, 0.10) !important;
+        color: #fff !important;
     }
 
     .top-menu-item.active {
-        background-color: var(--rz-primary-lighter);
-        color: var(--rz-primary);
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        color: #fff !important;
         font-weight: 600;
     }
 
@@ -97,10 +100,8 @@
         max-width: 100%;
     }
 
-    /* 다크 테마 지원 */
-    :root[data-theme='dark'] .top-menu-item:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-    }
+    /* 브랜드 타이틀은 항상 흰색 */
+    .brand-title{ color:#fff !important; }
 
     /* 반응형 대응 */
     @@media (max-width: 768px) {

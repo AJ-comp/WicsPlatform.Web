@@ -1,4 +1,5 @@
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider Auth
 
 @code {
     [Parameter]
@@ -12,7 +13,11 @@
             return;
         }
 
-        if (!IsAuthenticated)
+        // 새로고침/리다이렉션 직후 인증 전파 지연을 고려해 실제 상태를 한 번 더 확인
+        var state = await Auth.GetAuthenticationStateAsync();
+        var effectiveAuth = IsAuthenticated || (state?.User?.Identity?.IsAuthenticated == true);
+
+        if (!effectiveAuth)
         {
             var redirectUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
             if (!string.IsNullOrEmpty(redirectUrl))

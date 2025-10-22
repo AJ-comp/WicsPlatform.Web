@@ -168,6 +168,7 @@ builder.Services.AddCors(options =>
     });
 });
 // Identity 쿠키 명시적 구성 (경로 및 이름 등)
+var relaxCookies = builder.Configuration.GetValue<bool>("AuthCookies:RelaxForIpClients");
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login"; // 챌린지 시 이동 경로
@@ -175,16 +176,31 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Login";
     options.Cookie.Name = ".WicsPlatform.Identity";
     // HTTPS 사이트에서 브라우저 정책과 호환되도록 설정
+    // 기본(보안) 정책
     options.Cookie.SameSite = SameSiteMode.None;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    // 필요시(내부망 IP/인증서 미신뢰 테스트 환경) 완화 스위치
+    if (relaxCookies)
+    {
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.None; // allow over HTTP if needed
+    }
     options.SlidingExpiration = true;
 });
 
 // 전역 쿠키 정책 (IIS/프록시 환경에서 HTTPS 시 Secure 강제)
 builder.Services.Configure<CookiePolicyOptions>(o =>
 {
-    o.MinimumSameSitePolicy = SameSiteMode.None;
-    o.Secure = CookieSecurePolicy.Always;
+    if (relaxCookies)
+    {
+        o.MinimumSameSitePolicy = SameSiteMode.Lax;
+        o.Secure = CookieSecurePolicy.None;
+    }
+    else
+    {
+        o.MinimumSameSitePolicy = SameSiteMode.None;
+        o.Secure = CookieSecurePolicy.Always;
+    }
 });
 
 builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
@@ -207,8 +223,49 @@ else
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor,
-    // KnownProxies / KnownNetworks 설정이 필요하면 여기서 구성
 });
+
+// Debug cookie tracer (optional)
+var traceCookies = builder.Configuration.GetValue<bool>("AuthLogging:TraceCookies");
+if (traceCookies)
+{
+    var logPath = builder.Configuration["AuthLogging:LoginLogPath"];
+    if (!string.IsNullOrWhiteSpace(logPath))
+    {
+        if (!Path.IsPathRooted(logPath)) logPath = Path.Combine(builder.Environment.ContentRootPath, logPath);
+        Directory.CreateDirectory(logPath);
+    }
+    string LogFile() => Path.Combine(string.IsNullOrWhiteSpace(logPath) ? builder.Environment.ContentRootPath : logPath, $"cookie-trace-{DateTime.Now:yyyyMMdd}.log");
+
+    app.Use(async (ctx, next) =>
+    {
+        try
+        {
+            var p = ctx.Request.Path.Value ?? string.Empty;
+            if (p.StartsWith("/Account", StringComparison.OrdinalIgnoreCase) || p.StartsWith("/manage-broad-cast", StringComparison.OrdinalIgnoreCase) || p.Equals("/", StringComparison.Ordinal))
+            {
+                var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "-";
+                var ua = ctx.Request.Headers["User-Agent"].ToString();
+                var cookie = ctx.Request.Headers["Cookie"].ToString();
+                await File.AppendAllTextAsync(LogFile(), $"[{DateTime.Now:HH:mm:ss.fff}] -> PATH={p} IP={ip} COOKIE={cookie}\n");
+                ctx.Response.OnStarting(async () =>
+                {
+                    try
+                    {
+                        var setCookie = ctx.Response.Headers["Set-Cookie"].ToString();
+                        if (!string.IsNullOrEmpty(setCookie))
+                        {
+                            await File.AppendAllTextAsync(LogFile(), $"[{DateTime.Now:HH:mm:ss.fff}] <- PATH={p} SET-COOKIE={setCookie}\n");
+                        }
+                    }
+                    catch { }
+                });
+            }
+        }
+        catch { }
+        await next();
+    });
+}
 
 // app.UseHttpsRedirection();  // 주석 처리
 // 정적 파일 제공 설정 - 순서 중요!
