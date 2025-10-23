@@ -15,6 +15,7 @@ using WicsPlatform.Server.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http; // Added for CookiePolicyOptions
 using Microsoft.AspNetCore.HttpOverrides; // add forwarded headers
+using Microsoft.AspNetCore.Http.Features; // for FormOptions
 
 static void RegisterDBContext(WebApplicationBuilder builder)
 {
@@ -41,9 +42,15 @@ builder.Services.AddRadzenCookieThemeService(options =>
     options.Duration = TimeSpan.FromDays(365);
 });
 
+// Allow large multipart uploads (e.g., media files)
+builder.Services.Configure<FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = 200_000_000; // 200 MB
+});
+
 // 데이터 보호 키 저장 경로를 설정 파일에서 우선 읽고(IIS 권한 문제 대비)
 string? dataProtectionKeysPath = null;
-var configuredKeysPath = builder.Configuration["DataProtection:KeysPath"];
+var configuredKeysPath = builder.Configuration["DataProtection:KeysPath"]; // ex) "keys" -> ContentRoot/keys
 if (!string.IsNullOrWhiteSpace(configuredKeysPath))
 {
     try
@@ -208,6 +215,27 @@ builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
 });
 var app = builder.Build();
+
+// Ensure essential directories exist on startup (deploy-time creation)
+static void EnsureDir(string? path, string contentRoot)
+{
+    if (string.IsNullOrWhiteSpace(path)) return;
+    var full = Path.IsPathRooted(path) ? path : Path.Combine(contentRoot, path);
+    try { Directory.CreateDirectory(full); } catch { }
+}
+try
+{
+    // wwwroot/Uploads
+    EnsureDir(Path.Combine(app.Environment.WebRootPath, "Uploads"), app.Environment.ContentRootPath);
+    // DataProtection keys (already created above, but ensure again)
+    EnsureDir(builder.Configuration["DataProtection:KeysPath"], app.Environment.ContentRootPath);
+    // Auth logging folder
+    EnsureDir(builder.Configuration["AuthLogging:LogPath"], app.Environment.ContentRootPath);
+    // Upload diagnostics folder
+    EnsureDir(builder.Configuration["UploadLogging:LogPath"], app.Environment.ContentRootPath);
+}
+catch { }
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -229,7 +257,7 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 var traceCookies = builder.Configuration.GetValue<bool>("AuthLogging:TraceCookies");
 if (traceCookies)
 {
-    var logPath = builder.Configuration["AuthLogging:LoginLogPath"];
+    var logPath = builder.Configuration["AuthLogging:LogPath"];
     if (!string.IsNullOrWhiteSpace(logPath))
     {
         if (!Path.IsPathRooted(logPath)) logPath = Path.Combine(builder.Environment.ContentRootPath, logPath);

@@ -43,11 +43,39 @@
 
 	<ItemGroup>
 		<Folder Include="wwwroot\Uploads\" />
+		<Folder Include="keys\" />
+		<Folder Include="logs\auth\" />
+		<Folder Include="logs\upload\" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<Content Update="web.config">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+		<!-- Placeholders are optional: only copy if they exist locally -->
+		<Content Include="keys\.placeholder" Condition="Exists('keys\.placeholder')">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+		<Content Include="logs\auth\.placeholder" Condition="Exists('logs\auth\.placeholder')">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+		<Content Include="logs\upload\.placeholder" Condition="Exists('logs\upload\.placeholder')">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</Content>
 	</ItemGroup>
+
+	<!-- Create required directories in publish output even if empty -->
+	<Target Name="CreatePublishFolders" AfterTargets="CopyFilesToPublishDirectory;Publish">
+		<PropertyGroup>
+			<PublishKeysDir>$(PublishDir)keys\</PublishKeysDir>
+			<PublishLogsAuthDir>$(PublishDir)logs\auth\</PublishLogsAuthDir>
+			<PublishLogsUploadDir>$(PublishDir)logs\upload\</PublishLogsUploadDir>
+			<PublishUploadsDir>$(PublishDir)wwwroot\Uploads\</PublishUploadsDir>
+		</PropertyGroup>
+		<MakeDir Directories="$(PublishKeysDir);$(PublishLogsAuthDir);$(PublishLogsUploadDir);$(PublishUploadsDir)" />
+	</Target>
 </Project>

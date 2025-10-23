@@ -44,8 +44,8 @@ namespace WicsPlatform.Server.Controllers
             this.configuration = configuration;
             this.logger = logger;
 
-            // Read login log directory from configuration: AuthLogging:LoginLogPath
-            var cfgPath = configuration["AuthLogging:LoginLogPath"];
+            // Read login log directory from configuration: AuthLogging:LogPath
+            var cfgPath = configuration["AuthLogging:LogPath"];
             if (!string.IsNullOrWhiteSpace(cfgPath))
             {
                 try
