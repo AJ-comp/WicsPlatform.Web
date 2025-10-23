@@ -222,8 +222,8 @@ public partial class BroadcastsController : ODataController
                 return BadRequest(new { message = $"Broadcast {broadcastId} is already finalized." });
             }
 
-            // 방송 종료 실행
-            await scheduleExecutionService.FinalizeBroadcastAsync(broadcastId, broadcast.ChannelId);
+            // 방송 종료 실행: channelId만 전달하면 서비스가 내부에서 broadcastId를 조회하여 정리
+            await scheduleExecutionService.FinalizeBroadcastAsync(broadcast.ChannelId);
 
             return Ok(new 
             { 

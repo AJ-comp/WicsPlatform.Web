@@ -64,8 +64,7 @@ public class ScheduleExecutionService : IScheduleExecutionService
         {
             if (await ChannelHasOngoingAsync(db, ch.Id))
             {
-                _logger.LogInformation("[ScheduleExecution] Channel {ChannelId} already has an ongoing broadcast. Skipping.", ch.Id);
-                continue;
+                await FinalizeBroadcastAsync(ch.Id);
             }
 
             var prepared = await PrepareForChannelAsync(scope, ch.Id);
@@ -88,7 +87,7 @@ public class ScheduleExecutionService : IScheduleExecutionService
             }
             finally
             {
-                await FinalizeBroadcastAsync(broadcastId, ch.Id);
+                await FinalizeBroadcastAsync(ch.Id);
             }
         }
     }
@@ -189,53 +188,62 @@ public class ScheduleExecutionService : IScheduleExecutionService
         _logger.LogInformation("[ScheduleExecution] Waiting for playback completion for broadcast {BroadcastId}", broadcastId);
     }
 
-    public async Task FinalizeBroadcastAsync(ulong broadcastId, ulong channelId)
+    public async Task FinalizeBroadcastAsync(ulong channelId)
     {
         using var scope = _scopeFactory.CreateScope();
-        
+        var db = scope.ServiceProvider.GetRequiredService<wicsContext>();
+
+        // Find ongoing broadcast for the channel
+        var broadcast = await db.Broadcasts
+            .Where(x => x.ChannelId == channelId && x.OngoingYn == "Y")
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (broadcast == null)
+        {
+            _logger.LogWarning("[ScheduleExecution] No ongoing broadcast found for channel {ChannelId}. Nothing to finalize.", channelId);
+            return;
+        }
+
+        var broadcastId = broadcast.Id;
+
         _logger.LogInformation("[ScheduleExecution] Starting finalization for broadcast {BroadcastId}", broadcastId);
 
         // 1. 재생 중인 콘텐츠 중지
-        try 
-        { 
-            await _mediaService.StopMediaByBroadcastIdAsync(broadcastId); 
+        try
+        {
+            await _mediaService.StopMediaByBroadcastIdAsync(broadcastId);
             _logger.LogInformation("[ScheduleExecution] Media stopped for broadcast {BroadcastId}", broadcastId);
-        } 
-        catch (Exception ex) 
-        { 
-            _logger.LogError(ex, "[ScheduleExecution] Failed to stop media for broadcast {BroadcastId}", broadcastId); 
         }
-        
-        try 
-        { 
-            await _ttsService.StopTtsByBroadcastIdAsync(broadcastId); 
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ScheduleExecution] Failed to stop media for broadcast {BroadcastId}", broadcastId);
+        }
+
+        try
+        {
+            await _ttsService.StopTtsByBroadcastIdAsync(broadcastId);
             _logger.LogInformation("[ScheduleExecution] TTS stopped for broadcast {BroadcastId}", broadcastId);
-        } 
-        catch (Exception ex) 
-        { 
-            _logger.LogError(ex, "[ScheduleExecution] Failed to stop TTS for broadcast {BroadcastId}", broadcastId); 
         }
-        
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ScheduleExecution] Failed to stop TTS for broadcast {BroadcastId}", broadcastId);
+        }
+
         // 2. 오디오 믹서 중지 (UDP 전송도 자동으로 중지됨)
         await _mixer.StopMixer(broadcastId);
         _logger.LogInformation("[ScheduleExecution] Mixer stopped for broadcast {BroadcastId}", broadcastId);
 
         // 3. 데이터베이스 상태 업데이트
-        var db = scope.ServiceProvider.GetRequiredService<wicsContext>();
-        
-        var b = await db.Broadcasts.FirstOrDefaultAsync(x => x.Id == broadcastId);
-        if (b != null) 
-        { 
-            b.OngoingYn = "N"; 
-            b.UpdatedAt = DateTime.UtcNow; 
-            _logger.LogInformation("[ScheduleExecution] Broadcast {BroadcastId} marked as not ongoing", broadcastId);
-        }
+        broadcast.OngoingYn = "N";
+        broadcast.UpdatedAt = DateTime.UtcNow;
+        _logger.LogInformation("[ScheduleExecution] Broadcast {BroadcastId} marked as not ongoing", broadcastId);
 
         var ch = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId);
-        if (ch != null) 
-        { 
-            ch.State = 0; 
-            ch.UpdatedAt = DateTime.UtcNow; 
+        if (ch != null)
+        {
+            ch.State = 0;
+            ch.UpdatedAt = DateTime.UtcNow;
             _logger.LogInformation("[ScheduleExecution] Channel {ChannelId} state set to 0 (inactive)", channelId);
         }
 
@@ -246,13 +254,13 @@ public class ScheduleExecutionService : IScheduleExecutionService
         if (removeOwnerships.Count > 0)
         {
             db.SpeakerOwnershipStates.RemoveRange(removeOwnerships);
-            _logger.LogInformation("[ScheduleExecution] Deleted {Count} speaker ownership record(s) for channel {ChannelId}", 
+            _logger.LogInformation("[ScheduleExecution] Deleted {Count} speaker ownership record(s) for channel {ChannelId}",
                 removeOwnerships.Count, channelId);
         }
 
         await db.SaveChangesAsync();
-        
-        _logger.LogInformation("[ScheduleExecution] Broadcast {BroadcastId} finalized successfully for channel {ChannelId}", 
+
+        _logger.LogInformation("[ScheduleExecution] Broadcast {BroadcastId} finalized successfully for channel {ChannelId}",
             broadcastId, channelId);
     }
 }
