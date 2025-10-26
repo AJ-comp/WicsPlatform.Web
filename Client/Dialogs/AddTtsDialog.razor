@@ -1,4 +1,4 @@
-@attribute [Authorize]
+﻿@attribute [Authorize]
 
 <div class="tts-dialog">
     <!-- 헤더 섹션 -->
@@ -106,41 +106,41 @@
                 </ul>
             </div>
         </RadzenStack>
-    </RadzenTemplateForm>
 
-    <!-- 푸터 섹션 -->
-    <div class="dialog-footer">
-        <div class="footer-hint">
-            <RadzenIcon Icon="mic" />
-            <span>입력한 텍스트가 음성으로 변환됩니다</span>
+        <!-- 푸터 섹션 - Form 안으로 이동 -->
+        <div class="dialog-footer">
+            <div class="footer-hint">
+                <RadzenIcon Icon="mic" />
+                <span>입력한 텍스트가 음성으로 변환됩니다</span>
+            </div>
+            <div class="footer-actions">
+                <RadzenButton ButtonStyle="ButtonStyle.Light"
+                              Text="취소"
+                              Click="@CancelClick"
+                              Variant="Variant.Outlined"
+                              Disabled="@isProcessing"
+                              class="btn-cancel" />
+                @if (isProcessing)
+                {
+                    <RadzenButton ButtonType="ButtonType.Submit"
+                                  ButtonStyle="ButtonStyle.Primary"
+                                  Text="생성 중..."
+                                  Icon="sync"
+                                  IsBusy="true"
+                                  Disabled="true"
+                                  class="btn-submit" />
+                }
+                else
+                {
+                    <RadzenButton ButtonType="ButtonType.Submit"
+                                  ButtonStyle="ButtonStyle.Primary"
+                                  Icon="add_circle"
+                                  Text="생성"
+                                  class="btn-submit" />
+                }
+            </div>
         </div>
-        <div class="footer-actions">
-            <RadzenButton ButtonStyle="ButtonStyle.Light"
-                          Text="취소"
-                          Click="@CancelClick"
-                          Variant="Variant.Outlined"
-                          Disabled="@isProcessing"
-                          class="btn-cancel" />
-            @if (isProcessing)
-            {
-                <RadzenButton ButtonType="ButtonType.Submit"
-                              ButtonStyle="ButtonStyle.Primary"
-                              Text="생성 중..."
-                              Icon="sync"
-                              IsBusy="true"
-                              Disabled="true"
-                              class="btn-submit" />
-            }
-            else
-            {
-                <RadzenButton ButtonType="ButtonType.Submit"
-                              ButtonStyle="ButtonStyle.Primary"
-                              Icon="add_circle"
-                              Text="생성"
-                              class="btn-submit" />
-            }
-        </div>
-    </div>
+    </RadzenTemplateForm>
     
     </div>
 </div>

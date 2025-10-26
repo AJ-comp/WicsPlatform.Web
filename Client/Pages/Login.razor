@@ -18,7 +18,7 @@
 
         <!-- 로그인 폼 -->
         <div class="login-body">
-            <form>
+            <form @onsubmit="HandleLogin" @onsubmit:preventDefault="true">
                 @if (errorVisible)
                 {
                     <div class="elegant-alert error">
@@ -74,7 +74,7 @@
                     <input type="hidden" name="redirectUrl" value="@loginModel.redirectUrl" />
 
                     <div class="button-group">
-                        <button type="button" class="elegant-button primary" @onclick="HandleLogin">
+                        <button type="submit" class="elegant-button primary">
                             <span class="button-text">로그인</span>
                             <RadzenIcon Icon="arrow_forward" class="button-icon" />
                         </button>

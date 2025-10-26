@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Radzen;
 using System.Diagnostics;
@@ -516,25 +516,10 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
                 Debug.WriteLine($"[방송시작] ===== 1단계: DB 저장 작업 =====");
                 _logger.LogInformation("1단계: DB 저장 작업");
                 
-                Debug.WriteLine($"[방송시작] 1-1. 스피커/그룹 선택사항 DB 저장 중...");
-                LoggingService.AddLog("INFO", "스피커/그룹 선택사항 DB 저장");
-                await SaveSelectedSpeakersToChannel();
-                Debug.WriteLine($"[방송시작] ✓ 1-1. 스피커/그룹 DB 저장 완료");
+                // 모든 채널 설정을 한 번에 저장
+                await SaveAllChannelSettings();
                 
-                Debug.WriteLine($"[방송시작] 1-2. 플레이리스트 선택사항 DB 저장 중...");
-                LoggingService.AddLog("INFO", "플레이리스트 선택사항 DB 저장");
-                await SaveSelectedPlaylistsToChannel();
-                Debug.WriteLine($"[방송시작] ✓ 1-2. 플레이리스트 DB 저장 완료");
-                
-                Debug.WriteLine($"[방송시작] 1-3. 미디어 선택사항 DB 저장 중...");
-                LoggingService.AddLog("INFO", "미디어 선택사항 DB 저장");
-                await SaveSelectedMediaToChannel();
-                Debug.WriteLine($"[방송시작] ✓ 1-3. 미디어 DB 저장 완료");
-
-                Debug.WriteLine($"[방송시작] 1-4. TTS 선택사항 DB 저장 중...");
-                LoggingService.AddLog("INFO", "TTS 선택사항 DB 저장");
-                await SaveSelectedTtsToChannel();
-                Debug.WriteLine($"[방송시작] ✓ 1-4. TTS DB 저장 완료");
+                Debug.WriteLine($"[방송시작] ✓ 1단계: 모든 설정 DB 저장 완료");
             }
             else
             {
@@ -1027,6 +1012,17 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
             await CleanupMicrophone();
 
             _currentLoopbackSetting = false;
+
+            // 스피커 그룹 관리 섹션으로 돌아갈 때 채널 매핑 복원
+            await InvokeAsync(StateHasChanged);
+            await Task.Yield(); // UI 렌더링 완료 대기
+            
+            if (speakerSection != null && selectedChannel != null)
+            {
+                _logger.LogInformation("방송 종료 후 스피커/그룹 매핑 복원 시작");
+                await speakerSection.LoadChannelMappings();
+                _logger.LogInformation("스피커/그룹 매핑 복원 완료");
+            }
 
             await InvokeAsync(StateHasChanged);
 

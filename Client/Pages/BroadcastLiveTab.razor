@@ -1,4 +1,4 @@
-@using WicsPlatform.Client.Pages.SubPages
+﻿@using WicsPlatform.Client.Pages.SubPages
 
 @* 방송 복구 중 오버레이 *@
 @if (_isRecoveringBroadcast)
@@ -46,6 +46,14 @@
                                       Variant="Variant.Flat"
                                       Click="@OpenCreateChannelDialog"
                                       Title="채널 생성" />
+
+                        <RadzenButton Icon="save"
+                                      ButtonStyle="ButtonStyle.Success"
+                                      Size="ButtonSize.ExtraSmall"
+                                      Variant="Variant.Flat"
+                                      Click="@SaveChannelSettings"
+                                      Title="현재 설정 저장"
+                                      Disabled="@(selectedChannel == null || isBroadcasting)" />
 
                         <RadzenButton Icon="@(!isBroadcasting ? "play_circle" : "graphic_eq")"
                                       ButtonStyle="@(!isBroadcasting ? ButtonStyle.Success : ButtonStyle.Warning)"
@@ -298,10 +306,13 @@
                                                 @ref="monitoringSection" />
                 }
 
-                <!-- 스피커 그룹 관리 패널 -->
-                <BroadcastSpeakerSection Channel="@selectedChannel"
-                                         @bind-IsCollapsed="@speakerGroupPanelCollapsed"
-                                         @ref="speakerSection" />
+                <!-- 스피커 그룹 관리 패널 (방송 중이 아닐 때만 표시) -->
+                @if (!isBroadcasting)
+                {
+                    <BroadcastSpeakerSection Channel="@selectedChannel"
+                                             @bind-IsCollapsed="@speakerGroupPanelCollapsed"
+                                             @ref="speakerSection" />
+                }
 
                 <!-- TTS 설정 및 플레이리스트 가로 배치 -->
                 <RadzenRow Gap="0.75rem">

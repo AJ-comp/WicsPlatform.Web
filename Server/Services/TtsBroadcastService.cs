@@ -24,6 +24,7 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
         public int CurrentIndex { get; set; }
         public int CurrentStream { get; set; }
         public bool IsPlaying { get; set; }
+        public System.Threading.Timer CheckTimer { get; set; } // 재생 완료 체크 타이머
     }
 
     public TtsBroadcastService(
@@ -41,8 +42,6 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
         {
             Directory.CreateDirectory(_ttsFilePath);
         }
-
-        // InitializeBass(); // BASS 제거
 
         // 애플리케이션 종료 시 임시 파일 정리
         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
@@ -106,7 +105,14 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
             // 5. 첫 번째 파일 재생 시작
             await PlayNextFile(broadcastId);
 
-            // 6. 결과 반환
+            // 6. 재생 완료 체크 타이머 시작 (500ms 간격)
+            session.CheckTimer = new System.Threading.Timer(
+                async _ => await CheckPlaybackStatus(broadcastId),
+                null,
+                TimeSpan.FromMilliseconds(500),
+                TimeSpan.FromMilliseconds(500));
+
+            // 7. 결과 반환
             var result = new TtsPlaybackResult
             {
                 SessionId = Guid.NewGuid().ToString(),
@@ -134,6 +140,34 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
                 Success = false,
                 Message = ex.Message
             };
+        }
+    }
+
+    private async Task CheckPlaybackStatus(ulong broadcastId)
+    {
+        try
+        {
+            if (!_sessions.TryGetValue(broadcastId, out var session) || !session.IsPlaying)
+                return;
+
+            // AudioMixingService에서 TTS 재생 상태 확인
+            bool hasTts = audioMixingService.HasActiveTtsStream(broadcastId);
+
+            if (!hasTts)
+            {
+                // TTS 재생이 모두 완료됨
+                logger.LogInformation($"All TTS playback completed for broadcast {broadcastId}");
+                
+                // 세션 정리
+                await StopTtsByBroadcastIdAsync(broadcastId);
+                
+                // 재생 완료 이벤트 발생
+                OnPlaybackCompleted?.Invoke(broadcastId);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, $"Error checking TTS playback status for broadcast {broadcastId}");
         }
     }
 
@@ -184,10 +218,8 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
 
         if (session.CurrentIndex >= session.GeneratedFiles.Count)
         {
-            // 플레이리스트 종료 - 모든 임시 파일 정리
+            // 플레이리스트 종료 - 타이머가 자동으로 감지하여 정리함
             logger.LogInformation($"TTS playlist completed for broadcast {broadcastId}");
-            await StopTtsByBroadcastIdAsync(broadcastId);
-            OnPlaybackCompleted?.Invoke(broadcastId);
             return;
         }
 
@@ -208,7 +240,6 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
         if (ttsStreamId == 0)
         {
             logger.LogError($"Failed to add TTS to mixer");
-            // Bass.StreamFree(stream); // BASS 제거
             session.CurrentIndex++;
             await PlayNextFile(broadcastId);
             return;
@@ -234,6 +265,9 @@ public class TtsBroadcastService : ITtsBroadcastService, IDisposable
             if (_sessions.TryRemove(broadcastId, out var session))
             {
                 session.IsPlaying = false;
+
+                // 타이머 정지
+                session.CheckTimer?.Dispose();
 
                 // 모든 임시 파일 삭제
                 DeleteAllTempFiles(session);

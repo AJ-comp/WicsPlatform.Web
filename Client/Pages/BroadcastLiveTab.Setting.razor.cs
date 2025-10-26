@@ -1,4 +1,4 @@
-using Radzen;
+﻿using Radzen;
 using System.Net.Http.Json;
 using WicsPlatform.Client.Dialogs;
 
@@ -121,6 +121,53 @@ public partial class BroadcastLiveTab
             }
 
             NotifyInfo("볼륨 설정", "볼륨 설정이 업데이트되었습니다.");
+        }
+    }
+    #endregion
+
+    #region Save Channel Settings
+    /// <summary>
+    /// 현재 채널의 모든 설정을 저장합니다.
+    /// </summary>
+    protected async Task SaveChannelSettings()
+    {
+        if (selectedChannel == null)
+        {
+            NotifyWarn("채널 선택", "먼저 채널을 선택하세요.");
+            return;
+        }
+
+        if (isBroadcasting)
+        {
+            NotifyWarn("방송 중", "방송 중에는 설정을 저장할 수 없습니다. 방송 시작 시 자동으로 저장됩니다.");
+            return;
+        }
+
+        try
+        {
+            _logger.LogInformation($"수동 저장 시작: 채널 {selectedChannel.Id}");
+            
+            // 저장 중 알림
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Info,
+                Summary = "저장 중",
+                Detail = "채널 설정을 저장하는 중입니다...",
+                Duration = 2000
+            });
+
+            // 모든 설정 저장
+            await SaveAllChannelSettings();
+
+            _logger.LogInformation($"수동 저장 완료: 채널 {selectedChannel.Id}");
+            
+            NotifySuccess("저장 완료", 
+                $"'{selectedChannel.Name}' 채널의 모든 설정이 저장되었습니다.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "수동 저장 실패");
+            NotifyError("저장 실패", ex);
         }
     }
     #endregion
@@ -530,6 +577,41 @@ public partial class BroadcastLiveTab
         {
             LoggingService.AddLog("ERROR", $"TTS 매핑 실패: {ex.Message}");
             _logger.LogError(ex, "Failed to save selected TTS to channel");
+        }
+    }
+
+    /// <summary>
+    /// 채널의 모든 설정(스피커/그룹, 플레이리스트, 미디어, TTS)을 DB에 저장합니다.
+    /// </summary>
+    private async Task SaveAllChannelSettings()
+    {
+        if (selectedChannel == null)
+        {
+            _logger.LogWarning("SaveAllChannelSettings: selectedChannel is null");
+            return;
+        }
+
+        try
+        {
+            _logger.LogInformation($"채널 {selectedChannel.Id}의 모든 설정 저장 시작");
+            LoggingService.AddLog("INFO", $"채널 {selectedChannel.Name}의 설정 저장 시작");
+
+            // 병렬로 저장 (서로 독립적이므로)
+            await Task.WhenAll(
+                SaveSelectedSpeakersToChannel(),
+                SaveSelectedPlaylistsToChannel(),
+                SaveSelectedMediaToChannel(),
+                SaveSelectedTtsToChannel()
+            );
+
+            _logger.LogInformation($"채널 {selectedChannel.Id}의 모든 설정 저장 완료");
+            LoggingService.AddLog("SUCCESS", $"채널 {selectedChannel.Name}의 모든 설정 저장 완료");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SaveAllChannelSettings failed");
+            LoggingService.AddLog("ERROR", $"설정 저장 중 오류: {ex.Message}");
+            throw;
         }
     }
 }
