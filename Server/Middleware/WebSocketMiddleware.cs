@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
@@ -13,10 +13,10 @@ public partial class WebSocketMiddleware
     private readonly RequestDelegate next;
     private readonly ILogger<WebSocketMiddleware> logger;
     private readonly IServiceScopeFactory serviceScopeFactory;
-    private readonly IUdpBroadcastService udpService;
     private readonly IMediaBroadcastService mediaBroadcastService;
     private readonly ITtsBroadcastService ttsBroadcastService;
     private readonly IAudioMixingService audioMixingService;
+    private readonly IBroadcastManagementService broadcastMgmt;  // ✅ 추가
     private static readonly ConcurrentDictionary<ulong, BroadcastSession> _broadcastSessions = new();
 
     private readonly ushort MaxBuffer = 10000; // 최대 패킷 크기
@@ -25,18 +25,18 @@ public partial class WebSocketMiddleware
         RequestDelegate next,
         ILogger<WebSocketMiddleware> logger,
         IServiceScopeFactory serviceScopeFactory,
-        IUdpBroadcastService udpService,
         IMediaBroadcastService mediaBroadcastService,
         ITtsBroadcastService ttsBroadcastService,
-        IAudioMixingService audioMixingService)
+        IAudioMixingService audioMixingService,
+        IBroadcastManagementService broadcastMgmt)  // ✅ 추가
     {
         this.next = next;
         this.logger = logger;
         this.serviceScopeFactory = serviceScopeFactory;
-        this.udpService = udpService;
         this.mediaBroadcastService = mediaBroadcastService;
         this.ttsBroadcastService = ttsBroadcastService;
         this.audioMixingService = audioMixingService;
+        this.broadcastMgmt = broadcastMgmt;  // ✅ 추가
 
         mediaBroadcastService.OnPlaybackCompleted += OnPlaybackCompleted;
         ttsBroadcastService.OnPlaybackCompleted += OnPlaybackCompleted;

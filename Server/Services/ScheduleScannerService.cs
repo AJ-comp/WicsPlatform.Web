@@ -45,13 +45,13 @@ public class ScheduleScannerService : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<wicsContext>();
 
         // current time in UTC (DB values are UTC)
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;  // 날짜가 다를경우 날짜 때문에 요일이 안맞는 문제 때문에 로컬 시간 사용
         var startOfTodayUtc = now.Date; // UTC midnight
 
         // Find schedules that are not deleted and match today's weekday flag and time equal to current minute
         var candidates = await db.Schedules
             .Where(s => s.DeleteYn == "N")
-            .Where(s => s.StartTime.Hour == now.Hour && s.StartTime.Minute == now.Minute)
+            .Where(s => (s.StartTime.Hour + 9) % 24 == now.Hour && s.StartTime.Minute == now.Minute)
             .Where(s =>
                 (now.DayOfWeek == DayOfWeek.Monday && s.Monday == "Y") ||
                 (now.DayOfWeek == DayOfWeek.Tuesday && s.Tuesday == "Y") ||

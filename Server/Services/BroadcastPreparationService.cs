@@ -9,11 +9,16 @@ public class BroadcastPreparationService : IBroadcastPreparationService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BroadcastPreparationService> _logger;
+    private readonly SpeakerOwnershipBroker _ownershipBroker;
 
-    public BroadcastPreparationService(IServiceScopeFactory scopeFactory, ILogger<BroadcastPreparationService> logger)
+    public BroadcastPreparationService(
+        IServiceScopeFactory scopeFactory, 
+        ILogger<BroadcastPreparationService> logger,
+        SpeakerOwnershipBroker ownershipBroker)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _ownershipBroker = ownershipBroker;
     }
 
     public async Task<PreparedBroadcast> PrepareAsync(ulong channelId, IEnumerable<ulong>? selectedGroupIds = null, CancellationToken ct = default)
@@ -135,6 +140,11 @@ public class BroadcastPreparationService : IBroadcastPreparationService
             {
                 await GrantOwnershipAsync(db, sp.Id, channel.Id, ct);
                 sp.Active = true;
+                
+                // ✅ 이벤트 발행: 새로운 소유권 획득
+                await _ownershipBroker.PublishAsync(new SpeakerOwnershipChangedEvent(
+                    channel.Id, sp.Id, IsActive: true, DateTime.UtcNow), ct);
+                
                 continue;
             }
 
@@ -155,6 +165,11 @@ public class BroadcastPreparationService : IBroadcastPreparationService
 
                 await GrantOwnershipAsync(db, sp.Id, channel.Id, ct);
                 sp.Active = true;
+                
+                // ✅ 이벤트 발행: 좀비 채널에서 해제 후 새 채널 획득
+                await _ownershipBroker.PublishAsync(new SpeakerOwnershipChangedEvent(
+                    channel.Id, sp.Id, IsActive: true, DateTime.UtcNow), ct);
+                
                 continue;
             }
 
@@ -166,9 +181,17 @@ public class BroadcastPreparationService : IBroadcastPreparationService
                 db.SpeakerOwnershipStates.Update(current);
                 await db.SaveChangesAsync(ct);
 
+                // ✅ 이벤트 발행: 이전 채널에서 비활성화
+                await _ownershipBroker.PublishAsync(new SpeakerOwnershipChangedEvent(
+                    otherChannel.Id, sp.Id, IsActive: false, DateTime.UtcNow), ct);
+
                 await GrantOwnershipAsync(db, sp.Id, channel.Id, ct);
                 takeovers.Add(new TakeoverInfo(sp.Id, otherChannel.Id));
                 sp.Active = true;
+
+                // ✅ 이벤트 발행: 새 채널에서 활성화
+                await _ownershipBroker.PublishAsync(new SpeakerOwnershipChangedEvent(
+                    channel.Id, sp.Id, IsActive: true, DateTime.UtcNow), ct);
             }
             else
             {
@@ -179,17 +202,45 @@ public class BroadcastPreparationService : IBroadcastPreparationService
         return takeovers;
     }
 
+    /// <summary>
+    /// 스피커 소유권 부여 (이미 존재하면 업데이트)
+    /// </summary>
     private static async Task GrantOwnershipAsync(wicsContext db, ulong speakerId, ulong channelId, CancellationToken ct)
     {
-        await db.SpeakerOwnershipStates.AddAsync(new SpeakerOwnershipState
+        try
         {
-            SpeakerId = speakerId,
-            ChannelId = channelId,
-            Ownership = "Y",
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        }, ct);
-        await db.SaveChangesAsync(ct);
+            // 기존 레코드 조회 (복합 키: SpeakerId, ChannelId)
+            var existing = await db.SpeakerOwnershipStates
+                .FirstOrDefaultAsync(o => o.SpeakerId == speakerId && o.ChannelId == channelId, ct);
+
+            if (existing != null)
+            {
+                // 이미 존재 - 업데이트
+                existing.Ownership = "Y";
+                existing.UpdatedAt = DateTime.UtcNow;
+                db.SpeakerOwnershipStates.Update(existing);
+            }
+            else
+            {
+                // 없음 - 새로 추가
+                await db.SpeakerOwnershipStates.AddAsync(new SpeakerOwnershipState
+                {
+                    SpeakerId = speakerId,
+                    ChannelId = channelId,
+                    Ownership = "Y",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }, ct);
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // 로그 추가 (디버깅용)
+            throw new InvalidOperationException(
+                $"Failed to grant ownership: SpeakerId={speakerId}, ChannelId={channelId}", ex);
+        }
     }
 
     // -------- Media / TTS Loading --------

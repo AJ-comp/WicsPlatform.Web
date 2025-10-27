@@ -48,6 +48,13 @@ public class AudioMixingService : IAudioMixingService, IDisposable
     private readonly IUdpBroadcastService udpService;
     private readonly IServiceScopeFactory scopeFactory;
     private readonly ConcurrentDictionary<ulong, MixerSession> _sessions = new();
+    
+    // ✅ 스피커 소유권 브로커 추가
+    private readonly SpeakerOwnershipBroker _ownershipBroker;
+    private readonly CancellationTokenSource _disposeCts = new();
+    
+    // ✅ 스피커 리스트 접근 Lock
+    private readonly object _speakerListLock = new();
 
     private class MainMixerConfig { public int SampleRate { get; set; } public int Channels { get; set; } public int TimesliceMs { get; set; } public int SamplesPerSlice() => (SampleRate * TimesliceMs) / 1000; }
 
@@ -109,8 +116,20 @@ public class AudioMixingService : IAudioMixingService, IDisposable
     private const int FIXED_TIMESLICE_MS = 60; // 요청 주기
     private const int MIC_PREFILL_MS = 100;    // 마이크 프리필
 
-    public AudioMixingService(ILogger<AudioMixingService> logger, IUdpBroadcastService udpService, IServiceScopeFactory scopeFactory)
-    { this.logger = logger; this.udpService = udpService; this.scopeFactory = scopeFactory; }
+    public AudioMixingService(
+        ILogger<AudioMixingService> logger, 
+        IUdpBroadcastService udpService, 
+        IServiceScopeFactory scopeFactory,
+        SpeakerOwnershipBroker ownershipBroker)
+    { 
+        this.logger = logger; 
+        this.udpService = udpService; 
+        this.scopeFactory = scopeFactory;
+        _ownershipBroker = ownershipBroker;
+        
+        // ✅ 백그라운드 워커 시작
+        _ = Task.Run(ProcessOwnershipChangesAsync);
+    }
 
     // 초기화
     public async Task<bool> InitializeMixer(ulong broadcastId, ulong channelId, List<SpeakerInfo> speakers)
@@ -455,7 +474,16 @@ public class AudioMixingService : IAudioMixingService, IDisposable
                 pcm16[2 * i + 1] = (byte)((i16 >> 8) & 0xFF);
             }
             var opus = s.OpusCodec.Encode(pcm16);
-            await udpService.SendAudioToSpeakers(s.Speakers.Where(sp => sp.Active), opus);
+            
+            // ✅ UDP 전송 전에 활성화된 스피커만 필터링 (Lock 사용)
+            IEnumerable<SpeakerInfo> activeSpeakers;
+            lock (_speakerListLock)
+            {
+                activeSpeakers = s.Speakers.Where(sp => sp.Active).ToList();
+            }
+            
+            // ✅ Lock 밖에서 UDP 전송
+            await udpService.SendAudioToSpeakers(activeSpeakers, opus);
         }
         catch (Exception ex) { logger.LogError(ex, $"ProcessMixedOutput error for {broadcastId}"); }
     }
@@ -513,8 +541,65 @@ public class AudioMixingService : IAudioMixingService, IDisposable
 
     public void Dispose()
     {
-        var tasks = _sessions.Keys.Select(id => StopMixer(id)).ToArray();
-        Task.WaitAll(tasks); _sessions.Clear();
+        // ✅ 소유권 이벤트 워커 중지
+        _disposeCts.Cancel();
+        _disposeCts.Dispose();
+        
+        var tasks = _sessions.Keys.Select(id => StopMixer(id)). ToArray();
+        Task.WaitAll(tasks); 
+        _sessions.Clear();
+    }
+
+    // ✅ 소유권 변경 이벤트 처리 워커
+    private async Task ProcessOwnershipChangesAsync()
+    {
+        try
+        {
+            logger.LogInformation("[AudioMixer] Speaker ownership change processor started");
+            
+            await foreach (var evt in _ownershipBroker.Reader.ReadAllAsync(_disposeCts.Token))
+            {
+                HandleOwnershipChange(evt);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogInformation("[AudioMixer] Ownership change processor stopped");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AudioMixer] Error in ownership change processor");
+        }
+    }
+
+    // ✅ 소유권 변경 처리 (메모리 동기화)
+    private void HandleOwnershipChange(SpeakerOwnershipChangedEvent evt)
+    {
+        var affectedSessions = _sessions
+            .Where(s => s.Value.ChannelId == evt.ChannelId)
+            .ToList();
+
+        if (affectedSessions.Count == 0)
+        {
+            logger.LogDebug("[Ownership] No active sessions for channel {ChannelId}", evt.ChannelId);
+            return;
+        }
+
+        foreach (var (broadcastId, session) in affectedSessions)
+        {
+            lock (_speakerListLock)
+            {
+                var speaker = session.Speakers.FirstOrDefault(s => s.Id == evt.SpeakerId);
+                if (speaker != null && speaker.Active != evt.IsActive)
+                {
+                    speaker.Active = evt.IsActive;
+                    
+                    logger.LogInformation(
+                        "[Ownership] Speaker {SpeakerId} ({Name}) {Status} for broadcast {BroadcastId}",
+                        speaker.Id, speaker.Name, evt.IsActive ? "activated" : "deactivated", broadcastId);
+                }
+            }
+        }
     }
 
     private static ISampleProvider EnsureSampleRate(ISampleProvider sp, int targetRate) =>

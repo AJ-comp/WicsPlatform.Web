@@ -13,24 +13,21 @@ public class ScheduleExecutionService : IScheduleExecutionService
     private readonly ILogger<ScheduleExecutionService> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IAudioMixingService _mixer;
-    private readonly IMediaBroadcastService _mediaService;
-    private readonly ITtsBroadcastService _ttsService;
     private readonly IBroadcastPreparationService prepService;
+    private readonly IBroadcastManagementService _broadcastMgmt;
 
     public ScheduleExecutionService(
         ILogger<ScheduleExecutionService> logger,
         IServiceScopeFactory scopeFactory,
         IAudioMixingService mixer,
-        IMediaBroadcastService mediaService,
-        ITtsBroadcastService ttsService,
-        IBroadcastPreparationService prepService)
+        IBroadcastPreparationService prepService,
+        IBroadcastManagementService broadcastMgmt)
     {
         _logger = logger;
         _scopeFactory = scopeFactory;
         _mixer = mixer;
-        _mediaService = mediaService;
-        _ttsService = ttsService;
         this.prepService = prepService;
+        _broadcastMgmt = broadcastMgmt;
         _queue = System.Threading.Channels.Channel.CreateUnbounded<ulong>();
         _ = Task.Run(WorkerLoop);
     }
@@ -96,7 +93,7 @@ public class ScheduleExecutionService : IScheduleExecutionService
         => db.Channels.AsNoTracking().Where(c => c.ScheduleId == scheduleId && c.DeleteYn != "Y").ToListAsync();
 
     private static Task<bool> ChannelHasOngoingAsync(wicsContext db, ulong channelId)
-        => db.Broadcasts.AsNoTracking().AnyAsync(b => b.ChannelId == channelId && b.OngoingYn == "Y");
+        => db.Channels.AsNoTracking().AnyAsync(b => b.Id == channelId && b.State == 1);
 
     private async Task<PreparedChannelResources> PrepareForChannelAsync(IServiceScope scope, ulong channelId)
     {
@@ -151,116 +148,34 @@ public class ScheduleExecutionService : IScheduleExecutionService
         await _mixer.SetVolume(broadcastId, AudioSource.TTS, channelEntity?.TtsVolume ?? 1f);
 
         _logger.LogInformation("[ScheduleExecution] Starting ordered playlist for broadcast {BroadcastId} (items={Count})", broadcastId, prepared.OrderedPlaylist.Count);
+        
         foreach (var entry in prepared.OrderedPlaylist)
         {
             try
             {
                 if (entry.IsMedia)
                 {
-                    var jsonMedia = JsonSerializer.SerializeToElement(new { broadcastId, mediaIds = new List<ulong> { entry.Id } });
-                    _ = await _mediaService.HandlePlayRequestAsync(broadcastId, jsonMedia, prepared.Media.Where(m => m.Id == entry.Id).ToList(), new List<SpeakerInfo>(), channelId);
-                    _logger.LogInformation("[ScheduleExecution] Playing media {MediaId} in ordered playlist (broadcast {BroadcastId})", entry.Id, broadcastId);
-                    // Wait until media finished
-                    while (_mixer.HasActiveMediaStream(broadcastId))
-                    {
-                        await Task.Delay(200);
-                    }
+                    // ✅ BroadcastManagementService 사용
+                    await _broadcastMgmt.PlayMediaAndWaitAsync(broadcastId, entry.Id, prepared.Media, channelId);
                 }
                 else
                 {
-                    var jsonTts = JsonSerializer.SerializeToElement(new { broadcastId, ttsIds = new List<ulong> { entry.Id } });
-                    _ = await _ttsService.HandlePlayRequestAsync(broadcastId, jsonTts, prepared.Tts.Where(t => t.Id == entry.Id).ToList(), new List<SpeakerInfo>(), channelId);
-                    _logger.LogInformation("[ScheduleExecution] Playing TTS {TtsId} in ordered playlist (broadcast {BroadcastId})", entry.Id, broadcastId);
-                    while (_mixer.HasActiveTtsStream(broadcastId))
-                    {
-                        await Task.Delay(200);
-                    }
+                    // ✅ BroadcastManagementService 사용
+                    await _broadcastMgmt.PlayTtsAndWaitAsync(broadcastId, entry.Id, prepared.Tts, channelId);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[ScheduleExecution] Error playing playlist entry {EntryId} (broadcast {BroadcastId})", entry.Id, broadcastId);
             }
-            _logger.LogInformation("[ScheduleExecution] Ordered playlist finished for broadcast {BroadcastId}", broadcastId);
         }
 
-        // 3. 재생 종료 감시 (주문형 플레이리스트 사용 시 마지막 항목 종료 후 빠르게 통과)
-        _logger.LogInformation("[ScheduleExecution] Waiting for playback completion for broadcast {BroadcastId}", broadcastId);
+        _logger.LogInformation("[ScheduleExecution] Ordered playlist finished for broadcast {BroadcastId}", broadcastId);
     }
 
     public async Task FinalizeBroadcastAsync(ulong channelId)
     {
-        using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<wicsContext>();
-
-        // Find ongoing broadcast for the channel
-        var broadcast = await db.Broadcasts
-            .Where(x => x.ChannelId == channelId && x.OngoingYn == "Y")
-            .OrderByDescending(x => x.CreatedAt)
-            .FirstOrDefaultAsync();
-
-        if (broadcast == null)
-        {
-            _logger.LogWarning("[ScheduleExecution] No ongoing broadcast found for channel {ChannelId}. Nothing to finalize.", channelId);
-            return;
-        }
-
-        var broadcastId = broadcast.Id;
-
-        _logger.LogInformation("[ScheduleExecution] Starting finalization for broadcast {BroadcastId}", broadcastId);
-
-        // 1. 재생 중인 콘텐츠 중지
-        try
-        {
-            await _mediaService.StopMediaByBroadcastIdAsync(broadcastId);
-            _logger.LogInformation("[ScheduleExecution] Media stopped for broadcast {BroadcastId}", broadcastId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[ScheduleExecution] Failed to stop media for broadcast {BroadcastId}", broadcastId);
-        }
-
-        try
-        {
-            await _ttsService.StopTtsByBroadcastIdAsync(broadcastId);
-            _logger.LogInformation("[ScheduleExecution] TTS stopped for broadcast {BroadcastId}", broadcastId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[ScheduleExecution] Failed to stop TTS for broadcast {BroadcastId}", broadcastId);
-        }
-
-        // 2. 오디오 믹서 중지 (UDP 전송도 자동으로 중지됨)
-        await _mixer.StopMixer(broadcastId);
-        _logger.LogInformation("[ScheduleExecution] Mixer stopped for broadcast {BroadcastId}", broadcastId);
-
-        // 3. 데이터베이스 상태 업데이트
-        broadcast.OngoingYn = "N";
-        broadcast.UpdatedAt = DateTime.UtcNow;
-        _logger.LogInformation("[ScheduleExecution] Broadcast {BroadcastId} marked as not ongoing", broadcastId);
-
-        var ch = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId);
-        if (ch != null)
-        {
-            ch.State = 0;
-            ch.UpdatedAt = DateTime.UtcNow;
-            _logger.LogInformation("[ScheduleExecution] Channel {ChannelId} state set to 0 (inactive)", channelId);
-        }
-
-        // 4. 스피커 소유권 정리
-        var removeOwnerships = await db.SpeakerOwnershipStates
-            .Where(o => o.ChannelId == channelId)
-            .ToListAsync();
-        if (removeOwnerships.Count > 0)
-        {
-            db.SpeakerOwnershipStates.RemoveRange(removeOwnerships);
-            _logger.LogInformation("[ScheduleExecution] Deleted {Count} speaker ownership record(s) for channel {ChannelId}",
-                removeOwnerships.Count, channelId);
-        }
-
-        await db.SaveChangesAsync();
-
-        _logger.LogInformation("[ScheduleExecution] Broadcast {BroadcastId} finalized successfully for channel {ChannelId}",
-            broadcastId, channelId);
+        // ✅ BroadcastManagementService에 위임
+        await _broadcastMgmt.FinalizeBroadcastAsync(channelId);
     }
 }
