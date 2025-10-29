@@ -27,9 +27,9 @@ public class BroadcastPreparationService : IBroadcastPreparationService
         var db = scope.ServiceProvider.GetRequiredService<wicsContext>();
 
         var channel = await GetChannelAsync(db, channelId, ct);
-        var candidates = selectedGroupIds != null
-            ? await GetCandidateSpeakersFromSelectedGroupsAsync(db, channelId, selectedGroupIds, ct)
-            : await GetCandidateSpeakersFromChannelMappingsAsync(db, channelId, ct);
+
+        // ✅ 그룹 선택은 더 이상 사용하지 않음. 오직 MapChannelSpeakers만 사용
+        var candidates = await GetCandidateSpeakersFromChannelMappingsAsync(db, channelId, ct);
 
         var takeovers = await ResolveOwnershipAsync(db, channel, candidates, ct);
 
@@ -62,55 +62,17 @@ public class BroadcastPreparationService : IBroadcastPreparationService
                ?? throw new InvalidOperationException($"Channel {channelId} not found");
     }
 
-    // -------- Speaker Candidates (Selected Groups) --------
-    private static async Task<List<SpeakerInfo>> GetCandidateSpeakersFromSelectedGroupsAsync(
-        wicsContext db,
-        ulong channelId,
-        IEnumerable<ulong> selectedGroupIds,
-        CancellationToken ct)
-    {
-        return await (
-            from msg in db.MapSpeakerGroups.AsNoTracking()
-            join s in db.Speakers.AsNoTracking() on msg.SpeakerId equals s.Id
-            where selectedGroupIds.Contains(msg.GroupId) && msg.LastYn == "Y" && s.State == 1 && s.DeleteYn == "N"
-            select new SpeakerInfo
-            {
-                Id = s.Id,
-                Ip = s.VpnUseYn == "Y" ? s.VpnIp : s.Ip,
-                Name = s.Name,
-                ChannelId = channelId,
-                UseVpn = s.VpnUseYn == "Y",
-                Active = false
-            }
-        ).Distinct().ToListAsync(ct);
-    }
-
-    // -------- Speaker Candidates (Channel Mappings) --------
+    // -------- Speaker Candidates (MapChannelSpeakers only) --------
     private static async Task<List<SpeakerInfo>> GetCandidateSpeakersFromChannelMappingsAsync(
         wicsContext db,
         ulong channelId,
         CancellationToken ct)
     {
-        var groupSpeakerIds = await (
-            from mcg in db.MapChannelGroups.AsNoTracking()
-            join msg in db.MapSpeakerGroups.AsNoTracking() on mcg.GroupId equals msg.GroupId
-            join s in db.Speakers.AsNoTracking() on msg.SpeakerId equals s.Id
-            where mcg.ChannelId == channelId && mcg.DeleteYn != "Y" && msg.LastYn == "Y" && s.State == 1 && s.DeleteYn == "N"
-            select s.Id
-        ).Distinct().ToListAsync(ct);
-
-        var directSpeakerIds = await (
+        // ✅ 그룹(MapChannelGroups/MapSpeakerGroups)은 고려하지 않고, 오직 MapChannelSpeakers만 사용
+        return await (
             from mcs in db.MapChannelSpeakers.AsNoTracking()
             join s in db.Speakers.AsNoTracking() on mcs.SpeakerId equals s.Id
-            where mcs.ChannelId == channelId && s.State == 1 && s.DeleteYn == "N"
-            select s.Id
-        ).Distinct().ToListAsync(ct);
-
-        var allIds = groupSpeakerIds.Union(directSpeakerIds).Distinct().ToList();
-
-        return await (
-            from s in db.Speakers.AsNoTracking()
-            where allIds.Contains(s.Id)
+            where mcs.ChannelId == channelId && s.State == 1 && s.DeleteYn != "Y"
             select new SpeakerInfo
             {
                 Id = s.Id,
@@ -118,9 +80,10 @@ public class BroadcastPreparationService : IBroadcastPreparationService
                 Name = s.Name,
                 ChannelId = channelId,
                 UseVpn = s.VpnUseYn == "Y",
-                Active = false
+                Active = false,
+                UdpPort = s.UdpPort
             }
-        ).ToListAsync(ct);
+        ).Distinct().ToListAsync(ct);
     }
 
     // -------- Ownership Resolution --------

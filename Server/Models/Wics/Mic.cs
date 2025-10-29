@@ -13,10 +13,12 @@ namespace WicsPlatform.Server.Models.wics
         [Key]
         [Column("id")]
         [Required]
+        [MaxLength(50)]
         public string Id { get; set; }
 
         [Column("label")]
         [Required]
+        [MaxLength(100)]
         public string Label { get; set; }
 
         [Column("samplerate")]

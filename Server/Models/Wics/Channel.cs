@@ -26,6 +26,7 @@ namespace WicsPlatform.Server.Models.wics
 
         [Column("name")]
         [Required]
+        [MaxLength(50)]
         public string Name { get; set; }
 
         [Column("mic_volume")]
@@ -49,6 +50,7 @@ namespace WicsPlatform.Server.Models.wics
         public byte AudioMethod { get; set; }
 
         [Column("codec")]
+        [MaxLength(10)]
         public string Codec { get; set; }
 
         [Column("sampling_rate")]
@@ -68,9 +70,11 @@ namespace WicsPlatform.Server.Models.wics
         public sbyte State { get; set; }
 
         [Column("description")]
+        [MaxLength(200)]
         public string Description { get; set; }
 
         [Column("delete_yn")]
+        [MaxLength(1)]
         public string DeleteYn { get; set; }
 
         [Column("created_at")]

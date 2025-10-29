@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net.Sockets;
 
 namespace WicsPlatform.Server.Services;
@@ -11,71 +11,15 @@ public interface IUdpBroadcastService
 public class UdpBroadcastService : IUdpBroadcastService, IDisposable
 {
     private readonly ILogger<UdpBroadcastService> _logger;
-    private readonly IConfiguration _configuration;
     private readonly ConcurrentDictionary<string, UdpClient> _udpClients = new();
-    private readonly int _speakerPort;
     
-    // ✅ UDP 송신 로그 빈도 조절을 위한 패킷 카운터
+    // ✅ UDP 송신 로그 빈도 조절을 위한 패킷 카운터 (엔드포인트별)
     private readonly ConcurrentDictionary<string, long> _packetCounters = new();
 
-    public UdpBroadcastService(ILogger<UdpBroadcastService> logger, IConfiguration configuration)
+    public UdpBroadcastService(ILogger<UdpBroadcastService> logger)
     {
         _logger = logger;
-        _configuration = configuration;
-        
-        // ✅ 설정 읽기 방식 개선
-        _speakerPort = GetSpeakerPortFromConfiguration();
-        _logger.LogInformation($"UDP Broadcast Service initialized with speaker port: {_speakerPort}");
-    }
-
-    private int GetSpeakerPortFromConfiguration()
-    {
-        try
-        {
-            // 1. 먼저 UdpBroadcast:SpeakerPort 경로로 시도
-            var port = _configuration.GetValue<int?>("UdpBroadcast:SpeakerPort");
-            if (port.HasValue && port.Value > 0)
-            {
-                _logger.LogDebug($"Found UdpBroadcast:SpeakerPort = {port.Value}");
-                return port.Value;
-            }
-
-            // 2. 섹션 바인딩으로 시도
-            var udpSection = _configuration.GetSection("UdpBroadcast");
-            if (udpSection.Exists())
-            {
-                var sectionPort = udpSection.GetValue<int?>("SpeakerPort");
-                if (sectionPort.HasValue && sectionPort.Value > 0)
-                {
-                    _logger.LogDebug($"Found UdpBroadcast section SpeakerPort = {sectionPort.Value}");
-                    return sectionPort.Value;
-                }
-            }
-
-            // 3. 모든 설정 키 로그 출력 (디버깅용)
-            _logger.LogWarning("UdpBroadcast:SpeakerPort not found, checking all configuration keys:");
-            LogAllConfigurationKeys(_configuration, "");
-
-            // 4. 기본값 6001 사용 (설정에서 읽지 못한 경우)
-            _logger.LogWarning($"Could not read UdpBroadcast:SpeakerPort from configuration, using default port 6001");
-            return 6001; // ⭐ 기본값을 6001로 변경
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error reading speaker port configuration, using default port 6001");
-            return 6001; // ⭐ 오류 시에도 6001 사용
-        }
-    }
-
-    private void LogAllConfigurationKeys(IConfiguration config, string prefix)
-    {
-        foreach (var kvp in config.AsEnumerable())
-        {
-            if (!string.IsNullOrEmpty(kvp.Value))
-            {
-                _logger.LogDebug($"Config: {kvp.Key} = {kvp.Value}");
-            }
-        }
+        _logger.LogInformation("UDP Broadcast Service initialized (per-speaker port mode)");
     }
 
     public async Task SendAudioToSpeakers(IEnumerable<SpeakerInfo> speakers, byte[] audioData)
@@ -94,11 +38,19 @@ public class UdpBroadcastService : IUdpBroadcastService, IDisposable
     {
         try
         {
-            // IP별로 UdpClient 재사용
-            var udpClient = _udpClients.GetOrAdd(speaker.Ip, ip =>
+            if (speaker.UdpPort <= 0 || speaker.UdpPort > 65535)
+            {
+                _logger.LogWarning($"Invalid UDP port for speaker {speaker.Id} ({speaker.Name}) at {speaker.Ip}: {speaker.UdpPort}");
+                return;
+            }
+
+            var endpointKey = $"{speaker.Ip}:{speaker.UdpPort}";
+
+            // IP:Port 별로 UdpClient 재사용
+            var udpClient = _udpClients.GetOrAdd(endpointKey, _ =>
             {
                 var client = new UdpClient();
-                client.Connect(ip, _speakerPort);
+                client.Connect(speaker.Ip, speaker.UdpPort);
                 return client;
             });
 
@@ -107,15 +59,16 @@ public class UdpBroadcastService : IUdpBroadcastService, IDisposable
             await udpClient.SendAsync(packet, packet.Length);
 
             // 패킷 카운터만 업데이트 (로그 출력 제거)
-            _packetCounters.AddOrUpdate(speaker.Ip, 1, (key, value) => value + 1);
+            _packetCounters.AddOrUpdate(endpointKey, 1, (key, value) => value + 1);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Failed to send audio to speaker {speaker.Ip}:{_speakerPort}");
+            _logger.LogError(ex, "Failed to send audio to speaker {Ip}:{Port}", speaker.Ip, speaker.UdpPort);
 
             // 실패한 클라이언트 제거
-            _udpClients.TryRemove(speaker.Ip, out _);
-            _packetCounters.TryRemove(speaker.Ip, out _); // ✅ 패킷 카운터도 제거
+            var endpointKey = $"{speaker.Ip}:{speaker.UdpPort}";
+            _udpClients.TryRemove(endpointKey, out _);
+            _packetCounters.TryRemove(endpointKey, out _); // ✅ 패킷 카운터도 제거
         }
     }
 
@@ -162,6 +115,7 @@ public class SpeakerInfo
     public ulong ChannelId { get; set; }
     public bool UseVpn { get; set; } = false;
     public bool Active { get; set; } = false;
+    public int UdpPort { get; set; } // ✅ 스피커별 UDP 포트
 
     public override bool Equals(object obj)
     {

@@ -25,6 +25,7 @@ namespace WicsPlatform.Server.Models.wics
         public Channel Channel { get; set; }
 
         [Column("ownership")]
+        [MaxLength(1)]
         public string Ownership { get; set; }
 
         [Column("created_at")]

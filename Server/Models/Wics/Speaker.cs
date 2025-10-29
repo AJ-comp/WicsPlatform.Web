@@ -17,26 +17,35 @@ namespace WicsPlatform.Server.Models.wics
 
         [Column("ip")]
         [Required]
+        [MaxLength(50)]
         public string Ip { get; set; }
 
         [Column("vpn_ip")]
         [Required]
+        [MaxLength(50)]
         public string VpnIp { get; set; }
+
+        [Column("udp_port")]
+        public short UdpPort { get; set; }
 
         [Column("model")]
         [Required]
+        [MaxLength(50)]
         public string Model { get; set; }
 
         [Column("name")]
         [Required]
+        [MaxLength(50)]
         public string Name { get; set; }
 
         [Column("password")]
         [Required]
+        [MaxLength(50)]
         public string Password { get; set; }
 
         [Column("location")]
         [Required]
+        [MaxLength(50)]
         public string Location { get; set; }
 
         [Column("state")]
@@ -44,12 +53,14 @@ namespace WicsPlatform.Server.Models.wics
         public byte State { get; set; }
 
         [Column("vpn_use_yn")]
+        [MaxLength(1)]
         public string VpnUseYn { get; set; }
 
         [Column("ping_intv")]
         public ushort PingIntv { get; set; }
 
         [Column("delete_yn")]
+        [MaxLength(1)]
         public string DeleteYn { get; set; }
 
         [Column("created_at")]

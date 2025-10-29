@@ -17,13 +17,16 @@ namespace WicsPlatform.Server.Models.wics
 
         [Column("file_name")]
         [Required]
+        [MaxLength(100)]
         public string FileName { get; set; }
 
         [Column("full_path")]
         [Required]
+        [MaxLength(200)]
         public string FullPath { get; set; }
 
         [Column("delete_yn")]
+        [MaxLength(1)]
         public string DeleteYn { get; set; }
 
         [Column("created_at")]

@@ -265,6 +265,10 @@ namespace WicsPlatform.Server.Data
               .HasDefaultValueSql(@"'N'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Speaker>()
+              .Property(p => p.UdpPort)
+              .HasDefaultValueSql(@"'6001'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.Speaker>()
               .Property(p => p.VpnUseYn)
               .HasDefaultValueSql(@"'N'");
 

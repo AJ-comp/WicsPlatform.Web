@@ -28,6 +28,7 @@ namespace WicsPlatform.Server.Models.wics
         public Medium Medium { get; set; }
 
         [Column("delete_yn")]
+        [MaxLength(1)]
         public string DeleteYn { get; set; }
 
         [Column("created_at")]
