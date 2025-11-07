@@ -111,17 +111,33 @@ public class BroadcastManagementService : IBroadcastManagementService
 
     /// <summary>
     /// 진행 중인 방송 조회
+    /// 채널의 State가 1(방송 중)인 경우, 해당 채널의 최신 Broadcast 레코드를 반환합니다.
     /// </summary>
     private async Task<Broadcast?> FindOngoingBroadcastAsync(wicsContext db, ulong channelId)
     {
+        // 채널이 방송 중인지 먼저 확인 (State == 1)
+        var channel = await db.Channels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel == null)
+        {
+            _logger.LogWarning("[BroadcastManagement] Channel {ChannelId} not found", channelId);
+            return null;
+        }
+
+        if (channel.State != 1)
+        {
+            _logger.LogWarning("[BroadcastManagement] Channel {ChannelId} is not active (State={State})", channelId, channel.State);
+            return null;
+        }
+
+        // 최신 Broadcast 레코드를 가져옴 (OngoingYn 필터 제거)
         var broadcast = await db.Broadcasts
-            .Where(x => x.ChannelId == channelId && x.OngoingYn == "Y")
+            .Where(x => x.ChannelId == channelId)
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefaultAsync();
 
         if (broadcast == null)
         {
-            _logger.LogWarning($"[BroadcastManagement] No ongoing broadcast found for channel {channelId}");
+            _logger.LogWarning("[BroadcastManagement] No broadcast record found for active channel {ChannelId}", channelId);
         }
 
         return broadcast;
@@ -158,9 +174,9 @@ public class BroadcastManagementService : IBroadcastManagementService
     /// </summary>
     private async Task UpdateBroadcastStateAsync(wicsContext db, Broadcast broadcast, ulong channelId)
     {
-        broadcast.OngoingYn = "N";
+        // 설정 제거: OngoingYn은 더 이상 사용하지 않음 (읽기는 Channel.State)
         broadcast.UpdatedAt = DateTime.UtcNow;
-        _logger.LogInformation("[BroadcastManagement] Broadcast {BroadcastId} marked as not ongoing", broadcast.Id);
+        _logger.LogInformation("[BroadcastManagement] Broadcast {BroadcastId} updated timestamp", broadcast.Id);
 
         var ch = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId);
         if (ch != null)

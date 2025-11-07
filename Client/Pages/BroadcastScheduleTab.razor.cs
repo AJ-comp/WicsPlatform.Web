@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
 using Radzen;
 using WicsPlatform.Client.Dialogs;
 using WicsPlatform.Client.Services;
@@ -1240,10 +1240,12 @@ public partial class BroadcastScheduleTab
                 return;
             }
 
-            // 1. 진행 중인 Broadcast ID 찾기
+            // 1. 진행 중인 Broadcast ID 찾기 (OngoingYn 사용 제거 -> 최신 레코드 1건)
             var query = new Radzen.Query
             {
-                Filter = $"ChannelId eq {channel.Id} and OngoingYn eq 'Y'"
+                Filter = $"ChannelId eq {channel.Id}",
+                OrderBy = "CreatedAt desc",
+                Top = 1
             };
             var broadcasts = await WicsService.GetBroadcasts(query);
             var ongoingBroadcast = broadcasts.Value.FirstOrDefault();
@@ -1254,7 +1256,7 @@ public partial class BroadcastScheduleTab
                 {
                     Severity = NotificationSeverity.Warning,
                     Summary = "정지 실패",
-                    Detail = "진행 중인 방송을 찾을 수 없습니다.",
+                    Detail = "변경할 방송 레코드를 찾을 수 없습니다.",
                     Duration = 4000
                 });
                 return;

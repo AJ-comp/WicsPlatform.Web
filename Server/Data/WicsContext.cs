@@ -129,24 +129,8 @@ namespace WicsPlatform.Server.Data
               .HasPrincipalKey(i => i.Id);
 
             builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
-              .Property(p => p.SpeakerIdList)
-              .HasDefaultValueSql(@"''");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
-              .Property(p => p.MediaIdList)
-              .HasDefaultValueSql(@"''");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
-              .Property(p => p.TtsIdList)
-              .HasDefaultValueSql(@"''");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
               .Property(p => p.LoopbackYn)
               .HasDefaultValueSql(@"'N'");
-
-            builder.Entity<WicsPlatform.Server.Models.wics.Broadcast>()
-              .Property(p => p.OngoingYn)
-              .HasDefaultValueSql(@"'Y'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Channel>()
               .Property(p => p.Codec)

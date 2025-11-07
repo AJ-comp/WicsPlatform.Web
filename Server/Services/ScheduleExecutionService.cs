@@ -116,17 +116,10 @@ public class ScheduleExecutionService : IScheduleExecutionService
     private async Task<(ulong BroadcastId, Channel ChannelEntity)> CreateBroadcastAsync(IServiceScope scope, ulong channelId, PreparedChannelResources prepared)
     {
         var db = scope.ServiceProvider.GetRequiredService<wicsContext>();
-        // For DB record we still need flattened media/tts ids
-        var mediaIds = prepared.Media.Select(m => m.Id);
-        var ttsIds = prepared.Tts.Select(t => t.Id);
         var broadcast = new Broadcast
         {
             ChannelId = channelId,
-            SpeakerIdList = string.Join(' ', prepared.Speakers.Select(s => s.Id)),
-            MediaIdList = string.Join(' ', mediaIds),
-            TtsIdList = string.Join(' ', ttsIds),
             LoopbackYn = "N",
-            OngoingYn = "Y",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

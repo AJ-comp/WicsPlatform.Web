@@ -216,13 +216,13 @@ public partial class BroadcastsController : ODataController
                 return NotFound(new { message = $"Broadcast with ID {broadcastId} not found." });
             }
 
-            // 이미 종료된 방송인지 확인
-            if (broadcast.OngoingYn == "N")
+            // 이미 종료된 방송인지 확인: 채널 상태 기준으로 판단
+            if (broadcast.Channel == null || broadcast.Channel.State != 1)
             {
-                return BadRequest(new { message = $"Broadcast {broadcastId} is already finalized." });
+                return BadRequest(new { message = $"Broadcast {broadcastId} is already finalized (Channel.State != 1)." });
             }
 
-            // 방송 종료 실행: channelId만 전달하면 서비스가 내부에서 broadcastId를 조회하여 정리
+            // 방송 종료 실행: channelId만 전달하면 서비스가 내부에서 최신 방송을 조회하여 정리
             await scheduleExecutionService.FinalizeBroadcastAsync(broadcast.ChannelId);
 
             return Ok(new 

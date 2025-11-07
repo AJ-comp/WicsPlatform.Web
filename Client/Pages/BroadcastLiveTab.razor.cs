@@ -646,37 +646,17 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
     {
         try
         {
-            var selectedMediaIds = new List<ulong>();
-            if (playlistSection != null)
-            {
-                var selectedMedia = playlistSection.GetSelectedMedia();
-                selectedMediaIds = selectedMedia.Select(m => m.Id).ToList();
-            }
-
-            var selectedTtsIds = new List<ulong>();
-            if (ttsSection != null && ttsSection.HasSelectedTts())
-            {
-                selectedTtsIds = ttsSection.GetSelectedTts().Select(t => t.Id).ToList();
-            }
-
             var broadcast = new WicsPlatform.Server.Models.wics.Broadcast
             {
                 ChannelId = selectedChannel.Id,
-                SpeakerIdList = string.Join(' ', onlineSpeakers.Select(s => s.Id)),
-                MediaIdList = string.Join(' ', selectedMediaIds),
-                TtsIdList = string.Join(' ', selectedTtsIds),
                 LoopbackYn = "N",
-                OngoingYn = "Y",
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
 
             await WicsService.CreateBroadcast(broadcast);
 
-            _logger.LogInformation($"Broadcast created: Channel={selectedChannel.Id}, " +
-                                  $"SpeakerIdList='{broadcast.SpeakerIdList}', " +
-                                  $"MediaIdList='{broadcast.MediaIdList}', " +
-                                  $"TtsIdList='{broadcast.TtsIdList}'");
+            _logger.LogInformation($"Broadcast created: Channel={selectedChannel.Id}");
 
             _currentLoopbackSetting = false;
         }
@@ -763,20 +743,23 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
                 return;
             }
 
+            // 채널 상태 기반: 해당 채널의 최신 Broadcast만 선택 (OngoingYn 사용 제거)
             var query = new Radzen.Query
             {
-                Filter = $"ChannelId eq {selectedChannel.Id} and OngoingYn eq 'Y'"
+                Filter = $"ChannelId eq {selectedChannel.Id}",
+                OrderBy = "CreatedAt desc",
+                Top = 1
             };
 
             var result = await WicsService.GetBroadcasts(query);
 
             if (result?.Value == null || !result.Value.Any())
             {
-                _logger.LogInformation("No ongoing broadcasts to update");
+                _logger.LogInformation("No broadcast records found for channel to update");
                 return;
             }
 
-            _logger.LogInformation($"Updating {result.Value.Count()} ongoing broadcasts to stopped");
+            _logger.LogInformation($"Updating latest broadcast ({result.Value.First().Id}) metadata after stop");
 
             foreach (var broadcast in result.Value)
             {
@@ -784,8 +767,8 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
                 {
                     var updateData = new
                     {
-                        OngoingYn = "N",
-                        UpdatedAt = DateTime.Now
+                        UpdatedAt = DateTime.Now,
+                        LoopbackYn = "N"
                     };
 
                     var response = await Http.PatchAsJsonAsync(
@@ -795,7 +778,7 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
 
                     if (response.IsSuccessStatusCode)
                     {
-                        _logger.LogInformation($"Successfully updated broadcast {broadcast.Id} to stopped");
+                        _logger.LogInformation($"Successfully updated broadcast {broadcast.Id} metadata");
                     }
                     else
                     {
@@ -882,21 +865,28 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
                 return;
             }
 
+            // 최신 방송 1건만 선택 (채널 상태 기반, OngoingYn 사용 제거)
             var query = new Radzen.Query
             {
-                Filter = $"ChannelId eq {selectedChannel.Id} and OngoingYn eq 'Y'"
+                Filter = $"ChannelId eq {selectedChannel.Id}",
+                OrderBy = "CreatedAt desc",
+                Top = 1
             };
 
             var broadcasts = await WicsService.GetBroadcasts(query);
-            var currentLoopback = broadcasts.Value.FirstOrDefault()?.LoopbackYn == "Y";
+            var target = broadcasts.Value.FirstOrDefault();
+            if (target == null)
+            {
+                NotifyWarn("루프백 변경", "변경할 방송 레코드를 찾을 수 없습니다.");
+                return;
+            }
+
+            var currentLoopback = target.LoopbackYn == "Y";
             var newLoopback = !currentLoopback;
 
-            foreach (var broadcast in broadcasts.Value)
-            {
-                broadcast.LoopbackYn = newLoopback ? "Y" : "N";
-                broadcast.UpdatedAt = DateTime.Now;
-                await WicsService.UpdateBroadcast(broadcast.Id, broadcast);
-            }
+            target.LoopbackYn = newLoopback ? "Y" : "N";
+            target.UpdatedAt = DateTime.Now;
+            await WicsService.UpdateBroadcast(target.Id, target);
 
             _currentLoopbackSetting = newLoopback;
 

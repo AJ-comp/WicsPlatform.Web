@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Middleware;
 using WicsPlatform.Server.Models.wics;
@@ -72,7 +72,7 @@ public class BroadcastPreparationService : IBroadcastPreparationService
         return await (
             from mcs in db.MapChannelSpeakers.AsNoTracking()
             join s in db.Speakers.AsNoTracking() on mcs.SpeakerId equals s.Id
-            where mcs.ChannelId == channelId && s.State == 1 && s.DeleteYn != "Y"
+            where mcs.ChannelId == channelId && mcs.DeleteYn != "Y" && s.State == 1 && s.DeleteYn != "Y"
             select new SpeakerInfo
             {
                 Id = s.Id,
