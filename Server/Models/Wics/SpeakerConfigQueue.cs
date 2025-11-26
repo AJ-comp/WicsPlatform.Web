@@ -7,8 +7,8 @@ using System.Text.Json.Serialization;
 
 namespace WicsPlatform.Server.Models.wics
 {
-    [Table("map_channel_speaker")]
-    public partial class MapChannelSpeaker
+    [Table("speaker_config_queue")]
+    public partial class SpeakerConfigQueue
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -27,15 +27,7 @@ namespace WicsPlatform.Server.Models.wics
 
         public Speaker Speaker { get; set; }
 
-        [Column("delete_yn")]
-        public string DeleteYn { get; set; }
-
         [Column("created_at")]
-        [Required]
         public DateTime CreatedAt { get; set; }
-
-        [Column("updated_at")]
-        [Required]
-        public DateTime UpdatedAt { get; set; }
     }
 }

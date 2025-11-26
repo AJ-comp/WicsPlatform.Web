@@ -94,6 +94,8 @@ namespace WicsPlatform.Server.Models.wics
 
         public ICollection<MapChannelSpeaker> MapChannelSpeakers { get; set; }
 
+        public ICollection<SpeakerConfigQueue> SpeakerConfigQueues { get; set; }
+
         public ICollection<SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
     }
 }

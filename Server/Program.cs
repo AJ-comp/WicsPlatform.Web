@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.StaticFiles;
@@ -41,13 +41,11 @@ builder.Services.AddRadzenCookieThemeService(options =>
     options.Name = "WicsPlatformTheme";
     options.Duration = TimeSpan.FromDays(365);
 });
-
 // Allow large multipart uploads (e.g., media files)
 builder.Services.Configure<FormOptions>(o =>
 {
     o.MultipartBodyLengthLimit = 200_000_000; // 200 MB
 });
-
 // 데이터 보호 키 저장 경로를 설정 파일에서 우선 읽고(IIS 권한 문제 대비)
 string? dataProtectionKeysPath = null;
 var configuredKeysPath = builder.Configuration["DataProtection:KeysPath"]; // ex) "keys" -> ContentRoot/keys
@@ -55,9 +53,7 @@ if (!string.IsNullOrWhiteSpace(configuredKeysPath))
 {
     try
     {
-        var resolved = Path.IsPathRooted(configuredKeysPath)
-            ? configuredKeysPath
-            : Path.Combine(builder.Environment.ContentRootPath, configuredKeysPath);
+        var resolved = Path.IsPathRooted(configuredKeysPath) ? configuredKeysPath : Path.Combine(builder.Environment.ContentRootPath, configuredKeysPath);
         Directory.CreateDirectory(resolved);
         dataProtectionKeysPath = resolved;
     }
@@ -113,10 +109,8 @@ if (!string.IsNullOrEmpty(dataProtectionKeysPath))
 
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<WicsPlatform.Server.wicsService>();
-
 // ✅ 스피커 소유권 브로커 (Singleton) - 먼저 등록
 builder.Services.AddSingleton<SpeakerOwnershipBroker>();
-
 // 기존 서비스들 (브로커를 DI로 받을 수 있도록 순서 중요)
 builder.Services.AddSingleton<IAudioMixingService, AudioMixingService>();
 builder.Services.AddSingleton<IUdpBroadcastService, UdpBroadcastService>();
@@ -144,6 +138,7 @@ builder.Services.AddControllers().AddOData(opt =>
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Schedule>("Schedules");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.SchedulePlay>("SchedulePlays");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Speaker>("Speakers");
+    oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>("SpeakerConfigQueues");
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>("SpeakerOwnershipStates").EntityType.HasKey(entity => new { entity.SpeakerId, entity.ChannelId });
     oDataBuilderwics.EntitySet<WicsPlatform.Server.Models.wics.Tt>("Tts");
     opt.AddRouteComponents("odata/wics", oDataBuilderwics.GetEdmModel()).Count().Filter().OrderBy().Expand().Select().SetMaxTop(null).TimeZone = TimeZoneInfo.Utc;
@@ -153,7 +148,6 @@ builder.Services.AddHttpClient("WicsPlatform.Server").ConfigurePrimaryHttpMessag
 builder.Services.AddHeaderPropagation(o => o.Headers.Add("Cookie"));
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<WicsPlatform.Client.SecurityService>();
-
 // Client 서비스 등록 (Server-Side Rendering을 위해 필요)
 builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastWebSocketService>();
 builder.Services.AddScoped<WicsPlatform.Client.Services.BroadcastRecordingService>();
@@ -198,9 +192,9 @@ builder.Services.ConfigureApplicationCookie(options =>
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.None; // allow over HTTP if needed
     }
+
     options.SlidingExpiration = true;
 });
-
 // 전역 쿠키 정책 (IIS/프록시 환경에서 HTTPS 시 Secure 강제)
 builder.Services.Configure<CookiePolicyOptions>(o =>
 {
@@ -215,20 +209,26 @@ builder.Services.Configure<CookiePolicyOptions>(o =>
         o.Secure = CookieSecurePolicy.Always;
     }
 });
-
 builder.Services.AddDbContext<WicsPlatform.Server.Data.wicsContext>(options =>
 {
     options.UseMySql(builder.Configuration.GetConnectionString("wicsConnection"), ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("wicsConnection")));
 });
 var app = builder.Build();
-
 // Ensure essential directories exist on startup (deploy-time creation)
 static void EnsureDir(string? path, string contentRoot)
 {
-    if (string.IsNullOrWhiteSpace(path)) return;
+    if (string.IsNullOrWhiteSpace(path))
+        return;
     var full = Path.IsPathRooted(path) ? path : Path.Combine(contentRoot, path);
-    try { Directory.CreateDirectory(full); } catch { }
+    try
+    {
+        Directory.CreateDirectory(full);
+    }
+    catch
+    {
+    }
 }
+
 try
 {
     // wwwroot/Uploads
@@ -240,7 +240,9 @@ try
     // Upload diagnostics folder
     EnsureDir(builder.Configuration["UploadLogging:LogPath"], app.Environment.ContentRootPath);
 }
-catch { }
+catch
+{
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -250,15 +252,11 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // app.UseHsts();
+// app.UseHsts();
 }
 
 // Add forwarded headers support (IIS/프록시 환경에서 HTTPS 스킴 보존)
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor,
-});
-
+app.UseForwardedHeaders(new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor, });
 // Debug cookie tracer (optional)
 var traceCookies = builder.Configuration.GetValue<bool>("AuthLogging:TraceCookies");
 if (traceCookies)
@@ -266,11 +264,12 @@ if (traceCookies)
     var logPath = builder.Configuration["AuthLogging:LogPath"];
     if (!string.IsNullOrWhiteSpace(logPath))
     {
-        if (!Path.IsPathRooted(logPath)) logPath = Path.Combine(builder.Environment.ContentRootPath, logPath);
+        if (!Path.IsPathRooted(logPath))
+            logPath = Path.Combine(builder.Environment.ContentRootPath, logPath);
         Directory.CreateDirectory(logPath);
     }
-    string LogFile() => Path.Combine(string.IsNullOrWhiteSpace(logPath) ? builder.Environment.ContentRootPath : logPath, $"cookie-trace-{DateTime.Now:yyyyMMdd}.log");
 
+    string LogFile() => Path.Combine(string.IsNullOrWhiteSpace(logPath) ? builder.Environment.ContentRootPath : logPath, $"cookie-trace-{DateTime.Now:yyyyMMdd}.log");
     app.Use(async (ctx, next) =>
     {
         try
@@ -292,11 +291,16 @@ if (traceCookies)
                             await File.AppendAllTextAsync(LogFile(), $"[{DateTime.Now:HH:mm:ss.fff}] <- PATH={p} SET-COOKIE={setCookie}\n");
                         }
                     }
-                    catch { }
+                    catch
+                    {
+                    }
                 });
             }
         }
-        catch { }
+        catch
+        {
+        }
+
         await next();
     });
 }
@@ -326,10 +330,8 @@ app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvid
         ctx.Context.Response.Headers.Append("Pragma", "no-cache");
     }
 } });
-
 // 쿠키 정책 미들웨어는 인증 전에 위치
 app.UseCookiePolicy();
-
 app.UseCors("AllowAll"); // Apply CORS policy
 app.MapControllers();
 app.UseHeaderPropagation();

@@ -136,7 +136,7 @@ public class BroadcastPreparationService : IBroadcastPreparationService
                 continue;
             }
 
-            if (channel.Priority > otherChannel.Priority)
+            if (channel.Priority < otherChannel.Priority)
             {
                 // takeover
                 current.Ownership = "N";

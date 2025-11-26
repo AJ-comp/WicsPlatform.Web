@@ -29,9 +29,9 @@ public class OpusCodec : IDisposable
         _logger = logger;
 
         // 인코더 초기화
-        _encoder = new OpusEncoder(sampleRate, channels, OpusApplication.OPUS_APPLICATION_VOIP);
+        _encoder = new OpusEncoder(sampleRate, channels, OpusApplication.OPUS_APPLICATION_AUDIO);
         _encoder.Bitrate = bitrate;
-        _encoder.SignalType = OpusSignal.OPUS_SIGNAL_VOICE;
+        _encoder.SignalType = OpusSignal.OPUS_SIGNAL_MUSIC;
         _encoder.UseInbandFEC = true;
 
         // 디코더 초기화
@@ -55,9 +55,9 @@ public class OpusCodec : IDisposable
         _channels = channels;
 
         // 새로운 인코더 초기화
-        _encoder = new OpusEncoder(sampleRate, channels, OpusApplication.OPUS_APPLICATION_VOIP);
+        _encoder = new OpusEncoder(sampleRate, channels, OpusApplication.OPUS_APPLICATION_AUDIO);
         _encoder.Bitrate = bitrate;
-        _encoder.SignalType = OpusSignal.OPUS_SIGNAL_VOICE;
+        _encoder.SignalType = OpusSignal.OPUS_SIGNAL_MUSIC;
         _encoder.UseInbandFEC = true;
 
         // 새로운 디코더 초기화

@@ -372,6 +372,7 @@ namespace WicsPlatform.Server
                               .Include(i => i.MapChannelTts)
                               .Include(i => i.MapChannelGroups)
                               .Include(i => i.MapChannelSpeakers)
+                              .Include(i => i.SpeakerConfigQueues)
                               .Include(i => i.SpeakerOwnershipStates)
                               .FirstOrDefault();
 
@@ -2340,6 +2341,7 @@ namespace WicsPlatform.Server
                               .Where(i => i.Id == id)
                               .Include(i => i.MapSpeakerGroups)
                               .Include(i => i.MapChannelSpeakers)
+                              .Include(i => i.SpeakerConfigQueues)
                               .Include(i => i.SpeakerOwnershipStates)
                               .FirstOrDefault();
 
@@ -2364,6 +2366,171 @@ namespace WicsPlatform.Server
             }
 
             OnAfterSpeakerDeleted(itemToDelete);
+
+            return itemToDelete;
+        }
+    
+        public async Task ExportSpeakerConfigQueuesToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerconfigqueues/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerconfigqueues/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async Task ExportSpeakerConfigQueuesToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerconfigqueues/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerconfigqueues/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnSpeakerConfigQueuesRead(ref IQueryable<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> items);
+
+        public async Task<IQueryable<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>> GetSpeakerConfigQueues(Query query = null)
+        {
+            var items = Context.SpeakerConfigQueues.AsQueryable();
+
+            items = items.Include(i => i.Channel);
+            items = items.Include(i => i.Speaker);
+
+            if (query != null)
+            {
+                if (!string.IsNullOrEmpty(query.Expand))
+                {
+                    var propertiesToExpand = query.Expand.Split(',');
+                    foreach(var p in propertiesToExpand)
+                    {
+                        items = items.Include(p.Trim());
+                    }
+                }
+
+                ApplyQuery(ref items, query);
+            }
+
+            OnSpeakerConfigQueuesRead(ref items);
+
+            return await Task.FromResult(items);
+        }
+
+        partial void OnSpeakerConfigQueueGet(WicsPlatform.Server.Models.wics.SpeakerConfigQueue item);
+        partial void OnGetSpeakerConfigQueueById(ref IQueryable<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> items);
+
+
+        public async Task<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> GetSpeakerConfigQueueById(ulong id)
+        {
+            var items = Context.SpeakerConfigQueues
+                              .AsNoTracking()
+                              .Where(i => i.Id == id);
+
+            items = items.Include(i => i.Channel);
+            items = items.Include(i => i.Speaker);
+ 
+            OnGetSpeakerConfigQueueById(ref items);
+
+            var itemToReturn = items.FirstOrDefault();
+
+            OnSpeakerConfigQueueGet(itemToReturn);
+
+            return await Task.FromResult(itemToReturn);
+        }
+
+        partial void OnSpeakerConfigQueueCreated(WicsPlatform.Server.Models.wics.SpeakerConfigQueue item);
+        partial void OnAfterSpeakerConfigQueueCreated(WicsPlatform.Server.Models.wics.SpeakerConfigQueue item);
+
+        public async Task<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> CreateSpeakerConfigQueue(WicsPlatform.Server.Models.wics.SpeakerConfigQueue speakerconfigqueue)
+        {
+            OnSpeakerConfigQueueCreated(speakerconfigqueue);
+
+            var existingItem = Context.SpeakerConfigQueues
+                              .Where(i => i.Id == speakerconfigqueue.Id)
+                              .FirstOrDefault();
+
+            if (existingItem != null)
+            {
+               throw new Exception("Item already available");
+            }            
+
+            try
+            {
+                Context.SpeakerConfigQueues.Add(speakerconfigqueue);
+                Context.SaveChanges();
+            }
+            catch
+            {
+                Context.Entry(speakerconfigqueue).State = EntityState.Detached;
+                throw;
+            }
+
+            OnAfterSpeakerConfigQueueCreated(speakerconfigqueue);
+
+            return speakerconfigqueue;
+        }
+
+        public async Task<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> CancelSpeakerConfigQueueChanges(WicsPlatform.Server.Models.wics.SpeakerConfigQueue item)
+        {
+            var entityToCancel = Context.Entry(item);
+            if (entityToCancel.State == EntityState.Modified)
+            {
+              entityToCancel.CurrentValues.SetValues(entityToCancel.OriginalValues);
+              entityToCancel.State = EntityState.Unchanged;
+            }
+
+            return item;
+        }
+
+        partial void OnSpeakerConfigQueueUpdated(WicsPlatform.Server.Models.wics.SpeakerConfigQueue item);
+        partial void OnAfterSpeakerConfigQueueUpdated(WicsPlatform.Server.Models.wics.SpeakerConfigQueue item);
+
+        public async Task<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> UpdateSpeakerConfigQueue(ulong id, WicsPlatform.Server.Models.wics.SpeakerConfigQueue speakerconfigqueue)
+        {
+            OnSpeakerConfigQueueUpdated(speakerconfigqueue);
+
+            var itemToUpdate = Context.SpeakerConfigQueues
+                              .Where(i => i.Id == speakerconfigqueue.Id)
+                              .FirstOrDefault();
+
+            if (itemToUpdate == null)
+            {
+               throw new Exception("Item no longer available");
+            }
+                
+            var entryToUpdate = Context.Entry(itemToUpdate);
+            entryToUpdate.CurrentValues.SetValues(speakerconfigqueue);
+            entryToUpdate.State = EntityState.Modified;
+
+            Context.SaveChanges();
+
+            OnAfterSpeakerConfigQueueUpdated(speakerconfigqueue);
+
+            return speakerconfigqueue;
+        }
+
+        partial void OnSpeakerConfigQueueDeleted(WicsPlatform.Server.Models.wics.SpeakerConfigQueue item);
+        partial void OnAfterSpeakerConfigQueueDeleted(WicsPlatform.Server.Models.wics.SpeakerConfigQueue item);
+
+        public async Task<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> DeleteSpeakerConfigQueue(ulong id)
+        {
+            var itemToDelete = Context.SpeakerConfigQueues
+                              .Where(i => i.Id == id)
+                              .FirstOrDefault();
+
+            if (itemToDelete == null)
+            {
+               throw new Exception("Item no longer available");
+            }
+
+            OnSpeakerConfigQueueDeleted(itemToDelete);
+
+
+            Context.SpeakerConfigQueues.Remove(itemToDelete);
+
+            try
+            {
+                Context.SaveChanges();
+            }
+            catch
+            {
+                Context.Entry(itemToDelete).State = EntityState.Unchanged;
+                throw;
+            }
+
+            OnAfterSpeakerConfigQueueDeleted(itemToDelete);
 
             return itemToDelete;
         }

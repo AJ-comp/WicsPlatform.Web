@@ -26,7 +26,6 @@ namespace WicsPlatform.Server.Models.wics
         public string Content { get; set; }
 
         [Column("delete_yn")]
-        [MaxLength(1)]
         public string DeleteYn { get; set; }
 
         [Column("created_at")]

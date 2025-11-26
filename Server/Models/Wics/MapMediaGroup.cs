@@ -28,11 +28,9 @@ namespace WicsPlatform.Server.Models.wics
         public Group Group { get; set; }
 
         [Column("delete_yn")]
-        [MaxLength(1)]
         public string DeleteYn { get; set; }
 
         [Column("last_yn")]
-        [MaxLength(1)]
         public string LastYn { get; set; }
 
         [Column("created_at")]

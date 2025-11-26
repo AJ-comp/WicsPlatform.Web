@@ -5,35 +5,36 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace WicsPlatform.Server.Models.wics
+namespace WicsPlatform.Server.Models.wics;
+
+[Table("speaker_ownership_state")]
+public partial class SpeakerOwnershipState
 {
-    [Table("speaker_ownership_state")]
-    public partial class SpeakerOwnershipState
-    {
-        [Key]
-        [Column("speaker_id")]
-        [Required]
-        public ulong SpeakerId { get; set; }
+    [Key]
+    [Column("speaker_id")]
+    [Required]
+    public ulong SpeakerId { get; set; }
 
-        public Speaker Speaker { get; set; }
+    public Speaker Speaker { get; set; }
 
-        [Key]
-        [Column("channel_id")]
-        [Required]
-        public ulong ChannelId { get; set; }
+    [Key]
+    [Column("channel_id")]
+    [Required]
+    public ulong ChannelId { get; set; }
 
-        public Channel Channel { get; set; }
+    public Channel Channel { get; set; }
 
-        [Column("ownership")]
-        [MaxLength(1)]
-        public string Ownership { get; set; }
+    [Column("ownership")]
+    public string Ownership { get; set; }
 
-        [Column("created_at")]
-        [Required]
-        public DateTime CreatedAt { get; set; }
+    [Column("apply_config")]
+    public string ApplyConfig { get; set; }
 
-        [Column("updated_at")]
-        [Required]
-        public DateTime UpdatedAt { get; set; }
-    }
+    [Column("created_at")]
+    [Required]
+    public DateTime CreatedAt { get; set; }
+
+    [Column("updated_at")]
+    [Required]
+    public DateTime UpdatedAt { get; set; }
 }

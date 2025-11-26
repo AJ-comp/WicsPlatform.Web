@@ -116,6 +116,18 @@ namespace WicsPlatform.Server.Data
               .HasForeignKey(i => i.ScheduleId)
               .HasPrincipalKey(i => i.Id);
 
+            builder.Entity<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>()
+              .HasOne(i => i.Channel)
+              .WithMany(i => i.SpeakerConfigQueues)
+              .HasForeignKey(i => i.ChannelId)
+              .HasPrincipalKey(i => i.Id);
+
+            builder.Entity<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>()
+              .HasOne(i => i.Speaker)
+              .WithMany(i => i.SpeakerConfigQueues)
+              .HasForeignKey(i => i.SpeakerId)
+              .HasPrincipalKey(i => i.Id);
+
             builder.Entity<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>()
               .HasOne(i => i.Channel)
               .WithMany(i => i.SpeakerOwnershipStates)
@@ -264,8 +276,16 @@ namespace WicsPlatform.Server.Data
               .Property(p => p.DeleteYn)
               .HasDefaultValueSql(@"'N'");
 
+            builder.Entity<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>()
+              .Property(p => p.CreatedAt)
+              .HasDefaultValueSql(@"current_timestamp()");
+
             builder.Entity<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>()
               .Property(p => p.Ownership)
+              .HasDefaultValueSql(@"'N'");
+
+            builder.Entity<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>()
+              .Property(p => p.ApplyConfig)
               .HasDefaultValueSql(@"'N'");
 
             builder.Entity<WicsPlatform.Server.Models.wics.Tt>()
@@ -380,6 +400,10 @@ namespace WicsPlatform.Server.Data
               .Property(p => p.UpdatedAt)
               .HasColumnType("datetime");
 
+            builder.Entity<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>()
+              .Property(p => p.CreatedAt)
+              .HasColumnType("datetime");
+
             builder.Entity<WicsPlatform.Server.Models.wics.SpeakerOwnershipState>()
               .Property(p => p.CreatedAt)
               .HasColumnType("datetime");
@@ -426,10 +450,11 @@ namespace WicsPlatform.Server.Data
 
         public DbSet<WicsPlatform.Server.Models.wics.Speaker> Speakers { get; set; }
 
+        public DbSet<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> SpeakerConfigQueues { get; set; }
+
         public DbSet<WicsPlatform.Server.Models.wics.SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
 
         public DbSet<WicsPlatform.Server.Models.wics.Tt> Tts { get; set; }
-
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
         {
             configurationBuilder.Conventions.Add(_ => new BlankTriggerAddingConvention());

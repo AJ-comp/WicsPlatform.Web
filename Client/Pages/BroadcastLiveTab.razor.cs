@@ -436,11 +436,6 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
             await CleanupMicrophone();
 
             // 5. DB 업데이트 (이전 채널의 방송 상태를 종료로 변경)
-            if (selectedChannel != null)
-            {
-                await UpdateBroadcastRecordsToStopped();
-            }
-
             // 6. 루프백 설정 초기화
             _currentLoopbackSetting = false;
 
@@ -602,20 +597,24 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
             return false;
         }
 
-        // 복구 모드가 아닐 때만 그룹 검증 (복구 시에는 DB에서 비동기 로드 중)
+        // 복구 모드가 아닐 때만 스피커 선택 검증 (복구 시에는 DB에서 비동기 로드 중)
         if (!isRecovery)
         {
-            if (speakerSection == null || !speakerSection.GetSelectedGroups().Any())
+            // 그룹 선택 여부와 관계없이 '실제로 선택된 스피커'가 있는지 확인
+            // GetSelectedSpeakers()는 개별 선택 + 그룹으로 선택된 모든 스피커 ID를 반환합니다.
+            var selectedSpeakerIds = speakerSection?.GetSelectedSpeakers();
+
+            if (speakerSection == null || selectedSpeakerIds == null || !selectedSpeakerIds.Any())
             {
                 Debug.WriteLine($"[검증] ❌ speakerSection == null: {speakerSection == null}");
-                Debug.WriteLine($"[검증] ❌ 선택된 그룹 수: {speakerSection?.GetSelectedGroups()?.Count() ?? 0}");
-                NotifyWarn("스피커 그룹 선택", "방송할 스피커 그룹을 선택하세요.");
+                Debug.WriteLine($"[검증] ❌ 선택된 스피커 수: {selectedSpeakerIds?.Count ?? 0}");
+                NotifyWarn("스피커 선택", "방송할 스피커를 선택하세요.");
                 return false;
             }
         }
         else
         {
-            Debug.WriteLine($"[검증] 복구 모드 - 그룹 검증 건너뜀 (DB에서 로드 중)");
+            Debug.WriteLine($"[검증] 복구 모드 - 스피커 검증 건너뜀 (DB에서 로드 중)");
         }
 
         Debug.WriteLine($"[검증] ✓ 사전 조건 검증 통과");
@@ -985,19 +984,6 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
                 _logger.LogInformation("브로드캐스트 타이머 정리 완료");
             }
 
-            try
-            {
-                await UpdateBroadcastRecordsToStopped();
-                _logger.LogInformation("DB 업데이트 완료");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "DB 업데이트 실패");
-            }
-
-            // 채널 상태를 대기(0)로 업데이트
-            await UpdateChannelState(0);
-
             await StopWebSocketBroadcast();
             await CleanupMicrophone();
 
@@ -1014,6 +1000,8 @@ public partial class BroadcastLiveTab : IDisposable, IAsyncDisposable
                 _logger.LogInformation("스피커/그룹 매핑 복원 완료");
             }
 
+            // 서버에서 최신 채널/방송 상태를 다시 로드하여 UI를 동기화
+            await LoadInitialData();
             await InvokeAsync(StateHasChanged);
 
             _logger.LogInformation("HandleBroadcastStopped 완료");

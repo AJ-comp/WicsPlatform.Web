@@ -53,14 +53,12 @@ namespace WicsPlatform.Server.Models.wics
         public byte State { get; set; }
 
         [Column("vpn_use_yn")]
-        [MaxLength(1)]
         public string VpnUseYn { get; set; }
 
         [Column("ping_intv")]
         public ushort PingIntv { get; set; }
 
         [Column("delete_yn")]
-        [MaxLength(1)]
         public string DeleteYn { get; set; }
 
         [Column("created_at")]
@@ -74,6 +72,8 @@ namespace WicsPlatform.Server.Models.wics
         public ICollection<MapSpeakerGroup> MapSpeakerGroups { get; set; }
 
         public ICollection<MapChannelSpeaker> MapChannelSpeakers { get; set; }
+
+        public ICollection<SpeakerConfigQueue> SpeakerConfigQueues { get; set; }
 
         public ICollection<SpeakerOwnershipState> SpeakerOwnershipStates { get; set; }
     }

@@ -215,6 +215,20 @@ namespace WicsPlatform.Server.Controllers
             return ToExcel(ApplyQuery(await service.GetSpeakers(), Request.Query, false), fileName);
         }
 
+        [HttpGet("/export/wics/speakerconfigqueues/csv")]
+        [HttpGet("/export/wics/speakerconfigqueues/csv(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportSpeakerConfigQueuesToCSV(string fileName = null)
+        {
+            return ToCSV(ApplyQuery(await service.GetSpeakerConfigQueues(), Request.Query, false), fileName);
+        }
+
+        [HttpGet("/export/wics/speakerconfigqueues/excel")]
+        [HttpGet("/export/wics/speakerconfigqueues/excel(fileName='{fileName}')")]
+        public async Task<FileStreamResult> ExportSpeakerConfigQueuesToExcel(string fileName = null)
+        {
+            return ToExcel(ApplyQuery(await service.GetSpeakerConfigQueues(), Request.Query, false), fileName);
+        }
+
         [HttpGet("/export/wics/speakerownershipstates/csv")]
         [HttpGet("/export/wics/speakerownershipstates/csv(fileName='{fileName}')")]
         public async Task<FileStreamResult> ExportSpeakerOwnershipStatesToCSV(string fileName = null)

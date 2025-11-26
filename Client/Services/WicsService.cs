@@ -1347,6 +1347,100 @@ namespace WicsPlatform.Client
             return await httpClient.SendAsync(httpRequestMessage);
         }
 
+        public async System.Threading.Tasks.Task ExportSpeakerConfigQueuesToExcel(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerconfigqueues/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerconfigqueues/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        public async System.Threading.Tasks.Task ExportSpeakerConfigQueuesToCSV(Query query = null, string fileName = null)
+        {
+            navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerconfigqueues/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerconfigqueues/csv(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
+        }
+
+        partial void OnGetSpeakerConfigQueues(HttpRequestMessage requestMessage);
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>> GetSpeakerConfigQueues(Query query)
+        {
+            return await GetSpeakerConfigQueues(filter:$"{query.Filter}", orderby:$"{query.OrderBy}", top:query.Top, skip:query.Skip, count:query.Top != null && query.Skip != null);
+        }
+
+        public async Task<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>> GetSpeakerConfigQueues(string filter = default(string), string orderby = default(string), string expand = default(string), int? top = default(int?), int? skip = default(int?), bool? count = default(bool?), string format = default(string), string select = default(string), string apply = default(string))
+        {
+            var uri = new Uri(baseUri, $"SpeakerConfigQueues");
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:filter, top:top, skip:skip, orderby:orderby, expand:expand, select:select, count:count, apply:apply);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetSpeakerConfigQueues(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<Radzen.ODataServiceResult<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>>(response);
+        }
+
+        partial void OnCreateSpeakerConfigQueue(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> CreateSpeakerConfigQueue(WicsPlatform.Server.Models.wics.SpeakerConfigQueue speakerConfigQueue = default(WicsPlatform.Server.Models.wics.SpeakerConfigQueue))
+        {
+            var uri = new Uri(baseUri, $"SpeakerConfigQueues");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, uri);
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(speakerConfigQueue), Encoding.UTF8, "application/json");
+
+            OnCreateSpeakerConfigQueue(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>(response);
+        }
+
+        partial void OnDeleteSpeakerConfigQueue(HttpRequestMessage requestMessage);
+
+        public async Task<HttpResponseMessage> DeleteSpeakerConfigQueue(ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"SpeakerConfigQueues({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, uri);
+
+            OnDeleteSpeakerConfigQueue(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
+        partial void OnGetSpeakerConfigQueueById(HttpRequestMessage requestMessage);
+
+        public async Task<WicsPlatform.Server.Models.wics.SpeakerConfigQueue> GetSpeakerConfigQueueById(string expand = default(string), ulong id = default(ulong))
+        {
+            var uri = new Uri(baseUri, $"SpeakerConfigQueues({id})");
+
+            uri = Radzen.ODataExtensions.GetODataUri(uri: uri, filter:null, top:null, skip:null, orderby:null, expand:expand, select:null, count:null);
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            OnGetSpeakerConfigQueueById(httpRequestMessage);
+
+            var response = await httpClient.SendAsync(httpRequestMessage);
+
+            return await Radzen.HttpResponseMessageExtensions.ReadAsync<WicsPlatform.Server.Models.wics.SpeakerConfigQueue>(response);
+        }
+
+        partial void OnUpdateSpeakerConfigQueue(HttpRequestMessage requestMessage);
+        
+        public async Task<HttpResponseMessage> UpdateSpeakerConfigQueue(ulong id = default(ulong), WicsPlatform.Server.Models.wics.SpeakerConfigQueue speakerConfigQueue = default(WicsPlatform.Server.Models.wics.SpeakerConfigQueue))
+        {
+            var uri = new Uri(baseUri, $"SpeakerConfigQueues({id})");
+
+            var httpRequestMessage = new HttpRequestMessage(HttpMethod.Patch, uri);
+
+
+            httpRequestMessage.Content = new StringContent(Radzen.ODataJsonSerializer.Serialize(speakerConfigQueue), Encoding.UTF8, "application/json");
+
+            OnUpdateSpeakerConfigQueue(httpRequestMessage);
+
+            return await httpClient.SendAsync(httpRequestMessage);
+        }
+
         public async System.Threading.Tasks.Task ExportSpeakerOwnershipStatesToExcel(Query query = null, string fileName = null)
         {
             navigationManager.NavigateTo(query != null ? query.ToUrl($"export/wics/speakerownershipstates/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')") : $"export/wics/speakerownershipstates/excel(fileName='{(!string.IsNullOrEmpty(fileName) ? UrlEncoder.Default.Encode(fileName) : "Export")}')", true);
