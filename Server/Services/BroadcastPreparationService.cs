@@ -122,6 +122,7 @@ public class BroadcastPreparationService : IBroadcastPreparationService
             {
                 // release zombie & grant
                 current.Ownership = "N";
+                current.ApplyConfig = "N";
                 current.UpdatedAt = DateTime.UtcNow;
                 db.SpeakerOwnershipStates.Update(current);
                 await db.SaveChangesAsync(ct);
@@ -140,6 +141,7 @@ public class BroadcastPreparationService : IBroadcastPreparationService
             {
                 // takeover
                 current.Ownership = "N";
+                current.ApplyConfig = "N";
                 current.UpdatedAt = DateTime.UtcNow;
                 db.SpeakerOwnershipStates.Update(current);
                 await db.SaveChangesAsync(ct);
@@ -180,6 +182,7 @@ public class BroadcastPreparationService : IBroadcastPreparationService
             {
                 // 이미 존재 - 업데이트
                 existing.Ownership = "Y";
+                existing.ApplyConfig = "N";
                 existing.UpdatedAt = DateTime.UtcNow;
                 db.SpeakerOwnershipStates.Update(existing);
             }
@@ -191,6 +194,7 @@ public class BroadcastPreparationService : IBroadcastPreparationService
                     SpeakerId = speakerId,
                     ChannelId = channelId,
                     Ownership = "Y",
+                    ApplyConfig = "N",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 }, ct);

@@ -84,6 +84,33 @@
                         </RadzenFormField>
                     </RadzenColumn>
                 </RadzenRow>
+                <!-- 우선순위 필드 -->
+                <RadzenRow Gap="0.5rem">
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenFormField Text="우선순위" Variant="Variant.Outlined" class="form-field">
+                            <ChildContent>
+                                <RadzenNumeric @bind-Value="@model.Priority"
+                                               Min="0"
+                                               Max="255"
+                                               ShowUpDown="true"
+                                               Name="Priority"
+                                               class="input-field" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" class="field-hint">
+                                    <RadzenIcon Icon="priority_high" class="hint-icon" />
+                                    0~255 사이의 값일수록 우선순위가 높습니다 (0이 가장 높음)
+                                </RadzenText>
+                            </Helper>
+                        </RadzenFormField>
+                        <RadzenRequiredValidator Component="Priority"
+                                                 Text="우선순위는 필수 입력 항목입니다" />
+                        <RadzenNumericRangeValidator Component="Priority"
+                                                     Min="0"
+                                                     Max="255"
+                                                     Text="우선순위는 0~255 사이의 값이어야 합니다" />
+                    </RadzenColumn>
+                </RadzenRow>
             </RadzenStack>
         </RadzenCard>
 
@@ -94,10 +121,10 @@
                     <RadzenIcon Icon="lightbulb" class="info-icon" />
                     <RadzenText TextStyle="TextStyle.Subtitle2" class="info-title">수정 안내</RadzenText>
                 </RadzenStack>
-                <RadzenStack Gap="0.5rem" class="info-list">
+                <RadzenStack Gap="0.75rem" class="info-list">
                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
                         <RadzenIcon Icon="check_circle" class="check-icon" />
-                        <RadzenText TextStyle="TextStyle.Caption">채널명과 설명만 수정 가능합니다</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption">채널명, 설명 및 우선순위를 수정할 수 있습니다</RadzenText>
                     </RadzenStack>
                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem">
                         <RadzenIcon Icon="check_circle" class="check-icon" />

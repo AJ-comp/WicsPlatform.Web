@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http.Features; // for FormOptions
+using Microsoft.AspNetCore.HttpOverrides; // add forwarded headers
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.StaticFiles;
@@ -12,10 +15,6 @@ using WicsPlatform.Server.Contracts;
 using WicsPlatform.Server.Data;
 using WicsPlatform.Server.Models;
 using WicsPlatform.Server.Services;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Http; // Added for CookiePolicyOptions
-using Microsoft.AspNetCore.HttpOverrides; // add forwarded headers
-using Microsoft.AspNetCore.Http.Features; // for FormOptions
 
 static void RegisterDBContext(WebApplicationBuilder builder)
 {

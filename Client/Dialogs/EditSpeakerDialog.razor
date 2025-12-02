@@ -181,44 +181,44 @@
                     <li>상태는 실제 장치 상태와 일치하도록 설정해주세요</li>
                 </ul>
             </div>
-            }
+
+            <!-- 액션 버튼 -->
+            <div class="dialog-footer">
+                <div class="footer-hint">
+                    <RadzenIcon Icon="check_circle" />
+                    <span>변경사항을 저장하시겠습니까?</span>
+                </div>
+                <div class="footer-actions">
+                    <RadzenButton ButtonStyle="ButtonStyle.Light"
+                                  Text="취소"
+                                  Click="@CancelClick"
+                                  Variant="Variant.Outlined"
+                                  Disabled="@isProcessing"
+                                  class="btn-cancel" />
+                    @if (isProcessing)
+                    {
+                        <RadzenButton ButtonType="ButtonType.Submit"
+                                      ButtonStyle="ButtonStyle.Primary"
+                                      Text="저장 중..."
+                                      Icon="sync"
+                                      IsBusy="true"
+                                      Disabled="true"
+                                      class="btn-submit" />
+                    }
+                    else
+                    {
+                        <RadzenButton ButtonType="ButtonType.Submit"
+                                      ButtonStyle="ButtonStyle.Primary"
+                                      Icon="save"
+                                      Text="저장"
+                                      class="btn-submit"
+                                      Disabled="@isLoadingData" />
+                    }
+                </div>
+            </div>
+        }
         </RadzenStack>
     </RadzenTemplateForm>
-
-    <!-- 액션 버튼 -->
-    <div class="dialog-footer">
-        <div class="footer-hint">
-            <RadzenIcon Icon="check_circle" />
-            <span>변경사항을 저장하시겠습니까?</span>
-        </div>
-        <div class="footer-actions">
-            <RadzenButton ButtonStyle="ButtonStyle.Light"
-                          Text="취소"
-                          Click="@CancelClick"
-                          Variant="Variant.Outlined"
-                          Disabled="@isProcessing"
-                          class="btn-cancel" />
-            @if (isProcessing)
-            {
-                <RadzenButton ButtonType="ButtonType.Submit"
-                              ButtonStyle="ButtonStyle.Primary"
-                              Text="저장 중..."
-                              Icon="sync"
-                              IsBusy="true"
-                              Disabled="true"
-                              class="btn-submit" />
-            }
-            else
-            {
-                <RadzenButton ButtonType="ButtonType.Submit"
-                              ButtonStyle="ButtonStyle.Primary"
-                              Icon="save"
-                              Text="저장"
-                              class="btn-submit"
-                              Disabled="@isLoadingData" />
-            }
-        </div>
-    </div>
     
     </div>
 </div>

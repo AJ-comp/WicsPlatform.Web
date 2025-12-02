@@ -54,6 +54,7 @@ namespace WicsPlatform.Client.Dialogs
                     // 모델에 데이터 설정
                     model.Name = channel.Name;
                     model.Description = channel.Description;
+                    model.Priority = channel.Priority;
                 }
                 else
                 {
@@ -93,6 +94,7 @@ namespace WicsPlatform.Client.Dialogs
                 {
                     Name = model.Name,
                     Description = model.Description ?? "",
+                    Priority = model.Priority,
                     UpdatedAt = DateTime.UtcNow  // UTC 시간으로 설정
                 };
 
@@ -144,6 +146,7 @@ namespace WicsPlatform.Client.Dialogs
     {
         public string Name { get; set; }
         public string Description { get; set; }
+        public int Priority { get; set; }
         public DateTime UpdatedAt { get; set; }  // UpdatedAt 필드 추가
     }
 
@@ -153,6 +156,7 @@ namespace WicsPlatform.Client.Dialogs
         public ulong Id { get; set; }
         public string Name { get; set; }
         public string Description { get; set; }
+        public int Priority { get; set; }
         public sbyte State { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
