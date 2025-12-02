@@ -123,13 +123,9 @@ public partial class WebSocketMiddleware
         // 스피커 검증
         if (!onlineSpeakers.Any())
         {
-            logger.LogWarning($"No speakers available for broadcast {broadcastId}");
-            await SendMessageAsync(webSocket, JsonSerializer.Serialize(new
-            {
-                type = "error",
-                message = "No speakers available for broadcast"
-            }));
-            return false;
+            // 스피커가 0대인 경우에도 세션/믹서/복구 루틴은 그대로 진행한다.
+            // 단, 경고 로그만 남겨 운영자가 상태를 파악할 수 있도록 한다.
+            logger.LogWarning($"No speakers available for broadcast {broadcastId} (channel {channelId})");
         }
 
         // 상세 로깅
